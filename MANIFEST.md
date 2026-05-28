@@ -1,10 +1,18 @@
-# Manifest
+# MANIFEST.md
+
+**최종 갱신**: 2026-05-28
+
+This is the final universal research/development prompt kit.
+
+## Included files
 
 - `.gitignore`
+- `MANIFEST.md`
 - `README.md`
 - `claude-code/CLAUDE.md`
 - `claude-code/README.md`
 - `claude-code/agents/adversarial-reviewer.md`
+- `claude-code/agents/code-comment-hygiene-reviewer.md`
 - `claude-code/agents/context-explorer.md`
 - `claude-code/agents/data-ml-experiment-reviewer.md`
 - `claude-code/agents/hardware-vivado-reviewer.md`
@@ -22,6 +30,8 @@
 - `claude-code/skills/adversarial-review/templates/adversarial_review_packet.md`
 - `claude-code/skills/adversarial-review/templates/adversarial_review_report.md`
 - `claude-code/skills/ai-ml-experiment/SKILL.md`
+- `claude-code/skills/code-comment-hygiene/SKILL.md`
+- `claude-code/skills/code-comment-hygiene/references/comment_hygiene_policy.md`
 - `claude-code/skills/evidence-gate/SKILL.md`
 - `claude-code/skills/evidence-gate/references/acceptance_gate.md`
 - `claude-code/skills/hardware-vivado/SKILL.md`
@@ -37,6 +47,7 @@
 - `codex/AGENTS.md`
 - `codex/README.md`
 - `codex/agents/adversarial_reviewer.toml`
+- `codex/agents/code_comment_hygiene_reviewer.toml`
 - `codex/agents/context_explorer.toml`
 - `codex/agents/data_ml_experiment_reviewer.toml`
 - `codex/agents/hardware_vivado_reviewer.toml`
@@ -54,6 +65,8 @@
 - `codex/skills/adversarial-review/templates/adversarial_review_packet.md`
 - `codex/skills/adversarial-review/templates/adversarial_review_report.md`
 - `codex/skills/ai-ml-experiment/SKILL.md`
+- `codex/skills/code-comment-hygiene/SKILL.md`
+- `codex/skills/code-comment-hygiene/references/comment_hygiene_policy.md`
 - `codex/skills/evidence-gate/SKILL.md`
 - `codex/skills/evidence-gate/references/acceptance_gate.md`
 - `codex/skills/hardware-vivado/SKILL.md`
