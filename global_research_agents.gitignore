@@ -1,0 +1,81 @@
+# BEGIN UNIVERSAL RESEARCH AGENT KIT
+# Local AI agent caches, logs, and temporary files.
+# This block avoids committing private local state while allowing useful project configs
+# such as CLAUDE.md, AGENTS.md, .claude/agents, .codex/agents, and .agents/skills.
+
+.agent_logs/
+.agent_tmp/
+.agent_cache/
+*.agent.log
+*.agent.tmp
+*.agent.jsonl
+
+.claude/agent-memory-local/
+.claude/local/
+.claude/tmp/
+.claude/cache/
+.claude/**/*.log
+.claude/**/*.tmp
+CLAUDE.local.md
+
+.codex_cache/
+.codex/tmp/
+.codex/local/
+.codex/**/*.log
+.codex/**/*.tmp
+AGENTS.local.md
+AGENTS.override.local.md
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Node / JS
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+coverage/
+
+# Data / experiment outputs that should usually be versioned intentionally, not accidentally
+runs/
+wandb/
+mlruns/
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.npz
+*.npy
+
+# Vivado / FPGA local artifacts
+.Xil/
+*.jou
+*.str
+*.log
+*.wdb
+*.wcfg
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.srcs/sources_1/ip/*/synth/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/*.log
+.idea/workspace.xml
+
+# END UNIVERSAL RESEARCH AGENT KIT
