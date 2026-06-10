@@ -38,6 +38,7 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/hardware-vivado/SKILL.md`
 - `claude-code/skills/no-placeholder-development/SKILL.md`
 - `claude-code/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
+- `claude-code/skills/no-placeholder-development/references/research_code_guard_policy.md`
 - `claude-code/skills/report-writer/SKILL.md`
 - `claude-code/skills/report-writer/templates/carry_over.md`
 - `claude-code/skills/report-writer/templates/research_report.md`
@@ -76,6 +77,7 @@ This is the final universal research/development prompt kit.
 - `codex/skills/hardware-vivado/SKILL.md`
 - `codex/skills/no-placeholder-development/SKILL.md`
 - `codex/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
+- `codex/skills/no-placeholder-development/references/research_code_guard_policy.md`
 - `codex/skills/report-writer/SKILL.md`
 - `codex/skills/report-writer/templates/carry_over.md`
 - `codex/skills/report-writer/templates/research_report.md`

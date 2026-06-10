@@ -23,8 +23,9 @@ Always optimize for correctness, traceability, reproducibility, maintainability,
 6. Never leave placeholder code, TODO, FIXME, dummy logic, stubs, fake outputs, fake metrics, or test-only hardcoding.
 7. Never use fallback behavior, silent bypasses, or hardcoded constants unless they are explicitly specified and documented.
 8. Existing comments are not trusted evidence. If comments disagree with code, tests, logs, or current behavior, update or remove the comments.
-9. If a tool, MCP call, subagent review, test, experiment, synthesis, proof check, or log fails, treat the task as blocked until fixed or explicitly overridden by the user.
-10. User-facing replies must be in Korean unless the user requests another language.
+9. For research code, separate research integrity guards from production hardening. Keep guards that protect provenance, seeds, artifacts, claim scope, synthetic/measured separation, and fake-pass prevention; do not require defensive code that only makes the work more production-like while reducing readability.
+10. If a tool, MCP call, subagent review, test, experiment, synthesis, proof check, or log fails, treat the task as blocked until fixed or explicitly overridden by the user.
+11. User-facing replies must be in Korean unless the user requests another language.
 
 ## 2. Sequential Thinking MCP Policy
 
@@ -77,7 +78,9 @@ Recommended checkpoints:
 
 Codex MCP review must be artifact-specific. Generic approval is not evidence.
 
-A valid Codex MCP review must include verdict, scope reviewed, concrete evidence, missing evidence, findings, required fixes, and claim-control decision.
+A valid Codex MCP review must include verdict, scope reviewed, concrete evidence, missing evidence, findings, required fixes, research-sufficient notes, optional hardening, do-not-change notes, and claim-control decision.
+
+For research code, required fixes must protect claim validity, reproducibility, provenance, user data, or fake-pass prevention. Production-only hardening belongs under optional hardening unless the user requested production code.
 
 If Codex MCP fails, stalls, times out, returns a template echo, or gives generic approval, do not accept the result. Shrink the artifact slice, clarify the review packet, and retry once with a cleaner scope. If it still fails, mark the task as blocked.
 
@@ -106,6 +109,8 @@ The skill body and supporting references are loaded only when the skill is invok
 Quality Gate handles mechanically checkable issues: syntax, lint, type checks, unit tests, regression tests, static analysis, data integrity checks, plot/table regeneration, proof checker runs, Vivado reports, side-channel scripts, AI/ML evaluation scripts, and repository hygiene checks.
 
 Review Gate handles semantic issues: whether the artifact supports the claim, whether assumptions are hidden, whether implementation matches the method, whether baselines are fair, whether statistics are valid, whether conclusions overclaim, and whether fake-pass, fallback, stale-comment, or placeholder logic exists.
+
+For adversarial review of research code, classify findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`. Do not turn readable experiment scripts into production infrastructure unless that protects the claim, evidence trail, or user data.
 
 If Quality Gate fails, do not ask an LLM to approve the artifact as if clean.
 

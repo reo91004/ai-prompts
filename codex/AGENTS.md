@@ -20,6 +20,7 @@ Apply this protocol to software engineering, AI/ML experiments, side-channel res
 - Separate mechanical Quality Gates from semantic Review Gates.
 - Never accept missing logs, placeholder work, fake outputs, generic approval, fallback behavior, stale comments, or test-only hardcoding.
 - Existing comments are not evidence. If comments disagree with current code, tests, logs, data, or behavior, update or remove them.
+- For research code, separate research integrity guards from production hardening. Keep guards that protect provenance, seeds, artifacts, claim scope, synthetic/measured separation, and fake-pass prevention; do not require defensive code that only makes the work more production-like while reducing readability.
 - User-facing replies should be in Korean unless the user asks otherwise.
 
 ## Custom Agents
@@ -68,6 +69,8 @@ If Quality Gate fails, do not ask another LLM to approve the work as if clean.
 ## Review Gate
 
 Review semantics and claim strength. Check whether the artifact supports the claim, assumptions are hidden, baselines are fair, statistics are valid, code matches method, comments match code, logs are sufficient, fake-pass risk exists, and conclusions overclaim.
+
+For adversarial review of research code, classify findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`. Required fixes must protect claim validity, reproducibility, provenance, user data, or fake-pass prevention; production-only hardening is not an acceptance blocker unless the user asked for production code.
 
 ## Error Handling
 

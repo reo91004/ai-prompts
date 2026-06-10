@@ -11,4 +11,6 @@ Accept only if all relevant items hold:
 8. Limitations are documented.
 9. Claims do not exceed evidence.
 
+For research code, block only on issues that weaken claim validity, reproducibility, provenance, artifact integrity, user data safety, or fake-pass prevention. Production-only hardening is optional unless production use is part of the claim.
+
 Block if logs are missing, results are partial but described as complete, review is generic, daemon restart is used as evidence, tests pass only because behavior was bypassed, data or plots cannot be regenerated, or the claim relies on hidden assumptions.

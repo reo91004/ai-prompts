@@ -18,6 +18,8 @@ Use for FPGA, RTL, synthesis, implementation, timing, utilization, simulation, c
 ## Research Experiment Repo Gate
 Use for creating, reviewing, or refactoring repositories whose purpose is to validate a paper idea through experiments, model training, measurements, simulations, hardware runs, side-channel traces, or FPGA/embedded targets. Require a clear research question, chosen domain center, explicit script/package boundary, config policy, current docs source of truth, run artifact policy, hardware-free tests for reusable logic, and no premature generic framework.
 
+For research code, require guards that protect claim integrity: provenance, seed/config/run binding, artifact existence, synthetic/measured separation, and claim scope. Treat production-only defensive programming as optional unless production behavior is part of the claim.
+
 ## Statistics Gate
 Use for statistical claims, significance, uncertainty, robustness, ablations, and sample-based conclusions. Require sample size, variance/CI when appropriate, multiple-run reporting, and no cherry-picking.
 

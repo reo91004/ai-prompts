@@ -147,6 +147,8 @@ check_file "$HOME/.claude/skills/research-repo-design/references/research_experi
 check_file "$HOME/.agents/skills/research-repo-design/references/research_experiment_repo.md"
 check_file "$HOME/.claude/skills/research-domain-router/references/domain_gates.md"
 check_file "$HOME/.agents/skills/research-domain-router/references/domain_gates.md"
+check_file "$HOME/.claude/skills/no-placeholder-development/references/research_code_guard_policy.md"
+check_file "$HOME/.agents/skills/no-placeholder-development/references/research_code_guard_policy.md"
 
 check_exact_dir_entries "$HOME/.claude/agents" "${claude_agent_files[@]}"
 check_exact_dir_entries "$HOME/.codex/agents" "${codex_agent_files[@]}"

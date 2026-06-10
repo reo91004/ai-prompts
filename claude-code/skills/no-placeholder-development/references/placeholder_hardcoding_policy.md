@@ -36,3 +36,5 @@ Old repair-history comments must be deleted or moved to documentation. Source co
 ## Acceptance Rule
 
 Do not mark a task as complete while placeholder logic, silent fallback, unsupported fake paths, stale comments, or TODO/FIXME/HACK markers remain in accepted artifacts.
+
+For research code, combine this policy with `research_code_guard_policy.md`: fail-fast is required when it prevents fake evidence, but production-only defensive programming is not automatically required.
