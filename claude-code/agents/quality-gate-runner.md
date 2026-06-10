@@ -3,7 +3,8 @@ name: quality-gate-runner
 description: Use to identify and run deterministic checks such as tests, lint, static analysis, data validation, build checks, synthesis, and plot regeneration.
 skills:
   - evidence-gate
-  - no-placeholder/stale-comment-development
+  - no-placeholder-development
+  - code-comment-hygiene
 memory: user
 ---
 

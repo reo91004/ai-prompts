@@ -1,7 +1,7 @@
 # AGENTS.md — Universal Research & Development Protocol for Codex
 
 **Created**: 2026-05-28  
-**Last Updated**: 2026-05-28  
+**Last Updated**: 2026-06-10
 **Scope**: User-global Codex instructions  
 **Mode**: Research + Development + Skills + Custom Agents + Adversarial Review
 
@@ -30,9 +30,11 @@ Use them to separate context gathering, implementation, deterministic checks, ad
 
 ## Skills
 
-Use installed skills from `~/.agents/skills` when relevant: `sequential-thinking-mcp`, `research-domain-router`, `evidence-gate`, `no-placeholder-development`, `code-comment-hygiene`, `adversarial-review`, `ai-ml-experiment`, `side-channel-analysis`, `hardware-vivado`, and `report-writer`.
+Use installed skills from `~/.agents/skills` when relevant: `sequential-thinking-mcp`, `research-domain-router`, `research-repo-design`, `evidence-gate`, `no-placeholder-development`, `code-comment-hygiene`, `adversarial-review`, `ai-ml-experiment`, `side-channel-analysis`, `hardware-vivado`, and `report-writer`.
 
 Codex should select relevant skills by description or explicit user invocation.
+
+Use `research-repo-design` before creating, reviewing, or refactoring research experiment repositories, especially hardware-backed paper-idea validation repos and handoff-driven repository cleanups.
 
 ## Sequential Thinking MCP
 

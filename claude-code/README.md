@@ -21,3 +21,5 @@ Sequential Thinking MCP와 Codex MCP 서버 자체는 별도로 설치되어 있
 ## Final Update
 
 Includes `code-comment-hygiene` skill and reviewer agent. Use it for stale comments, TODO/FIXME/HACK cleanup, and comment-code mismatch review.
+
+Includes `research-repo-design` skill. Use it before creating, reviewing, or refactoring hardware-backed research experiment repositories.

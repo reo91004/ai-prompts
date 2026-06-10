@@ -1,6 +1,6 @@
 # MANIFEST.md
 
-**최종 갱신**: 2026-05-28
+**최종 갱신**: 2026-06-10
 
 This is the final universal research/development prompt kit.
 
@@ -40,6 +40,8 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/report-writer/SKILL.md`
 - `claude-code/skills/report-writer/templates/carry_over.md`
 - `claude-code/skills/report-writer/templates/research_report.md`
+- `claude-code/skills/research-repo-design/SKILL.md`
+- `claude-code/skills/research-repo-design/references/research_experiment_repo.md`
 - `claude-code/skills/research-domain-router/SKILL.md`
 - `claude-code/skills/research-domain-router/references/domain_gates.md`
 - `claude-code/skills/sequential-thinking-mcp/SKILL.md`
@@ -75,10 +77,13 @@ This is the final universal research/development prompt kit.
 - `codex/skills/report-writer/SKILL.md`
 - `codex/skills/report-writer/templates/carry_over.md`
 - `codex/skills/report-writer/templates/research_report.md`
+- `codex/skills/research-repo-design/SKILL.md`
+- `codex/skills/research-repo-design/references/research_experiment_repo.md`
 - `codex/skills/research-domain-router/SKILL.md`
 - `codex/skills/research-domain-router/references/domain_gates.md`
 - `codex/skills/sequential-thinking-mcp/SKILL.md`
 - `codex/skills/side-channel-analysis/SKILL.md`
 - `global_research_agents.gitignore`
+- `cleanup_backups.sh`
 - `install_all.sh`
 - `verify_install.sh`

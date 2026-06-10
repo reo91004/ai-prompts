@@ -1,7 +1,7 @@
 # CLAUDE.md — Universal Research & Development Protocol
 
 **Created**: 2026-05-28  
-**Last Updated**: 2026-05-28  
+**Last Updated**: 2026-06-10
 **Scope**: User-global Claude Code instructions  
 **Mode**: Research + Development + Sequential Thinking MCP + Subagent-First + Codex MCP Adversarial Review
 
@@ -88,6 +88,7 @@ Instead, use installed skills when relevant:
 
 - `/sequential-thinking-mcp` for structured reasoning and MCP usage policy;
 - `/research-domain-router` to choose domain-specific gates;
+- `/research-repo-design` for new research experiment repositories, hardware-backed paper-idea validation repos, and handoff-driven repo restructuring;
 - `/evidence-gate` for acceptance, evidence, and claim control;
 - `/no-placeholder-development` for software/development tasks;
 - `/code-comment-hygiene` for any code reading, editing, refactoring, review, cleanup, or legacy-code task;
