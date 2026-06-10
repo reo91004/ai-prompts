@@ -19,6 +19,7 @@ This is the final universal research/development prompt kit.
 - `claude-code/agents/implementation-engineer.md`
 - `claude-code/agents/literature-method-reviewer.md`
 - `claude-code/agents/quality-gate-runner.md`
+- `claude-code/agents/research-repo-architect.md`
 - `claude-code/agents/report-writer.md`
 - `claude-code/agents/sequential-reasoning-coordinator.md`
 - `claude-code/agents/side-channel-security-reviewer.md`
@@ -56,6 +57,7 @@ This is the final universal research/development prompt kit.
 - `codex/agents/implementation_engineer.toml`
 - `codex/agents/literature_method_reviewer.toml`
 - `codex/agents/quality_gate_runner.toml`
+- `codex/agents/research_repo_architect.toml`
 - `codex/agents/report_writer.toml`
 - `codex/agents/sequential_reasoning_coordinator.toml`
 - `codex/agents/side_channel_security_reviewer.toml`

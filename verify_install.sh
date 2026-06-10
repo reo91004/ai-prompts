@@ -79,6 +79,7 @@ claude_agents=(
   implementation-engineer
   literature-method-reviewer
   quality-gate-runner
+  research-repo-architect
   report-writer
   sequential-reasoning-coordinator
   side-channel-security-reviewer
@@ -96,6 +97,7 @@ codex_agents=(
   implementation_engineer
   literature_method_reviewer
   quality_gate_runner
+  research_repo_architect
   report_writer
   sequential_reasoning_coordinator
   side_channel_security_reviewer

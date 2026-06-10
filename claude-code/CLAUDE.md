@@ -52,6 +52,7 @@ Prefer these installed subagents when relevant:
 - `implementation-engineer`
 - `test-debug-engineer`
 - `software-architect`
+- `research-repo-architect`
 - `code-comment-hygiene-reviewer`
 - `data-ml-experiment-reviewer`
 - `statistics-reviewer`
@@ -88,7 +89,7 @@ Instead, use installed skills when relevant:
 
 - `/sequential-thinking-mcp` for structured reasoning and MCP usage policy;
 - `/research-domain-router` to choose domain-specific gates;
-- `/research-repo-design` for new research experiment repositories, hardware-backed paper-idea validation repos, and handoff-driven repo restructuring;
+- `/research-repo-design` for new research experiment repositories, AI/ML, diffusion, LLM fine-tuning, RL, simulation, hardware-backed paper-idea validation repos, and handoff-driven repo restructuring;
 - `/evidence-gate` for acceptance, evidence, and claim control;
 - `/no-placeholder-development` for software/development tasks;
 - `/code-comment-hygiene` for any code reading, editing, refactoring, review, cleanup, or legacy-code task;

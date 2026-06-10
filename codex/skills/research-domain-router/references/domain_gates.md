@@ -16,7 +16,7 @@ Use for cryptographic protocols, attacks, threat models, implementation security
 Use for FPGA, RTL, synthesis, implementation, timing, utilization, simulation, constraints, and bitstream-related claims. Require tool version, target part, constraints, logs, simulation evidence, synthesis/implementation reports, timing/utilization reports when claiming timing or area.
 
 ## Research Experiment Repo Gate
-Use for creating, reviewing, or refactoring repositories whose purpose is to validate a paper idea through experiments, measurements, hardware runs, side-channel traces, or FPGA/embedded targets. Require a clear research question, explicit script/package boundary, current docs source of truth, run artifact policy, hardware-free tests for reusable logic, and no premature generic framework.
+Use for creating, reviewing, or refactoring repositories whose purpose is to validate a paper idea through experiments, model training, measurements, simulations, hardware runs, side-channel traces, or FPGA/embedded targets. Require a clear research question, chosen domain center, explicit script/package boundary, config policy, current docs source of truth, run artifact policy, hardware-free tests for reusable logic, and no premature generic framework.
 
 ## Statistics Gate
 Use for statistical claims, significance, uncertainty, robustness, ablations, and sample-based conclusions. Require sample size, variance/CI when appropriate, multiple-run reporting, and no cherry-picking.

@@ -24,9 +24,9 @@ Apply this protocol to software engineering, AI/ML experiments, side-channel res
 
 ## Custom Agents
 
-Available custom agents include `context_explorer`, `sequential_reasoning_coordinator`, `adversarial_reviewer`, `quality_gate_runner`, `implementation_engineer`, `test_debug_engineer`, `software_architect`, `code_comment_hygiene_reviewer`, `data_ml_experiment_reviewer`, `statistics_reviewer`, `side_channel_security_reviewer`, `hardware_vivado_reviewer`, `literature_method_reviewer`, and `report_writer`.
+Available custom agents include `context_explorer`, `sequential_reasoning_coordinator`, `adversarial_reviewer`, `quality_gate_runner`, `implementation_engineer`, `test_debug_engineer`, `software_architect`, `research_repo_architect`, `code_comment_hygiene_reviewer`, `data_ml_experiment_reviewer`, `statistics_reviewer`, `side_channel_security_reviewer`, `hardware_vivado_reviewer`, `literature_method_reviewer`, and `report_writer`.
 
-Use them to separate context gathering, implementation, deterministic checks, adversarial review, comment hygiene review, and reporting.
+Use them to separate context gathering, repository architecture, implementation, deterministic checks, adversarial review, comment hygiene review, and reporting.
 
 ## Skills
 
@@ -34,7 +34,7 @@ Use installed skills from `~/.agents/skills` when relevant: `sequential-thinking
 
 Codex should select relevant skills by description or explicit user invocation.
 
-Use `research-repo-design` before creating, reviewing, or refactoring research experiment repositories, especially hardware-backed paper-idea validation repos and handoff-driven repository cleanups.
+Use `research-repo-design` and prefer `research_repo_architect` before creating, reviewing, or refactoring research experiment repositories, including AI/ML, diffusion, LLM fine-tuning, RL, simulation, hardware-backed paper-idea validation repos, and handoff-driven repository cleanups.
 
 ## Sequential Thinking MCP
 
