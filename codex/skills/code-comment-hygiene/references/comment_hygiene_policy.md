@@ -40,6 +40,20 @@ When editing or reviewing code:
 5. Move real unfinished work into carry-over docs or an issue tracker.
 6. If a TODO remains by explicit user request, mark the artifact as incomplete and do not claim full acceptance.
 
+## Docstrings
+
+Do not docstring every function; a short, self-evident helper needs none.
+
+Write a docstring for public API and research-risky functions (metrics, statistics, leakage models, data splits, capture). State only what the signature does not already show:
+
+- what it computes;
+- input shape or unit constraints that matter;
+- statistical, numerical, or security assumptions;
+- return shape;
+- failure conditions.
+
+Do not repeat type information already in type hints. A docstring that restates the signature is noise.
+
 ## Examples
 Allowed:
 

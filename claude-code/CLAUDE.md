@@ -3,7 +3,7 @@
 **Created**: 2026-05-28  
 **Last Updated**: 2026-06-10
 **Scope**: User-global Claude Code instructions  
-**Mode**: Research + Development + Sequential Thinking MCP + Subagent-First + Codex MCP Adversarial Review
+**Mode**: Research + Development + Sequential Thinking MCP + Single-Agent-First + Codex MCP Adversarial Review
 
 ## 0. Role
 
@@ -15,9 +15,9 @@ Always optimize for correctness, traceability, reproducibility, maintainability,
 
 ## 1. Always-On Operating Rules
 
-1. For every non-trivial task, use Sequential Thinking MCP if the MCP tool is available.
-2. For every non-trivial task, use subagents unless the task is clearly small and local.
-3. For important claims or changes, call Codex MCP as an adversarial reviewer when available.
+1. Use Sequential Thinking MCP, when available, for genuinely hard planning, unclear debugging, and acceptance decisions — not for every non-trivial task.
+2. Default to one primary agent. Add a subagent only when the task crosses a domain boundary, changes repository architecture, affects a research claim, or needs final adversarial acceptance. Do not spawn agents merely because a task is non-trivial.
+3. Call Codex MCP as an adversarial reviewer for important claims and before acceptance, when available.
 4. Separate mechanical checks from semantic review.
 5. Never approve by optimism, comments, naming, partial logs, or generic LLM approval.
 6. Never leave placeholder code, TODO, FIXME, dummy logic, stubs, fake outputs, fake metrics, or test-only hardcoding.
@@ -29,52 +29,33 @@ Always optimize for correctness, traceability, reproducibility, maintainability,
 
 ## 2. Sequential Thinking MCP Policy
 
-Use Sequential Thinking MCP at these points whenever available:
+Use Sequential Thinking MCP, when available, for genuinely hard cases rather than routine work:
 
-- before planning non-trivial tasks;
-- before selecting a methodology or implementation strategy;
-- when debugging unclear failures;
-- before expensive experiments, training, synthesis, implementation, or data collection;
-- before final acceptance;
-- when claims involve research, security, statistics, benchmarks, production impact, or architecture decisions.
+- planning a hard or ambiguous task;
+- debugging an unclear failure;
+- before an expensive experiment, training run, synthesis, or data collection;
+- before final acceptance of a research, security, statistics, or benchmark claim.
 
-If Sequential Thinking MCP is unavailable, continue only after noting internally or in the relevant report that it was unavailable.
+Skip it for small, local, or mechanical tasks. If it is unavailable when warranted, continue only after noting the limitation in the relevant report.
 
-## 3. Subagent-First Policy
+## 3. Single-Agent-First, Specialist-on-Demand Policy
 
-Use subagents for codebase exploration, literature or method review, implementation planning, data and experiment validation, security or side-channel review, hardware/Vivado/RTL review, adversarial critique, test and CI planning, code-comment hygiene review, and final report writing.
+Handle most tasks with one primary agent. Add a specialist agent only when the task crosses a domain boundary, changes repository architecture, affects a research claim, or needs final adversarial acceptance. Do not spawn multiple agents merely because a task is non-trivial.
 
-Prefer these installed subagents when relevant:
+Call agents from the lowest tier that fits:
 
-- `context-explorer`
-- `sequential-reasoning-coordinator`
-- `adversarial-reviewer`
-- `quality-gate-runner`
-- `implementation-engineer`
-- `test-debug-engineer`
-- `software-architect`
-- `research-repo-architect`
-- `code-comment-hygiene-reviewer`
-- `data-ml-experiment-reviewer`
-- `statistics-reviewer`
-- `side-channel-security-reviewer`
-- `hardware-vivado-reviewer`
-- `literature-method-reviewer`
-- `report-writer`
+- Tier 0 — usually not called directly: `sequential-reasoning-coordinator`, `quality-gate-runner`, `code-comment-hygiene-reviewer`, `report-writer`.
+- Tier 1 — occasional in general development or research: `context-explorer`, `implementation-engineer`, `test-debug-engineer`, `software-architect`.
+- Tier 2 — research repository design and acceptance: `research-repo-architect`, `adversarial-reviewer`.
+- Tier 3 — domain review, only when the domain is already named: `data-ml-experiment-reviewer`, `statistics-reviewer`, `side-channel-security-reviewer`, `hardware-vivado-reviewer`, `literature-method-reviewer`.
 
-Subagents may explore in parallel, but acceptance must be sequential: context result, implementation/method result, deterministic evidence, Codex MCP review when available, Claude critical review, documentation, and final acceptance decision.
+For initial research repository creation, use at most: `research-repo-architect` for the skeleton; one domain reviewer only if the user already named the domain; `adversarial-reviewer` only before acceptance. Do not run `quality-gate-runner` or domain reviewers during file creation.
+
+When specialists do run, acceptance stays sequential: context, implementation or method, deterministic evidence, Codex MCP review when available, Claude critical review, documentation, and final decision.
 
 ## 4. Codex MCP Adversarial Review Policy
 
-Use Codex MCP as an adversarial reviewer throughout the work, not only at the end, when available.
-
-Recommended checkpoints:
-
-1. Plan Review
-2. First Slice Review
-3. Pre-Test Review
-4. Post-Result Review
-5. Pre-Acceptance Review
+Call Codex MCP as an adversarial reviewer for important claims and before acceptance, when available, rather than at every step. Plan or first-slice reviews are optional; the acceptance review of a research claim is the priority.
 
 Codex MCP review must be artifact-specific. Generic approval is not evidence.
 
@@ -120,6 +101,8 @@ For any development task:
 
 - produce working, maintainable code;
 - prefer clear architecture over clever patches;
+- prefer the smallest solution that works; avoid speculative abstraction, one-implementation interfaces, factories, registries, and config for values that never change;
+- keep experiment parameters in config (YAML once `configs/` exists), never in CLI flags; CLI flags may only reference paths (`--config`, `--run`, `--out`); keep CLIs as numbered stage scripts or a thin command, never a mega-CLI or speculative flags and modes;
 - avoid placeholder implementation;
 - avoid TODO/FIXME unless the user explicitly asks for a planning stub;
 - do not fake interfaces with dummy outputs;
@@ -144,6 +127,8 @@ Rules:
 - If a TODO represents real unfinished work, move it into a carry-over document or issue tracker and make the code safe or explicitly unsupported.
 - Comments are never proof that code implements a behavior. Verify executable code, tests, logs, and outputs.
 - Do not add comments that merely restate obvious code. Prefer comments for invariants, boundary conditions, security assumptions, data provenance, and non-obvious tradeoffs.
+- Prefer no comment over a stale or obvious one. Put unfinished work in `docs/handoff.md`, not in source comments.
+- Docstring only public or research-risky functions; do not docstring every function or restate type hints already in the signature.
 
 Allowed comment example:
 

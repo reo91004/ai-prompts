@@ -13,3 +13,6 @@ Also use `code-comment-hygiene` when code contains comments, TODO/FIXME/HACK not
 For code changes: implement real behavior, avoid silent fallback, avoid test-only hardcoding, run relevant checks when possible, keep comments synchronized with current behavior, and document limitations honestly in carry-over notes.
 
 For research code: keep research integrity guards that protect claims and provenance, but do not require production hardening that makes experiment scripts harder to read without strengthening the claim.
+
+## Scope And Minimalism
+Implement the smallest solution that fully works. Do not add speculative abstraction, one-implementation interfaces, factories, registries, config for values that never change, or framework machinery before a second real caller exists. Prefer numbered stage scripts and a thin CLI over a mega-CLI with speculative flags or modes. Keep experiment parameters in config (YAML once `configs/` exists), never in CLI flags; CLI flags may only reference paths (`--config`, `--run`, `--out`). Over-engineering is as unacceptable as a placeholder: both are code that should not exist yet.

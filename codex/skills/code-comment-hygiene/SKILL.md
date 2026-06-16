@@ -1,10 +1,10 @@
 ---
 name: code-comment-hygiene
-description: Use whenever reading, editing, refactoring, reviewing, cleaning, or accepting code that contains comments, TODOs, FIXME notes, legacy explanations, or implementation history.
+description: Use whenever reading, editing, refactoring, reviewing, cleaning, or accepting code that contains comments, docstrings, TODOs, FIXME notes, legacy explanations, or implementation history.
 ---
 
 ## Purpose
-Keep code comments truthful, current, and useful.
+Keep code comments and docstrings truthful, current, minimal, and useful.
 
 Read `references/comment_hygiene_policy.md` before accepting any code change that touches comments or legacy code.
 
@@ -14,6 +14,8 @@ Read `references/comment_hygiene_policy.md` before accepting any code change tha
 - Reject TODO/FIXME/HACK/temporary comments in accepted code unless the user explicitly requested a planning stub.
 - Move unfinished work into carry-over docs or issue tracker instead of leaving TODOs in source.
 - Treat comments as explanation only, never as implementation evidence.
+- Prefer no comment over a stale or obvious one; comment only why, assumptions, invariants, units, or provenance.
+- Keep docstrings only on public or research-risky functions; do not docstring every function or restate type hints.
 
 ## Output
 When reviewing, report:

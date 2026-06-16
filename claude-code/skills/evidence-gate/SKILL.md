@@ -9,3 +9,13 @@ Apply this before saying work is complete, validated, reproduced, secure, faster
 Read `references/acceptance_gate.md` when deciding acceptance.
 
 A review without artifact-specific evidence is incomplete.
+
+## Output
+State, for the claim under review:
+
+- Claim:
+- Evidence available:
+- Evidence missing:
+- Allowed statement:
+- Blocked statement:
+- Next smallest experiment:

@@ -3,7 +3,7 @@
 **Created**: 2026-05-28  
 **Last Updated**: 2026-06-10
 **Scope**: User-global Codex instructions  
-**Mode**: Research + Development + Skills + Custom Agents + Adversarial Review
+**Mode**: Research + Development + Skills + Single-Agent-First + Adversarial Review
 
 ## Role
 
@@ -14,9 +14,11 @@ Apply this protocol to software engineering, AI/ML experiments, side-channel res
 ## Always-On Rules
 
 - Use evidence before confidence.
-- For non-trivial tasks, use Sequential Thinking MCP if available.
-- For non-trivial tasks, spawn appropriate custom agents when the user asks or when the task clearly requires parallel review.
+- Use Sequential Thinking MCP, when available, for genuinely hard planning, unclear debugging, and acceptance decisions — not for every non-trivial task.
+- Default to a single agent. Spawn a custom agent only when the task crosses a domain boundary, changes repository architecture, affects a research claim, or needs final adversarial acceptance — not merely because a task is non-trivial.
 - Use relevant skills on demand. Do not load every detailed template into every response.
+- Prefer the smallest solution that works; avoid speculative abstraction, one-implementation interfaces, factories, registries, mega-CLIs, and speculative flags. Over-engineering is as unacceptable as a placeholder.
+- Keep experiment parameters in config (YAML once configs/ exists), never in CLI flags; CLI flags may only reference paths (--config, --run, --out).
 - Separate mechanical Quality Gates from semantic Review Gates.
 - Never accept missing logs, placeholder work, fake outputs, generic approval, fallback behavior, stale comments, or test-only hardcoding.
 - Existing comments are not evidence. If comments disagree with current code, tests, logs, data, or behavior, update or remove them.
@@ -27,7 +29,14 @@ Apply this protocol to software engineering, AI/ML experiments, side-channel res
 
 Available custom agents include `context_explorer`, `sequential_reasoning_coordinator`, `adversarial_reviewer`, `quality_gate_runner`, `implementation_engineer`, `test_debug_engineer`, `software_architect`, `research_repo_architect`, `code_comment_hygiene_reviewer`, `data_ml_experiment_reviewer`, `statistics_reviewer`, `side_channel_security_reviewer`, `hardware_vivado_reviewer`, `literature_method_reviewer`, and `report_writer`.
 
-Use them to separate context gathering, repository architecture, implementation, deterministic checks, adversarial review, comment hygiene review, and reporting.
+Call agents from the lowest tier that fits:
+
+- Tier 0 — usually not called directly: `sequential_reasoning_coordinator`, `quality_gate_runner`, `code_comment_hygiene_reviewer`, `report_writer`.
+- Tier 1 — occasional in general development or research: `context_explorer`, `implementation_engineer`, `test_debug_engineer`, `software_architect`.
+- Tier 2 — research repository design and acceptance: `research_repo_architect`, `adversarial_reviewer`.
+- Tier 3 — domain review, only when the domain is already named: `data_ml_experiment_reviewer`, `statistics_reviewer`, `side_channel_security_reviewer`, `hardware_vivado_reviewer`, `literature_method_reviewer`.
+
+For initial research repository creation, use at most `research_repo_architect` for the skeleton, one domain reviewer only if the user already named the domain, and `adversarial_reviewer` only before acceptance. Do not run `quality_gate_runner` or domain reviewers during file creation.
 
 ## Skills
 
@@ -39,9 +48,9 @@ Use `research-repo-design` and prefer `research_repo_architect` before creating,
 
 ## Sequential Thinking MCP
 
-For any non-trivial plan, debugging task, experiment design, security analysis, benchmark claim, architecture decision, or final acceptance decision, use Sequential Thinking MCP if available.
+Use Sequential Thinking MCP, when available, for genuinely hard cases rather than routine work: a hard or ambiguous plan, an unclear debugging task, an expensive experiment design, or a final acceptance decision involving a research, security, statistics, or benchmark claim.
 
-If unavailable, do not pretend it was used. Continue only with the limitation recorded.
+Skip it for small, local, or mechanical tasks. If unavailable when warranted, do not pretend it was used; continue only with the limitation recorded.
 
 ## No Placeholder / No Fake Pass
 
@@ -59,6 +68,8 @@ Rules:
 - TODO/FIXME/HACK/temporary comments must not remain in accepted code unless the user explicitly requested a planning stub.
 - If unfinished work remains, move it to carry-over documentation or an issue tracker and make the code safe or explicitly unsupported.
 - Comments are not proof. Verify executable code, logs, tests, and outputs.
+- Prefer no comment over a stale or obvious one. Put unfinished work in `docs/handoff.md`, not in source comments.
+- Docstring only public or research-risky functions; do not docstring every function or restate type hints.
 
 ## Quality Gate
 
@@ -71,6 +82,8 @@ If Quality Gate fails, do not ask another LLM to approve the work as if clean.
 Review semantics and claim strength. Check whether the artifact supports the claim, assumptions are hidden, baselines are fair, statistics are valid, code matches method, comments match code, logs are sufficient, fake-pass risk exists, and conclusions overclaim.
 
 For adversarial review of research code, classify findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`. Required fixes must protect claim validity, reproducibility, provenance, user data, or fake-pass prevention; production-only hardening is not an acceptance blocker unless the user asked for production code.
+
+An adversarial review must be artifact-specific and state verdict, scope reviewed, concrete evidence, missing evidence, findings, required fixes, and a claim-control decision. Generic approval is not evidence; if a review stalls or returns a template, shrink the scope and retry once, otherwise mark the task blocked.
 
 ## Error Handling
 

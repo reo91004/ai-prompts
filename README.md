@@ -56,16 +56,10 @@ bash install_all.sh
 
 ## 백업 정리
 
-설치가 만든 백업을 확인하려면 dry-run으로 실행합니다.
+설치가 만든 백업(`*.bak.*`)을 삭제합니다.
 
 ```bash
 bash cleanup_backups.sh
-```
-
-실제로 삭제하려면 명시적으로 `--delete`를 붙입니다.
-
-```bash
-bash cleanup_backups.sh --delete
 ```
 
 ## 폴더 구조
