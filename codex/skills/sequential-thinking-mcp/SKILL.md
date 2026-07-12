@@ -1,14 +1,12 @@
 ---
 name: sequential-thinking-mcp
-description: Use for structured step-by-step reasoning with Sequential Thinking MCP on non-trivial research, development, debugging, planning, and acceptance tasks.
+description: Use Sequential Thinking MCP for genuinely hard planning, unclear debugging, expensive experiment design, and claim acceptance.
 ---
 
 ## Use
-When the task is non-trivial, explicitly use Sequential Thinking MCP if the MCP tool is available.
+Use this skill only when the task is genuinely hard or ambiguous: consequential planning, unclear debugging, expensive training/data collection/synthesis/measurement design, or acceptance of a research, security, statistics, or benchmark claim. Skip it for small, local, and mechanical work.
 
-Apply it before planning, choosing an implementation or experiment design, debugging ambiguous failures, running expensive training/data collection/synthesis/measurement, and accepting a final claim.
-
-If the MCP tool is unavailable, continue with an explicit note in the relevant report or internal checklist that Sequential Thinking MCP was unavailable.
+Call the MCP only when its tool is available. If it is unavailable when warranted, record that limitation and continue with explicit reasoning; never state or imply that the MCP ran.
 
 ## Output
 Return problem decomposition, assumptions, candidate approaches, risks, verification steps, and acceptance blockers.

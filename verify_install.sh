@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+bash "$ROOT/scripts/validate_harness.sh"
 
 missing=0
 check_file() {
@@ -18,6 +21,14 @@ check_dir() {
     echo "OK: $1"
   fi
 }
+check_executable() {
+  if [ ! -x "$1" ]; then
+    echo "Missing executable: $1"
+    missing=1
+  else
+    echo "OK executable: $1"
+  fi
+}
 check_contains() {
   local path="$1"
   local pattern="$2"
@@ -28,40 +39,77 @@ check_contains() {
     echo "OK pattern in $path: $pattern"
   fi
 }
-check_exact_dir_entries() {
-  local dir="$1"
-  shift
-  local path name expected found
 
-  if [ ! -d "$dir" ]; then
+check_same_file() {
+  local source="$1"
+  local installed="$2"
+  if ! cmp -s "$source" "$installed"; then
+    echo "Content mismatch: $installed"
+    missing=1
+  else
+    echo "OK content: $installed"
+  fi
+}
+
+check_same_dir() {
+  local source="$1"
+  local installed="$2"
+  if ! diff -qr "$source" "$installed" >/dev/null 2>&1; then
+    echo "Directory content mismatch: $installed"
+    missing=1
+  else
+    echo "OK directory content: $installed"
+  fi
+}
+
+check_manifest() {
+  local source_dir="$1"
+  local suffix="$2"
+  local manifest="$3"
+  local checksum_file="$manifest.cksum"
+  local expected_checksum actual_checksum
+  local source name
+
+  if [ ! -f "$manifest" ]; then
+    echo "Missing ownership manifest: $manifest"
+    missing=1
     return
   fi
 
-  for path in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
-    if [ ! -e "$path" ]; then
-      continue
+  if [ -L "$manifest" ]; then
+    echo "Unsafe ownership manifest: $manifest"
+    missing=1
+    return
+  fi
+
+  if [ ! -f "$checksum_file" ] || [ -L "$checksum_file" ]; then
+    echo "Missing or unsafe manifest checksum: $checksum_file"
+    missing=1
+  else
+    expected_checksum="$(cat "$checksum_file")"
+    actual_checksum="$(cksum "$manifest" | awk '{ print $1 ":" $2 }')"
+    if [ "$expected_checksum" != "$actual_checksum" ]; then
+      echo "Manifest checksum mismatch: $manifest"
+      missing=1
     fi
+  fi
 
-    name="$(basename "$path")"
-    if [ "$name" = ".DS_Store" ]; then
-      continue
-    fi
-
-    found=0
-    for expected in "$@"; do
-      if [ "$name" = "$expected" ]; then
-        found=1
-        break
-      fi
-    done
-
-    if [ "$found" -ne 1 ]; then
-      echo "Unexpected managed entry: $path"
+  for source in "$source_dir"/*"$suffix"; do
+    [ -e "$source" ] || continue
+    name="${source##*/}"
+    if ! grep -Fqx "$name" "$manifest"; then
+      echo "Missing manifest entry in $manifest: $name"
       missing=1
     fi
   done
-}
 
+  while IFS= read -r name || [ -n "$name" ]; do
+    if [ -z "$name" ] || [ ! -e "$source_dir/$name" ]; then
+      echo "Unexpected manifest entry in $manifest: $name"
+      missing=1
+    fi
+  done < "$manifest"
+}
 check_file "$HOME/.claude/CLAUDE.md"
 check_dir "$HOME/.claude/agents"
 check_dir "$HOME/.claude/skills"
@@ -70,94 +118,96 @@ check_file "$HOME/.codex/AGENTS.md"
 check_dir "$HOME/.codex/agents"
 check_dir "$HOME/.agents/skills"
 
-claude_agents=(
-  adversarial-reviewer
-  code-comment-hygiene-reviewer
-  context-explorer
-  data-ml-experiment-reviewer
-  hardware-vivado-reviewer
-  implementation-engineer
-  literature-method-reviewer
-  quality-gate-runner
-  research-repo-architect
-  report-writer
-  sequential-reasoning-coordinator
-  side-channel-security-reviewer
-  software-architect
-  statistics-reviewer
-  test-debug-engineer
-)
-
-codex_agents=(
-  adversarial_reviewer
-  code_comment_hygiene_reviewer
-  context_explorer
-  data_ml_experiment_reviewer
-  hardware_vivado_reviewer
-  implementation_engineer
-  literature_method_reviewer
-  quality_gate_runner
-  research_repo_architect
-  report_writer
-  sequential_reasoning_coordinator
-  side_channel_security_reviewer
-  software_architect
-  statistics_reviewer
-  test_debug_engineer
-)
-
-skills=(
-  adversarial-review
-  ai-ml-experiment
-  code-comment-hygiene
-  evidence-gate
-  hardware-vivado
-  no-placeholder-development
-  report-writer
-  research-domain-router
-  research-repo-design
-  sequential-thinking-mcp
-  side-channel-analysis
-)
-
-claude_agent_files=()
-for agent in "${claude_agents[@]}"; do
-  claude_agent_files+=("$agent.md")
+for source in "$ROOT/claude-code/agents"/*.md; do
+  check_same_file "$source" "$HOME/.claude/agents/${source##*/}"
 done
 
-codex_agent_files=()
-for agent in "${codex_agents[@]}"; do
-  codex_agent_files+=("$agent.toml")
+for source in "$ROOT/codex/agents"/*.toml; do
+  check_same_file "$source" "$HOME/.codex/agents/${source##*/}"
 done
 
-for agent in "${claude_agents[@]}"; do
-  check_file "$HOME/.claude/agents/$agent.md"
+for source in "$ROOT/claude-code/skills"/*; do
+  [ -d "$source" ] || continue
+  check_same_dir "$source" "$HOME/.claude/skills/${source##*/}"
+done
+for source in "$ROOT/codex/skills"/*; do
+  [ -d "$source" ] || continue
+  check_same_dir "$source" "$HOME/.agents/skills/${source##*/}"
 done
 
-for agent in "${codex_agents[@]}"; do
-  check_file "$HOME/.codex/agents/$agent.toml"
-done
+check_executable "$HOME/.claude/skills/resource-aware-orchestration/scripts/detect_resources.sh"
+check_executable "$HOME/.agents/skills/resource-aware-orchestration/scripts/detect_resources.sh"
 
-for skill in "${skills[@]}"; do
-  check_file "$HOME/.claude/skills/$skill/SKILL.md"
-  check_file "$HOME/.agents/skills/$skill/SKILL.md"
-done
+check_same_file "$ROOT/claude-code/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+check_same_file "$ROOT/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"
 
-check_file "$HOME/.claude/skills/research-repo-design/references/research_experiment_repo.md"
-check_file "$HOME/.agents/skills/research-repo-design/references/research_experiment_repo.md"
-check_file "$HOME/.claude/skills/research-domain-router/references/domain_gates.md"
-check_file "$HOME/.agents/skills/research-domain-router/references/domain_gates.md"
-check_file "$HOME/.claude/skills/no-placeholder-development/references/research_code_guard_policy.md"
-check_file "$HOME/.agents/skills/no-placeholder-development/references/research_code_guard_policy.md"
-
-check_exact_dir_entries "$HOME/.claude/agents" "${claude_agent_files[@]}"
-check_exact_dir_entries "$HOME/.codex/agents" "${codex_agent_files[@]}"
-check_exact_dir_entries "$HOME/.claude/skills" "${skills[@]}"
-check_exact_dir_entries "$HOME/.agents/skills" "${skills[@]}"
+check_manifest "$ROOT/claude-code/agents" ".md" "$HOME/.universal-research-agent-kit/manifests/claude-agents"
+check_manifest "$ROOT/codex/agents" ".toml" "$HOME/.universal-research-agent-kit/manifests/codex-agents"
+check_manifest "$ROOT/claude-code/skills" "" "$HOME/.universal-research-agent-kit/manifests/claude-skills"
+check_manifest "$ROOT/codex/skills" "" "$HOME/.universal-research-agent-kit/manifests/codex-skills"
 
 check_file "$HOME/.config/git/ignore"
 check_contains "$HOME/.config/git/ignore" "BEGIN UNIVERSAL RESEARCH AGENT KIT"
 check_contains "$HOME/.config/git/ignore" "END UNIVERSAL RESEARCH AGENT KIT"
+
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != "1" ]; then
+  if command -v codex >/dev/null 2>&1; then
+    codex_plugins="$(codex plugin list --json)"
+    if ! printf '%s\n' "$codex_plugins" | EXPECTED_PONYTAIL_PATH="$HOME/.universal-research-agent-kit/marketplaces/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail" node -e '
+      const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+      const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
+      const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
+      const valid = lazy && lazy.version === "4.17.0" && lazy.installed === true &&
+        lazy.enabled === true && ponytail && ponytail.version === "4.8.4" &&
+        ponytail.installed === true && ponytail.enabled === true &&
+        ponytail.source?.source === "local" &&
+        ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
+      process.exit(valid ? 0 : 1);
+    '; then
+      echo "Missing Codex integration: LazyCodex or Ponytail"
+      missing=1
+    else
+      echo "OK Codex integrations: LazyCodex and Ponytail"
+    fi
+    for name in arxiv semantic-scholar semantic_scholar; do
+      if (cd "$HOME" && codex mcp get "$name" >/dev/null 2>&1); then
+        echo "Unexpected Codex paper-search MCP: $name"
+        missing=1
+      fi
+    done
+  fi
+
+  if command -v claude >/dev/null 2>&1; then
+    if ! claude plugin list --json | node -e '
+      const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
+      const ponytail = plugins.find((item) =>
+        item.id === "ponytail@ponytail" && item.scope === "user");
+      process.exit(ponytail && ponytail.version === "4.8.4" &&
+        ponytail.enabled === true ? 0 : 1);
+    '; then
+      echo "Missing Claude integration: Ponytail"
+      missing=1
+    else
+      echo "OK Claude integration: Ponytail"
+    fi
+    if ! command -v node >/dev/null 2>&1; then
+      echo "Cannot verify Claude user MCP configuration without Node.js"
+      missing=1
+    elif ! CLAUDE_USER_CONFIG="$HOME/.claude.json" node -e '
+      const fs = require("fs");
+      const path = process.env.CLAUDE_USER_CONFIG;
+      if (!fs.existsSync(path)) process.exit(0);
+      const config = JSON.parse(fs.readFileSync(path, "utf8"));
+      const servers = config.mcpServers || {};
+      const blocked = ["arxiv", "semantic-scholar", "semantic_scholar"];
+      const hasOwn = (name) => Object.prototype.hasOwnProperty.call(servers, name);
+      process.exit(blocked.some(hasOwn) ? 1 : 0);
+    '; then
+      echo "Unexpected Claude user paper-search MCP configuration"
+      missing=1
+    fi
+  fi
+fi
 
 if [ "$missing" -ne 0 ]; then
   echo "Install verification failed."

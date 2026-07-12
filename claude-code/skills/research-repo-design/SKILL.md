@@ -10,6 +10,8 @@ Use it for AI/ML, diffusion, LLM fine-tuning, RL, hardware measurement, side-cha
 
 Read `references/research_experiment_repo.md` before proposing or accepting a repository structure. Follow its Minimal Creation Rule: create only files needed for the first run, its reproducibility, or current docs.
 
+Apply the Global Core → Domain Skill → Project Overlay hierarchy. Do not require `.omo`, fixed experiment stages, equipment constants, resource policy frameworks, or review-policy frameworks in every research repository. Put repository-specific values in the Project Overlay and invoke the shared skills on demand.
+
 ## Default
 When asked to create an initial research repository, default to Level 1 unless the user asks for paper-artifact quality or the first run needs hardware, real data, or model-training stages. Ask at most one question when the domain is unclear; otherwise create the smallest runnable skeleton.
 

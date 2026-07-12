@@ -12,6 +12,8 @@ Also use `code-comment-hygiene` when code contains comments, TODO/FIXME/HACK not
 
 For code changes: implement real behavior, avoid silent fallback, avoid test-only hardcoding, run relevant checks when possible, keep comments synchronized with current behavior, and document limitations honestly in carry-over notes.
 
+Treat `RESOURCE_*` failures and unsupported platform or tool states as explicit non-success results. Do not silently lower correctness requirements, omit a required child, or report a pass because resource detection failed. Sequential execution is the safe resource response when delegation remains necessary.
+
 For research code: keep research integrity guards that protect claims and provenance, but do not require production hardening that makes experiment scripts harder to read without strengthening the claim.
 
 ## Scope And Minimalism

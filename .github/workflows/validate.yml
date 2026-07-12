@@ -1,0 +1,51 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  harness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Validate harness contracts
+        run: bash scripts/validate_harness.sh
+      - name: Test resource detector including WSL fixtures
+        run: bash tests/test_resource_detector.sh
+      - name: Exercise the live resource detector
+        shell: bash
+        run: |
+          output_file="$(mktemp)"
+          trap 'rm -f "$output_file"' EXIT
+          bash codex/skills/resource-aware-orchestration/scripts/detect_resources.sh > "$output_file"
+          cat "$output_file"
+          grep -Eq '^status=(OK|RESOURCE_CONSTRAINED)$' "$output_file"
+          concurrency="$(sed -n 's/^concurrency=//p' "$output_file")"
+          case "$concurrency" in 1|2|3|4|5|6) ;; *) exit 1 ;; esac
+          grep -Fxq 'writer_slots=1' "$output_file"
+          grep -Fxq 'heavy_command_slots=1' "$output_file"
+          case "$RUNNER_OS" in
+            macOS) grep -Fxq 'platform=macos' "$output_file" ;;
+            Linux)
+              grep -Fxq 'platform=linux' "$output_file"
+              grep -Fxq 'cgroup_v2=detected' "$output_file"
+              grep -Eq '^cgroup_path=/' "$output_file"
+              ;;
+            *) exit 1 ;;
+          esac
+      - name: Test isolated repeat installation
+        run: bash tests/test_install_regression.sh
+      - name: Check patch whitespace
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^..HEAD
+          else
+            git diff --check
+          fi

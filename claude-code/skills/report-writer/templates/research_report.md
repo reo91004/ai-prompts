@@ -17,15 +17,18 @@
 [수행한 절차]
 
 ## 5. 증거
-| 항목 | 결과 | 근거 |
-|---|---|---|
-| [검증 항목] | PASS/FAIL/PARTIAL | [로그, 파일, 명령, 데이터] |
+| 항목 | Origin / Purpose | Measurement / Claim Scope | 결과 | 근거 |
+|---|---|---|---|---|
+| [검증 항목] | [synthetic/simulated/measured] / [diagnostic/claim_bearing] | [scope] | PASS/FAIL/PARTIAL | [artifact path, decisive log] |
 
-## 6. 적대적 리뷰 결과
+## 6. 실행 명령과 실패
+[명령, exit code, 실패 단계, 미실행 검증]
+
+## 7. 적대적 리뷰 결과
 [Codex MCP 또는 subagent review 결과]
 
-## 7. 한계
+## 8. 한계와 남은 위험
 [아직 주장할 수 없는 내용]
 
-## 8. Carry-Over
+## 9. Carry-Over
 [다음으로 넘길 항목]

@@ -9,7 +9,8 @@ Accept only if all relevant items hold:
 6. No placeholder, fake-pass, TODO, dummy, stub, or test-only hardcoding remains.
 7. Reproducibility path exists when required.
 8. Limitations are documented.
-9. Claims do not exceed evidence.
+9. The evidence contract is complete when a research or benchmark claim is present.
+10. Claims do not exceed evidence origin, purpose, measurement scope, or claim scope.
 
 For research code, block only on issues that weaken claim validity, reproducibility, provenance, artifact integrity, user data safety, or fake-pass prevention. Production-only hardening is optional unless production use is part of the claim.
 

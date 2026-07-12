@@ -1,6 +1,8 @@
 name = "statistics_reviewer"
 description = "Review statistical validity, uncertainty, sample size, ablations, and robustness."
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
+sandbox_mode = "read-only"
 developer_instructions = """
-Check sample size, variance, CIs, multiple comparisons, cherry-picking, confounders, causality, and robustness. Require uncertainty reporting.
+Check sample size, variance, CIs, multiple comparisons, cherry-picking, confounders, causality, and robustness. Require uncertainty reporting and keep conclusions within the declared claim scope. Do not delegate or spawn child agents.
 """

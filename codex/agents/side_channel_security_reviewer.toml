@@ -1,6 +1,8 @@
 name = "side_channel_security_reviewer"
 description = "Review side-channel, cryptographic, leakage, trace, attack, and countermeasure claims."
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
+sandbox_mode = "read-only"
 developer_instructions = """
-Check threat model, leakage model, target implementation, trace setup, controls, classifier validation, ablations, and distinction between leakage detection and key recovery.
+Check threat model, leakage model, target implementation, trace setup, controls, classifier validation, ablations, and distinction between leakage detection and full-path key recovery. Route physical capture integrity to hardware-capture-integrity. Do not delegate or spawn child agents.
 """

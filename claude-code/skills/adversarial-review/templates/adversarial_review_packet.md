@@ -15,6 +15,12 @@ Review only the provided artifact slice.
 ## Required Evidence
 [What would count as sufficient evidence]
 
+## Evidence Contract
+[Origin, purpose, blinding, measurement scope, and exact claim scope]
+
+## Review Budget And Delta
+[Round number, prior required fixes, and changed artifact slice]
+
 ## Attack Questions
 1. What could be wrong?
 2. What evidence is missing?

@@ -1,47 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TS="$(date +%Y%m%d_%H%M%S)"
+source "$ROOT/../lib/install_common.sh"
+kit_init_state
 
-mkdir -p "$HOME/.codex" "$HOME/.agents"
+kit_require_real_dir "$HOME/.codex"
+kit_require_real_dir "$HOME/.agents"
+kit_require_real_dir "$HOME/.codex/agents"
+kit_require_real_dir "$HOME/.agents/skills"
 
-backup_file() {
-  local dst="$1"
-  if [ -f "$dst" ]; then
-    cp "$dst" "$dst.bak.$TS"
-    echo "Backed up $dst -> $dst.bak.$TS"
-  fi
-}
+kit_backup_path "$HOME/.codex/AGENTS.md" "codex/AGENTS.md"
+kit_backup_path "$HOME/.codex/agents" "codex/agents"
+kit_backup_path "$HOME/.agents/skills" "shared/skills"
 
-backup_dir() {
-  local dst="$1"
-  if [ -d "$dst" ]; then
-    cp -R "$dst" "$dst.bak.$TS"
-    echo "Backed up $dst -> $dst.bak.$TS"
-  fi
-}
+agent_manifest="$KIT_BACKUP_DIR/codex-agents.current"
+skill_manifest="$KIT_BACKUP_DIR/codex-skills.current"
+kit_create_empty_file "$agent_manifest"
+kit_create_empty_file "$skill_manifest"
 
-reset_managed_dir() {
-  local dst="$1"
-  case "$dst" in
-    "$HOME/.codex/agents"|"$HOME/.agents/skills") ;;
-    *)
-      echo "Refusing to reset unmanaged directory: $dst" >&2
-      exit 1
-      ;;
-  esac
+agent_count=0
+for source in "$ROOT/agents"/*.toml; do
+  [ -f "$source" ] || continue
+  name="${source##*/}"
+  printf '%s\n' "$name" >> "$agent_manifest"
+  agent_count=$((agent_count + 1))
+done
+[ "$agent_count" -gt 0 ] || kit_die "No Codex agent files found in $ROOT/agents"
 
-  backup_dir "$dst"
-  rm -rf "$dst"
-  mkdir -p "$dst"
-}
+skill_count=0
+for source in "$ROOT/skills"/*; do
+  [ -d "$source" ] || continue
+  name="${source##*/}"
+  printf '%s\n' "$name" >> "$skill_manifest"
+  skill_count=$((skill_count + 1))
+done
+[ "$skill_count" -gt 0 ] || kit_die "No Codex skill directories found in $ROOT/skills"
 
-backup_file "$HOME/.codex/AGENTS.md"
-reset_managed_dir "$HOME/.codex/agents"
-reset_managed_dir "$HOME/.agents/skills"
+sort -o "$agent_manifest" "$agent_manifest"
+sort -o "$skill_manifest" "$skill_manifest"
+kit_prune_manifest "$HOME/.codex/agents" "$KIT_MANIFEST_ROOT/codex-agents" "$agent_manifest"
+kit_prune_manifest "$HOME/.agents/skills" "$KIT_MANIFEST_ROOT/codex-skills" "$skill_manifest"
 
-cp "$ROOT/AGENTS.md" "$HOME/.codex/AGENTS.md"
-cp "$ROOT/agents"/*.toml "$HOME/.codex/agents/"
-cp -R "$ROOT/skills"/* "$HOME/.agents/skills/"
+kit_replace_file "$ROOT/AGENTS.md" "$HOME/.codex/AGENTS.md"
+for source in "$ROOT/agents"/*.toml; do
+  [ -f "$source" ] || continue
+  kit_replace_file "$source" "$HOME/.codex/agents/${source##*/}"
+done
+for source in "$ROOT/skills"/*; do
+  [ -d "$source" ] || continue
+  kit_replace_dir "$source" "$HOME/.agents/skills/${source##*/}"
+done
+
+kit_commit_manifest "$agent_manifest" "$KIT_MANIFEST_ROOT/codex-agents"
+kit_commit_manifest "$skill_manifest" "$KIT_MANIFEST_ROOT/codex-skills"
 
 echo "Installed Codex global protocol to ~/.codex and ~/.agents/skills"

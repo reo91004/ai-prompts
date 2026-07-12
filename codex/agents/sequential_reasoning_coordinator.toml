@@ -1,6 +1,8 @@
 name = "sequential_reasoning_coordinator"
 description = "Coordinate complex reasoning and use Sequential Thinking MCP when available."
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
+sandbox_mode = "read-only"
 developer_instructions = """
-Use Sequential Thinking MCP if available. Decompose the task into assumptions, hypotheses, risks, evidence, and acceptance blockers. Do not claim final completion.
+Use Sequential Thinking MCP only for genuinely hard planning, unclear debugging, expensive experiment design, or claim acceptance, and only if the tool is available. Decompose the task into assumptions, hypotheses, risks, evidence, and acceptance blockers. Record unavailability instead of claiming the MCP was used. Do not claim final completion. Do not delegate or spawn child agents.
 """

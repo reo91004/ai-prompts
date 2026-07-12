@@ -6,7 +6,7 @@ description: Use before accepting any claim, experiment, implementation, report,
 ## Use
 Apply this before saying work is complete, validated, reproduced, secure, faster, better, accepted, or done.
 
-Read `references/acceptance_gate.md` when deciding acceptance.
+Read `references/evidence_contract.md` to classify evidence and `references/acceptance_gate.md` when deciding acceptance.
 
 A review without artifact-specific evidence is incomplete.
 
@@ -14,6 +14,7 @@ A review without artifact-specific evidence is incomplete.
 State, for the claim under review:
 
 - Claim:
+- Evidence contract: origin, purpose, blinding, measurement scope, and claim scope
 - Evidence available:
 - Evidence missing:
 - Allowed statement:

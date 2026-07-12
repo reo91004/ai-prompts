@@ -1,12 +1,13 @@
 # MANIFEST.md
 
-**최종 갱신**: 2026-06-10
+**최종 갱신**: 2026-07-13
 
 This is the final universal research/development prompt kit.
 
 ## Included files
 
 - `.gitignore`
+- `.github/workflows/validate.yml`
 - `MANIFEST.md`
 - `README.md`
 - `claude-code/CLAUDE.md`
@@ -35,6 +36,8 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/code-comment-hygiene/references/comment_hygiene_policy.md`
 - `claude-code/skills/evidence-gate/SKILL.md`
 - `claude-code/skills/evidence-gate/references/acceptance_gate.md`
+- `claude-code/skills/evidence-gate/references/evidence_contract.md`
+- `claude-code/skills/hardware-capture-integrity/SKILL.md`
 - `claude-code/skills/hardware-vivado/SKILL.md`
 - `claude-code/skills/no-placeholder-development/SKILL.md`
 - `claude-code/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
@@ -46,10 +49,15 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/research-repo-design/references/research_experiment_repo.md`
 - `claude-code/skills/research-domain-router/SKILL.md`
 - `claude-code/skills/research-domain-router/references/domain_gates.md`
+- `claude-code/skills/resource-aware-orchestration/SKILL.md`
+- `claude-code/skills/resource-aware-orchestration/references/task_result_contract.md`
+- `claude-code/skills/resource-aware-orchestration/scripts/detect_resources.sh`
+- `claude-code/skills/review-budget/SKILL.md`
 - `claude-code/skills/sequential-thinking-mcp/SKILL.md`
 - `claude-code/skills/side-channel-analysis/SKILL.md`
 - `codex/AGENTS.md`
 - `codex/README.md`
+- `codex/config.toml.example`
 - `codex/agents/adversarial_reviewer.toml`
 - `codex/agents/code_comment_hygiene_reviewer.toml`
 - `codex/agents/context_explorer.toml`
@@ -74,6 +82,8 @@ This is the final universal research/development prompt kit.
 - `codex/skills/code-comment-hygiene/references/comment_hygiene_policy.md`
 - `codex/skills/evidence-gate/SKILL.md`
 - `codex/skills/evidence-gate/references/acceptance_gate.md`
+- `codex/skills/evidence-gate/references/evidence_contract.md`
+- `codex/skills/hardware-capture-integrity/SKILL.md`
 - `codex/skills/hardware-vivado/SKILL.md`
 - `codex/skills/no-placeholder-development/SKILL.md`
 - `codex/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
@@ -85,9 +95,48 @@ This is the final universal research/development prompt kit.
 - `codex/skills/research-repo-design/references/research_experiment_repo.md`
 - `codex/skills/research-domain-router/SKILL.md`
 - `codex/skills/research-domain-router/references/domain_gates.md`
+- `codex/skills/resource-aware-orchestration/SKILL.md`
+- `codex/skills/resource-aware-orchestration/references/task_result_contract.md`
+- `codex/skills/resource-aware-orchestration/scripts/detect_resources.sh`
+- `codex/skills/review-budget/SKILL.md`
 - `codex/skills/sequential-thinking-mcp/SKILL.md`
 - `codex/skills/side-channel-analysis/SKILL.md`
 - `global_research_agents.gitignore`
 - `cleanup_backups.sh`
 - `install_all.sh`
+- `install_integrations.sh`
+- `lib/install_common.sh`
+- `scripts/validate_harness.sh`
+- `tests/fixtures/resources/base/available_bytes`
+- `tests/fixtures/resources/base/cpu_count`
+- `tests/fixtures/resources/base/oom_after`
+- `tests/fixtures/resources/base/oom_before`
+- `tests/fixtures/resources/base/platform`
+- `tests/fixtures/resources/base/swap_free_bytes`
+- `tests/fixtures/resources/base/swap_total_bytes`
+- `tests/fixtures/resources/base/swapout_after`
+- `tests/fixtures/resources/base/swapout_before`
+- `tests/fixtures/resources/base/total_bytes`
+- `tests/fixtures/resources/cgroup-zero/available_bytes`
+- `tests/fixtures/resources/cgroup-zero/cgroup_memory_current`
+- `tests/fixtures/resources/cgroup-zero/cgroup_memory_max`
+- `tests/fixtures/resources/cgroup-zero/cpu_count`
+- `tests/fixtures/resources/cgroup-zero/platform`
+- `tests/fixtures/resources/cgroup-zero/total_bytes`
+- `tests/fixtures/resources/windows/available_bytes`
+- `tests/fixtures/resources/windows/cpu_count`
+- `tests/fixtures/resources/windows/platform`
+- `tests/fixtures/resources/windows/total_bytes`
+- `tests/fixtures/resources/wsl/available_bytes`
+- `tests/fixtures/resources/wsl/cpu_count`
+- `tests/fixtures/resources/wsl/oom_after`
+- `tests/fixtures/resources/wsl/oom_before`
+- `tests/fixtures/resources/wsl/platform`
+- `tests/fixtures/resources/wsl/swap_free_bytes`
+- `tests/fixtures/resources/wsl/swap_total_bytes`
+- `tests/fixtures/resources/wsl/swapout_after`
+- `tests/fixtures/resources/wsl/swapout_before`
+- `tests/fixtures/resources/wsl/total_bytes`
+- `tests/test_install_regression.sh`
+- `tests/test_resource_detector.sh`
 - `verify_install.sh`

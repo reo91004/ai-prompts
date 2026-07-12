@@ -16,6 +16,8 @@ Read `references/comment_hygiene_policy.md` before accepting any code change tha
 - Treat comments as explanation only, never as implementation evidence.
 - Prefer no comment over a stale or obvious one; comment only why, assumptions, invariants, units, or provenance.
 - Keep docstrings only on public or research-risky functions; do not docstring every function or restate type hints.
+- Keep resource and review policy change history in documentation, not source comments. Comments may state only the current invariant or threshold provenance.
+- When scanning for unfinished markers, distinguish policy examples and quoted forbidden terms from executable-source markers; report both categories separately rather than treating documentation examples as unfinished implementation.
 
 ## Output
 When reviewing, report:

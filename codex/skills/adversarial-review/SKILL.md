@@ -8,6 +8,8 @@ Attack the artifact, not the author. Use concrete evidence.
 
 Use `templates/adversarial_review_packet.md` when asking Codex MCP or another reviewer to review. Use `templates/adversarial_review_report.md` when recording results.
 
+Apply `review-budget` first. Run deterministic evidence before semantic review, use one semantic reviewer, and review only the changed delta after required fixes. A failed deterministic gate cannot be converted to approval by reviewer judgment.
+
 A valid review must include verdict, scope, evidence, findings, missing evidence, required fixes, research-sufficient notes, optional hardening, do-not-change notes, and claim-control decision.
 
 ## Calibration
