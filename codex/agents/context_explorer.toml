@@ -1,5 +1,5 @@
 name = "context_explorer"
-description = "Explore docs, files, prior notes, assumptions, and carry-over before work begins."
+description = "Use proactively before acting on an unfamiliar repo, subsystem, papers, or carry-over, or when broad read-only exploration would flood parent context. Returns structure, entry points, constraints, and risks as a synthesis. Not for small known files or implementation."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"

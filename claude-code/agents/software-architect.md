@@ -1,6 +1,6 @@
 ---
 name: software-architect
-description: Use for API design, system design, refactoring plans, dependency decisions, production maintainability, and developer workflows.
+description: Use for API or system design, refactoring plans, dependency decisions, and production maintainability. Returns a design or plan. Not for research-repo layout or claim review.
 model: sonnet
 effort: high
 tools: [Read, Grep, Glob, Bash]

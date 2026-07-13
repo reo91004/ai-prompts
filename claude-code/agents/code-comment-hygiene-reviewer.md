@@ -1,6 +1,6 @@
 ---
 name: code-comment-hygiene-reviewer
-description: Use proactively for code review, refactoring, cleanup, legacy code, or any file containing comments, TODO, FIXME, HACK, temporary notes, or stale explanations.
+description: Use when reviewing or cleaning comments, TODO/FIXME/HACK markers, stale explanations, or comment-code mismatches. Returns flagged lines and rewrites. Not for logic, architecture, or claim review.
 model: sonnet
 effort: low
 tools: [Read, Grep, Glob]

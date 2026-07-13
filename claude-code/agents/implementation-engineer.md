@@ -1,6 +1,6 @@
 ---
 name: implementation-engineer
-description: Use for implementation work in software, scripts, pipelines, utilities, and experiments with no placeholder or fake-pass logic.
+description: Use for one bounded implementation or refactoring slice with explicit file ownership and independent acceptance criteria. Returns the diff and evidence. Not for exploration, review, or acceptance.
 model: sonnet
 effort: medium
 tools: [Read, Grep, Glob, Bash, Write, Edit]

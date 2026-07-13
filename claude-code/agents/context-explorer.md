@@ -1,6 +1,6 @@
 ---
 name: context-explorer
-description: Use for initial exploration of repositories, papers, docs, prior notes, assumptions, and carry-over before implementing or reviewing.
+description: Use proactively before acting on an unfamiliar repo, subsystem, papers, or carry-over, or when broad read-only exploration would flood parent context. Returns structure, entry points, constraints, and risks as a synthesis. Not for small known files or implementation.
 model: sonnet
 effort: medium
 tools: [Read, Grep, Glob, Bash]

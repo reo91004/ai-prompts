@@ -1,6 +1,6 @@
 ---
 name: data-ml-experiment-reviewer
-description: Use for AI/ML experiments, model evaluation, datasets, train/test splits, metrics, baselines, and reproducibility.
+description: Use when designing or accepting an AI/ML experiment, dataset split, metric, baseline, or reproducibility claim. Returns findings on experimental validity. Not for general code review or non-ML statistics.
 model: sonnet
 effort: high
 tools: [Read, Grep, Glob, Bash]

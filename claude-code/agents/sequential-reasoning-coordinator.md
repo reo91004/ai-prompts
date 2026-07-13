@@ -1,6 +1,6 @@
 ---
 name: sequential-reasoning-coordinator
-description: Use for genuinely hard planning, unclear failures, expensive experiment design, and claim acceptance. Prefer Sequential Thinking MCP when available.
+description: Use for genuinely hard planning, unclear failures, expensive experiment design, or claim acceptance, preferring Sequential Thinking MCP. Returns decomposition, risks, and acceptance blockers. Not for routine or mechanical work.
 model: opus
 effort: high
 tools: [Read, Grep, Glob, Bash]

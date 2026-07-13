@@ -5,7 +5,9 @@ description: Use before delegation to select safe concurrency on macOS, Linux, o
 
 ## Delegation Gate
 
-Keep small local work in the main agent. Delegate only when a child owns one bounded specialist deliverable and delegation has a clear net benefit. One child is valid; never create a second child merely to satisfy a minimum agent count. Detected slots are a ceiling, not a target. Child agents must not delegate.
+Actively delegate non-trivial work when a delegation trigger applies; assign each separable specialist deliverable to a subagent, and keep work in the main agent only for genuinely trivial or tightly coupled tasks. One child is valid and zero is right for trivial work; never create a child merely to satisfy a count. Child agents must not delegate.
+
+Delegate by default for: a bounded implementation or refactoring slice with explicit ownership; exploration of an unfamiliar subsystem before acting; high-volume searches, tests, logs, traces, or document retrieval whose raw output would pollute parent context; domain-sensitive design, implementation change, evidence interpretation, or claim review; final acceptance of a material claim; and independent workstreams that can proceed concurrently. For high-volume work, keep raw output in an artifact and return only a concise synthesis with evidence pointers. Detected slots are a ceiling, not a target.
 
 Run `scripts/detect_resources.sh` before a spawn wave, when the previous snapshot is older than 600 seconds, after a heavy command, after `RESOURCE_*`, after exit 137 or SIGKILL, and after a cgroup OOM counter increase. A new snapshot applies to new spawns only; do not cancel healthy running work because the recommendation decreased. Allow one writer per shared worktree and one heavy command at a time. After pressure clears, restore slots one step per fresh snapshot rather than jumping straight back to the ceiling.
 

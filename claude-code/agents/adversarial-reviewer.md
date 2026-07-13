@@ -1,6 +1,6 @@
 ---
 name: adversarial-reviewer
-description: Use for hostile review of code, experiments, papers, claims, logs, plots, and research conclusions before acceptance.
+description: Use before accepting a material research, benchmark, security, architecture, release, or user-data-safety claim. Returns a verdict with required fixes and a claim-control decision. Not for mechanical or low-risk changes.
 model: opus
 effort: high
 tools: [Read, Grep, Glob, Bash]

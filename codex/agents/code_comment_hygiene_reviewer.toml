@@ -1,5 +1,5 @@
 name = "code_comment_hygiene_reviewer"
-description = "Review code comments, TODO/FIXME/HACK markers, stale explanations, and comment-code mismatches."
+description = "Use when reviewing or cleaning comments, TODO/FIXME/HACK markers, stale explanations, or comment-code mismatches. Returns flagged lines and rewrites. Not for logic, architecture, or claim review."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "low"
 sandbox_mode = "read-only"

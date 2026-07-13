@@ -1,5 +1,5 @@
 name = "test_debug_engineer"
-description = "Debug failures and design tests from evidence."
+description = "Use for debugging a failure, designing tests, or root-causing CI or flaky behavior from evidence. Returns the fix or test with a reproduction. Not for feature implementation or review."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"

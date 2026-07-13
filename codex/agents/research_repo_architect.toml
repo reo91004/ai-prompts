@@ -1,5 +1,5 @@
 name = "research_repo_architect"
-description = "Design and refactor research experiment repositories for AI/ML, hardware, side-channel, simulation, and paper-idea validation work."
+description = "Use when creating or refactoring a research experiment repository across AI/ML, hardware, side-channel, simulation, or paper-idea validation. Returns a structure plan. Not for feature code or general software architecture."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

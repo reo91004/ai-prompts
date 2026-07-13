@@ -1,6 +1,6 @@
 ---
 name: side-channel-security-reviewer
-description: Use for side-channel attack research, leakage detection, trace analysis, classifier validation, crypto/security claims, and countermeasures.
+description: Use when designing or accepting a side-channel experiment, leakage detection, trace analysis, key-recovery claim, or countermeasure evaluation. Returns security findings. Not for non-security statistics or general review.
 model: opus
 effort: high
 tools: [Read, Grep, Glob, Bash]

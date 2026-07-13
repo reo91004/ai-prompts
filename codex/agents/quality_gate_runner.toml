@@ -1,5 +1,5 @@
 name = "quality_gate_runner"
-description = "Plan and inspect deterministic checks such as tests, lint, static analysis, data validation, and synthesis."
+description = "Use to run high-volume deterministic checks such as tests, lint, static analysis, data validation, build, synthesis, or plot regeneration, returning a concise pass/fail summary with evidence pointers while keeping raw output in an artifact. Not for a single quick command or semantic review."
 model = "gpt-5.6-luna"
 model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"

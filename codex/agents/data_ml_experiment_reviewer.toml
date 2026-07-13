@@ -1,5 +1,5 @@
 name = "data_ml_experiment_reviewer"
-description = "Review AI/ML datasets, training, evaluation, baselines, metrics, and reproducibility."
+description = "Use when designing or accepting an AI/ML experiment, dataset split, metric, baseline, or reproducibility claim. Returns findings on experimental validity. Not for general code review or non-ML statistics."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

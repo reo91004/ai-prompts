@@ -1,6 +1,6 @@
 ---
 name: research-repo-architect
-description: Use for designing or refactoring research experiment repositories, including AI/ML, hardware, side-channel, simulation, and paper-idea validation repos.
+description: Use when creating or refactoring a research experiment repository across AI/ML, hardware, side-channel, simulation, or paper-idea validation. Returns a structure plan. Not for feature code or general software architecture.
 model: opus
 effort: high
 tools: [Read, Grep, Glob, Bash]

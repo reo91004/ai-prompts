@@ -1,5 +1,5 @@
 name = "sequential_reasoning_coordinator"
-description = "Coordinate complex reasoning and use Sequential Thinking MCP when available."
+description = "Use for genuinely hard planning, unclear failures, expensive experiment design, or claim acceptance, preferring Sequential Thinking MCP. Returns decomposition, risks, and acceptance blockers. Not for routine or mechanical work."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

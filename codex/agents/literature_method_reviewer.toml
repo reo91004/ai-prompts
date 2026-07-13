@@ -1,5 +1,5 @@
 name = "literature_method_reviewer"
-description = "Review literature, citations, methodology, assumptions, novelty, and proof sketches."
+description = "Use when reviewing literature, methodology, novelty, citations, or proof sketches, or positioning a claim against prior work. Returns method findings. Not for code or measured-result review."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

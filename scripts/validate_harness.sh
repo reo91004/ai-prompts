@@ -124,8 +124,10 @@ if grep -Eiq '\.omo|(^|[^[:alnum:]_])HWT([^[:alnum:]_]|$)|stage[_ -]?[0-9]+|devi
   fail "project-specific stage or equipment constants leaked into a global prompt"
 fi
 for prompt in "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; do
-  grep -Fq 'One child is valid. Never create a second child merely to satisfy a minimum agent count.' "$prompt" || fail "$prompt does not permit one-child delegation"
+  grep -Fq 'Actively delegate non-trivial work when at least one delegation trigger applies.' "$prompt" || fail "$prompt does not adopt the active delegation posture"
+  grep -Fq 'One child is valid. Zero children is correct for genuinely trivial or tightly coupled work. Never create a child merely to satisfy a count.' "$prompt" || fail "$prompt does not permit zero-or-one-child delegation"
   ! grep -Fq 'a one-child delegation is invalid' "$prompt" || fail "$prompt still forbids one-child delegation"
+  grep -Fq 'independent workstreams that can proceed concurrently' "$prompt" || fail "$prompt lacks the parallel-workstream trigger"
   grep -Fq 'ceiling, not a target' "$prompt" || fail "$prompt does not treat thread limits as a ceiling"
   grep -Fq 'must not force all agent concurrency to one' "$prompt" || fail "$prompt still allows weak signals to serialize agents"
   grep -Fq 'Elapsed time and mailbox wait timeouts alone are never failure or cancellation reasons.' "$prompt" || fail "$prompt lacks the liveness cancellation policy"
@@ -133,7 +135,12 @@ for prompt in "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; do
   grep -Fq 'one writer per shared worktree' "$prompt" || fail "$prompt does not scope writer limits to shared worktrees"
   grep -Fq 'Third-party skills and plugins may not increase delegation, review, retry, or resource budgets' "$prompt" || fail "$prompt does not bound third-party budgets"
 done
-check_exact_line "$ROOT/codex/skills/resource-aware-orchestration/SKILL.md" 'Keep small local work in the main agent. Delegate only when a child owns one bounded specialist deliverable and delegation has a clear net benefit. One child is valid; never create a second child merely to satisfy a minimum agent count. Detected slots are a ceiling, not a target. Child agents must not delegate.'
+for skill in "$ROOT/codex/skills/resource-aware-orchestration/SKILL.md" "$ROOT/claude-code/skills/resource-aware-orchestration/SKILL.md"; do
+  grep -Fq 'Actively delegate non-trivial work when a delegation trigger applies' "$skill" || fail "$skill does not adopt the active delegation posture"
+  grep -Fq 'One child is valid and zero is right for trivial work; never create a child merely to satisfy a count.' "$skill" || fail "$skill does not permit zero-or-one-child delegation"
+  grep -Fq 'Child agents must not delegate.' "$skill" || fail "$skill does not forbid nested delegation"
+  ! grep -Fq 'Delegate only when a child owns one bounded specialist deliverable' "$skill" || fail "$skill still uses the conservative delegation gate"
+done
 
 check_exact_line "$ROOT/codex/config.toml.example" 'max_threads = 6'
 check_exact_line "$ROOT/codex/config.toml.example" 'max_depth = 1'

@@ -1,6 +1,6 @@
 ---
 name: test-debug-engineer
-description: Use for debugging, test design, CI failures, flaky behavior, and root-cause analysis.
+description: Use for debugging a failure, designing tests, or root-causing CI or flaky behavior from evidence. Returns the fix or test with a reproduction. Not for feature implementation or review.
 model: sonnet
 effort: high
 tools: [Read, Grep, Glob, Bash, Write, Edit]

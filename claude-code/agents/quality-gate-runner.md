@@ -1,6 +1,6 @@
 ---
 name: quality-gate-runner
-description: Use to identify and run deterministic checks such as tests, lint, static analysis, data validation, build checks, synthesis, and plot regeneration.
+description: Use to run high-volume deterministic checks such as tests, lint, static analysis, data validation, build, synthesis, or plot regeneration, returning a concise pass/fail summary with evidence pointers while keeping raw output in an artifact. Not for a single quick command or semantic review.
 model: sonnet
 effort: low
 tools: [Read, Grep, Glob, Bash]

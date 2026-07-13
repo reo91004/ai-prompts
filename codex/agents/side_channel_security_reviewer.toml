@@ -1,5 +1,5 @@
 name = "side_channel_security_reviewer"
-description = "Review side-channel, cryptographic, leakage, trace, attack, and countermeasure claims."
+description = "Use when designing or accepting a side-channel experiment, leakage detection, trace analysis, key-recovery claim, or countermeasure evaluation. Returns security findings. Not for non-security statistics or general review."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

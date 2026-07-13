@@ -1,6 +1,6 @@
 ---
 name: literature-method-reviewer
-description: Use for literature review, methodology, assumptions, novelty, citations, proof sketches, and paper positioning.
+description: Use when reviewing literature, methodology, novelty, citations, or proof sketches, or positioning a claim against prior work. Returns method findings. Not for code or measured-result review.
 model: sonnet
 effort: high
 tools: [Read, Grep, Glob, WebSearch, WebFetch]

@@ -1,5 +1,5 @@
 name = "statistics_reviewer"
-description = "Review statistical validity, uncertainty, sample size, ablations, and robustness."
+description = "Use when accepting a statistical conclusion or reviewing uncertainty, sample size, ablations, or robustness. Returns statistical findings. Not for mechanical changes or domain-specific attack claims."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

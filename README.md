@@ -151,9 +151,32 @@ universal_research_agent_prompt_kit_final/
 
 Subagent와 skill은 도구가 인식할 수 있는 위치에 설치됩니다. Skill 본문과 reference/template은 관련 작업일 때만 읽도록 지침화되어 있습니다.
 
+## 서브에이전트 위임
+
+전역 지침은 **적극 위임**을 기본 자세로 둡니다. non-trivial 작업은 위임 트리거를 먼저 찾아 분리 가능한 전문 산출물을 각각 서브에이전트에 맡깁니다. 트리거 6종: (1) 소유권이 명확한 구현·리팩터 슬라이스 → implementation-engineer, (2) 낯선 서브시스템 선행 탐색 → context-explorer, (3) 대형 테스트·로그·넓은 grep·문서 조회처럼 원본 출력이 부모 컨텍스트를 오염시킬 작업 → 요약 반환 서브에이전트, (4) 도메인 민감 설계·구현 변경·증거 해석·claim 리뷰 → 해당 도메인 리뷰어, (5) material한 research/benchmark/security/architecture/release/user-data 안전 claim의 최종 수용 → adversarial-reviewer, (6) 동시 진행 가능한 독립 워크스트림 → 각 1명 병렬. 큰 출력 작업은 원본을 artifact에 두고 요약·evidence pointer만 회수하고, 독립 자식을 띄운 뒤 부모는 의존 없는 작업을 계속하다 synthesis/acceptance 경계에서만 대기합니다.
+
+모델은 부모=추론 강모델·자식=집중 모델 패턴입니다(claim acceptance 역할 opus/Sol, 구현·탐색·기계 작업 sonnet/Terra·Luna). 각 서브에이전트의 `description`이 자동 위임을 결정하므로 30개 전부 "언제 호출/언제 호출 안 함/무엇을 반환/경계"를 담습니다.
+
+**핑퐁 방지**: 적극 위임이지만 라운드1에서 뺀 과잉은 되살리지 않습니다 — 강제 최소 인원 없음(child 1개도 0개도 유효), quick command는 직접 실행, semantic reviewer 1명(+delta 1회), 다중 리뷰 lane 없음, `max_depth = 1`. 트리거가 없으면 main-only로 처리하고 사유를 내부에 한 줄만 기록합니다.
+
+정책은 `Global Core → Domain Skill → Project Overlay` 순서로 적용되고, child의 nested delegation은 금지됩니다.
+
+### 위임 행동 시나리오 (릴리스 전 정성 확인)
+
+| 시나리오 | 기대 동작 |
+| --- | --- |
+| README 오탈자 1개 | child 0, main 직접 수정 |
+| 낯선 대형 repo 구조 파악 | context-explorer 1, 요약 회수 |
+| 5,000줄 테스트 로그 분석 | quality/debug child 1, 원본은 artifact·요약만 회수 |
+| 독립 조사 3건 | read-only child 최대 3개 병렬 |
+| 한 파일 긴밀한 10줄 수정 | main-only 또는 bounded writer 1 |
+| SCA key-recovery claim acceptance | reviewer 1(+delta 1회) |
+
+각 작업의 위임 판단은 planned-work의 `evidence.md`에 경량 ledger(task·trigger·delegated role·solo reason·parallel|isolation·useful|redundant·latency)로 남길 수 있습니다.
+
 ## 자원 인식형 오케스트레이션
 
-정책은 `Global Core → Domain Skill → Project Overlay` 순서로 적용됩니다. 작은 로컬 작업은 main agent가 단독 처리합니다. child 수는 독립 산출물 수를 따르며 **child 1개도 유효합니다** — 최소 인원을 채우기 위해 작업을 쪼개지 않습니다. 감지된 slot은 목표가 아니라 상한이고, child의 nested delegation은 금지됩니다(`max_depth = 1`).
+작은 로컬 작업은 main agent가 단독 처리합니다. 감지된 slot은 목표가 아니라 상한입니다.
 
 resource detector는 macOS의 `sysctl`, `memory_pressure`, `vm_stat`, Linux/WSL의 `/proc`, PSI, cgroup v2 신호를 읽습니다. Linux에서는 현재 process의 cgroup v2 경로와 mount root를 해석하고 그 경로부터 mount root까지 가장 엄격한 memory, CPU, cpuset, OOM 제한을 적용합니다. `agent_slots`는 절대 메모리 headroom(가용 2GiB당 slot 1개, 1–6 clamp)과 CPU 한도, `HARNESS_MAX_THREADS`, `HARNESS_TASK_CAP`의 최솟값이며 기본 상한은 6입니다.
 

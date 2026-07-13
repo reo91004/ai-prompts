@@ -1,6 +1,6 @@
 ---
 name: hardware-vivado-reviewer
-description: Use for Vivado, FPGA, RTL, synthesis, implementation, timing, utilization, simulation, and hardware evidence review.
+description: Use when reviewing Vivado, FPGA, RTL synthesis, timing, utilization, simulation, or hardware evidence. Returns findings tied to the reports. Not for software-only or non-hardware work.
 model: sonnet
 effort: high
 tools: [Read, Grep, Glob, Bash]

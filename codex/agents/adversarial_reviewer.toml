@@ -1,5 +1,5 @@
 name = "adversarial_reviewer"
-description = "Attack code, experiments, papers, logs, plots, and claims for missing evidence and overclaims."
+description = "Use before accepting a material research, benchmark, security, architecture, release, or user-data-safety claim. Returns a verdict with required fixes and a claim-control decision. Not for mechanical or low-risk changes."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

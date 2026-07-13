@@ -1,5 +1,5 @@
 name = "software_architect"
-description = "Review software architecture, APIs, dependencies, maintainability, and developer workflow."
+description = "Use for API or system design, refactoring plans, dependency decisions, and production maintainability. Returns a design or plan. Not for research-repo layout or claim review."
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"

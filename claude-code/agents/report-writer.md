@@ -1,6 +1,6 @@
 ---
 name: report-writer
-description: Use for Korean research reports, experiment logs, adversarial review reports, carry-over records, and final summaries.
+description: Use to write Korean research reports, experiment logs, review reports, or carry-over records from established evidence. Returns the document. Not for producing or judging the evidence itself.
 model: sonnet
 effort: low
 tools: [Read, Grep, Glob, Write, Edit]

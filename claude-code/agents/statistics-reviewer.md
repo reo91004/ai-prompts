@@ -1,6 +1,6 @@
 ---
 name: statistics-reviewer
-description: Use for statistical claims, uncertainty, significance, sample size, ablations, and robustness checks.
+description: Use when accepting a statistical conclusion or reviewing uncertainty, sample size, ablations, or robustness. Returns statistical findings. Not for mechanical changes or domain-specific attack claims.
 model: opus
 effort: high
 tools: [Read, Grep, Glob, Bash]

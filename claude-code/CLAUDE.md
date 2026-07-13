@@ -26,8 +26,10 @@ The more specific layer may refine the layer above it but must not weaken safety
 
 ## Delegation Contract
 
-- Keep small or tightly coupled work in the main agent. Delegate only when a child has one bounded specialist deliverable and delegation has a clear net benefit.
-- One child is valid. Never create a second child merely to satisfy a minimum agent count.
+- Actively delegate non-trivial work when at least one delegation trigger applies. At the start of a non-trivial task, look first for separable specialist deliverables and assign each suitable one to a subagent. If no trigger applies, keep the work in the main agent and record a one-line internal reason (tight coupling, or delegation overhead exceeding task size).
+- Delegate by default for: a bounded implementation or refactoring slice with explicit ownership (implementation-engineer); exploration of an unfamiliar subsystem before acting (context-explorer); high-volume searches, tests, logs, traces, or document retrieval whose raw output would pollute parent context (a summarizing subagent); domain-sensitive design, implementation change, evidence interpretation, or claim review (the matching specialist); final acceptance of a material research, benchmark, security, architecture, release, or user-data-safety claim (adversarial-reviewer); and independent workstreams that can proceed concurrently (one subagent each).
+- One child is valid. Zero children is correct for genuinely trivial or tightly coupled work. Never create a child merely to satisfy a count.
+- For high-volume delegated work, keep raw output in an artifact and return only a concise synthesis, evidence pointers, remaining risks, and the exact parent action. After spawning independent children, continue parent work that does not depend on their results; wait only at a synthesis or acceptance boundary.
 - Treat the configured thread limit as a ceiling, not a target. Start from the configured or host default ceiling and reduce it only after confirmed, sustained resource pressure.
 - Low free swap, one noisy sample, a stale snapshot, or detector failure alone does not prove resource pressure and must not force all agent concurrency to one.
 - Run the `resource-aware-orchestration` detector before a spawn wave. A new resource recommendation applies to new work; do not cancel healthy existing work merely because the recommended concurrency decreased.
@@ -54,7 +56,7 @@ Available agents cover context exploration, sequential reasoning, implementation
 
 ## Acceptance
 
-- Run cheap deterministic checks directly. Do not spawn an agent merely to run a command that the main agent can run safely.
+- Run cheap, low-output deterministic checks directly; do not spawn an agent for a quick command. Delegate a check when its output would flood context, when several independent checks can run concurrently, or when interpreting the result needs a dedicated specialist, and take back only the summary and evidence pointers.
 - Run relevant syntax, type, lint, build, test, data, reproducibility, proof, synthesis, analysis, and artifact checks.
 - Apply the Review Necessity Gate. Use one semantic reviewer, then at most one targeted delta re-review by default.
 - Classify review findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`.
