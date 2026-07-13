@@ -197,6 +197,16 @@ codex_lazycodex_pinned_enabled() {
   '
 }
 
+# Outside the ultra profile any enabled LazyCodex version conflicts with the
+# harness review budget, so the check is version-agnostic.
+codex_lazycodex_enabled() {
+  codex plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+    const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
+    process.exit(lazy && lazy.installed === true && lazy.enabled === true ? 0 : 1);
+  '
+}
+
 claude_ponytail_kit_enabled() {
   claude plugin list --json | node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
@@ -231,11 +241,15 @@ if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
   echo "Skipped integration verification by explicit environment setting."
 elif [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
   echo "No integrations state recorded (pre-migration install)."
-  if codex_usable && codex_lazycodex_pinned_enabled; then
-    echo "Legacy kit-pinned LazyCodex 4.17.0 is still enabled; run 'sh install.sh' to migrate."
-    missing=1
+  if codex_usable; then
+    if codex_lazycodex_enabled; then
+      echo "LazyCodex is still enabled; run 'sh install.sh' to migrate."
+      missing=1
+    else
+      echo "OK integrations: no enabled LazyCodex detected"
+    fi
   else
-    echo "OK integrations: no legacy kit-pinned LazyCodex detected"
+    echo "Integrations unverified: Codex CLI or Node.js unavailable."
   fi
 else
   requested_profile="$(read_state requested_profile)"
@@ -319,16 +333,13 @@ else
         missing=1
       fi
       ;;
-    disabled_legacy|not_requested)
-      if codex_usable && codex_lazycodex_pinned_enabled; then
-        echo "Kit-pinned LazyCodex 4.17.0 is enabled but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
+    disabled_legacy|not_requested|user_owned_warned)
+      if codex_usable && codex_lazycodex_enabled; then
+        echo "LazyCodex is enabled but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
         missing=1
       else
         echo "OK Codex integration: LazyCodex $codex_lazycodex_state"
       fi
-      ;;
-    user_owned_warned)
-      echo "Warning: a non-kit-pinned LazyCodex version is installed and was preserved as user-owned."
       ;;
     host_unavailable|skipped_env)
       echo "Codex LazyCodex: $codex_lazycodex_state"
@@ -379,6 +390,26 @@ else
       missing=1
       ;;
   esac
+
+  # LazyCodex installs raise agents.max_threads far above the harness
+  # ceiling; outside ultra the installer caps it at 6.
+  if [ "$requested_profile" != "ultra" ] && command -v codex >/dev/null 2>&1 &&
+     [ -f "$HOME/.codex/config.toml" ] && [ ! -L "$HOME/.codex/config.toml" ]; then
+    agents_max_threads="$(awk '$0 == "[agents]" { s = 1; next } /^\[/ { s = 0 } s && /^max_threads[ \t]*=/ { sub(/^max_threads[ \t]*=[ \t]*/, ""); print; exit }' "$HOME/.codex/config.toml")"
+    case "$agents_max_threads" in
+      ''|*[!0-9]*)
+        echo "OK Codex config: no numeric agents.max_threads override"
+        ;;
+      *)
+        if [ "$agents_max_threads" -gt 6 ]; then
+          echo "Codex agents.max_threads is $agents_max_threads (harness ceiling is 6); run 'sh install.sh' to cap it."
+          missing=1
+        else
+          echo "OK Codex config: agents.max_threads = $agents_max_threads"
+        fi
+        ;;
+    esac
+  fi
 fi
 
 if [ "$missing" -ne 0 ]; then

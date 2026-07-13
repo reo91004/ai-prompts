@@ -237,7 +237,7 @@ run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrati
 [ "$(state_value "$A_HOME" claude_sequential_thinking)" = "preexisting" ]
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
 
-echo "Scenario B: user-owned Ponytail is preserved and still verifies"
+echo "Scenario B: default profile is ponytail and user-owned Ponytail is preserved"
 B_HOME="$WORK/home-b"
 B_CODEX="$WORK/mock-b-codex"
 B_CLAUDE="$WORK/mock-b-claude"
@@ -256,13 +256,14 @@ case "\$cmd" in
 esac
 MOCK
 chmod +x "$MOCK_BIN/git"
-run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install_all.sh" --integrations ponytail >/dev/null
+run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install_all.sh" >/dev/null
 rm -f "$MOCK_BIN/git"
 
 if grep -Eq 'remove|uninstall|disable' "$B_CODEX/calls.log" "$B_CLAUDE/calls.log"; then
   echo "user-owned integrations were modified" >&2
   exit 1
 fi
+[ "$(state_value "$B_HOME" requested_profile)" = "ponytail" ]
 [ "$(state_value "$B_HOME" codex_ponytail)" = "preserved_user_owned" ]
 [ "$(state_value "$B_HOME" claude_ponytail)" = "preserved_user_owned" ]
 [ "$(state_value "$B_HOME" codex_lazycodex)" = "not_requested" ]
@@ -298,5 +299,46 @@ run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" no
 [ "$(state_value "$C_HOME" claude_ponytail)" = "not_requested" ]
 [ "$(state_value "$C_HOME" codex_sequential_thinking)" = "registered_kit" ]
 [ "$(state_value "$C_HOME" claude_sequential_thinking)" = "registered_kit" ]
+
+echo "Scenario D: any-version LazyCodex is disabled and max_threads is capped"
+D_HOME="$WORK/home-d"
+D_CODEX="$WORK/mock-d-codex"
+D_CLAUDE="$WORK/mock-d-claude"
+mkdir -p "$D_HOME/.codex/plugins" "$D_HOME/.claude/plugins"
+printf '%s\n' \
+  '[agents]' \
+  'max_threads = 1000' \
+  '' \
+  '[plugins."omo@sisyphuslabs"]' \
+  'enabled = true' > "$D_HOME/.codex/config.toml"
+mkdir -p "$D_CODEX" "$D_CLAUDE"
+: > "$D_CODEX/calls.log"
+: > "$D_CLAUDE/calls.log"
+node -e '
+  const fs = require("fs");
+  const dir = process.argv[1];
+  fs.writeFileSync(dir + "/plugins.json", JSON.stringify({
+    installed: [{
+      pluginId: "omo@sisyphuslabs",
+      version: "4.16.1",
+      installed: true,
+      enabled: true,
+      source: { source: "npm" },
+    }],
+  }));
+  fs.writeFileSync(dir + "/marketplaces.json", "[]");
+' "$D_CODEX"
+printf '%s\n' '[]' > "$D_CLAUDE/plugins.json"
+printf '%s\n' '[]' > "$D_CLAUDE/marketplaces.json"
+run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+[ "$(state_value "$D_HOME" codex_lazycodex)" = "disabled_legacy" ]
+[ "$(state_value "$D_HOME" codex_ponytail)" = "not_requested" ]
+d_disabled_line="$(grep -A1 '^\[plugins."omo@sisyphuslabs"\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
+[ "$d_disabled_line" = "enabled = false" ] || {
+  echo "non-pinned LazyCodex was not disabled" >&2; exit 1; }
+d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
+[ "$d_threads_line" = "max_threads = 6" ] || {
+  echo "agents.max_threads was not capped to 6" >&2; exit 1; }
 
 echo "Integration migration tests passed."

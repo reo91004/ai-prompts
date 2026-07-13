@@ -305,8 +305,9 @@ configure_claude_marketplace() {
   fi
 }
 
-# Legacy LazyCodex reconciliation: only the kit-pinned version counts as
-# kit-installed. Any other version is treated as user-owned and preserved.
+# LazyCodex reconciliation is version-agnostic: outside the ultra profile
+# every installed LazyCodex is disabled (never removed) because its
+# always-delegate/5-lane workflow overrides this harness's review budget.
 reconcile_codex_lazycodex() {
   local status version enablement
 
@@ -317,20 +318,35 @@ reconcile_codex_lazycodex() {
   fi
   version="${status%% *}"
   enablement="${status##* }"
-  if [ "$version" != "$LAZYCODEX_VERSION" ]; then
-    echo "Warning: LazyCodex $version is not the kit-pinned $LAZYCODEX_VERSION; treating it as user-owned and leaving it unchanged." >&2
-    CODEX_LAZYCODEX_STATE="user_owned_warned"
-    return
-  fi
   if [ "$enablement" = "enabled" ]; then
-    echo "Disabling kit-installed legacy LazyCodex $LAZYCODEX_VERSION (profile: $PROFILE). Re-enable by setting enabled = true under [plugins.\"omo@sisyphuslabs\"] in ~/.codex/config.toml"
+    echo "Disabling LazyCodex $version (profile: $PROFILE). Re-enable by setting enabled = true under [plugins.\"omo@sisyphuslabs\"] in ~/.codex/config.toml or reinstalling with --integrations ultra"
     codex_set_plugin_enabled "omo@sisyphuslabs" false
-    [ "$(codex_plugin_status "omo@sisyphuslabs")" = "$LAZYCODEX_VERSION disabled" ] ||
-      kit_die "Failed to disable legacy LazyCodex."
+    [ "$(codex_plugin_status "omo@sisyphuslabs")" = "$version disabled" ] ||
+      kit_die "Failed to disable LazyCodex."
   else
-    echo "Kit-installed legacy LazyCodex is already disabled."
+    echo "LazyCodex $version is already disabled."
   fi
   CODEX_LAZYCODEX_STATE="disabled_legacy"
+}
+
+# LazyCodex installs raise agents.max_threads to 1000; the harness ceiling
+# is 6. Values at or below 6 are a deliberate user choice and stay.
+codex_cap_agent_threads() {
+  local config="$HOME/.codex/config.toml"
+  local current
+  local tmp
+
+  [ -f "$config" ] || return 0
+  kit_require_regular_or_absent "$config"
+  current="$(awk '$0 == "[agents]" { s = 1; next } /^\[/ { s = 0 } s && /^max_threads[ \t]*=/ { sub(/^max_threads[ \t]*=[ \t]*/, ""); print; exit }' "$config")"
+  case "$current" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  [ "$current" -gt 6 ] || return 0
+  echo "Capping agents.max_threads from $current to 6 in ~/.codex/config.toml."
+  tmp="$(mktemp "$config.tmp.XXXXXX")"
+  awk '$0 == "[agents]" { s = 1; print; next } /^\[/ { s = 0; print; next } s && /^max_threads[ \t]*=/ { print "max_threads = 6"; next } { print }' "$config" > "$tmp"
+  mv "$tmp" "$config"
 }
 
 # Profile none removes only kit-owned Ponytail remnants; user-owned
@@ -452,6 +468,7 @@ if [ "$codex_available" -eq 1 ]; then
     CODEX_LAZYCODEX_STATE="installed_kit_owned"
   else
     reconcile_codex_lazycodex
+    codex_cap_agent_threads
   fi
 
   if [ "$PROFILE" = "none" ]; then

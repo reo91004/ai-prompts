@@ -5,12 +5,12 @@ source "$ROOT/lib/install_common.sh"
 
 usage() {
   echo "usage: install_all.sh [--integrations none|ponytail|ultra]"
-  echo "  none      core prompts, agents, and skills only (default)"
-  echo "  ponytail  core plus the pinned Ponytail plugin"
-  echo "  ultra     core plus Ponytail and the pinned LazyCodex workflow"
+  echo "  ponytail  core plus pinned Ponytail and Sequential Thinking MCP (default)"
+  echo "  none      core only; also reconciles away kit and legacy integrations"
+  echo "  ultra     ponytail plus the pinned LazyCodex workflow"
 }
 
-INTEGRATIONS_PROFILE=none
+INTEGRATIONS_PROFILE=ponytail
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --integrations)
