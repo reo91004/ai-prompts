@@ -48,7 +48,7 @@ The more specific layer may refine the layer above it but must not weaken safety
 
 ## Skills And Agents
 
-Select only relevant skills. Route research domains through `research-domain-router`; use `resource-aware-orchestration` for delegation, `review-budget` for semantic review, and `evidence-gate` as the evidence contract authority. Use `hardware-capture-integrity` only for physical capture work.
+Select only relevant skills. Route research domains through `research-domain-router`; use `resource-aware-orchestration` for delegation, `review-budget` for semantic review, and `evidence-gate` as the evidence contract authority. Use `hardware-capture-integrity` only for physical capture work. Route multi-session, claim-bearing, or handover-driven work through `planned-work`, which keeps the user-inspectable plan and evidence ledger under the project's `.plans/`; small local tasks do not open a ledger entry.
 
 Available agents cover context exploration, sequential reasoning, implementation, debugging, software and research architecture, deterministic quality gates, comment hygiene, AI/ML, statistics, side-channel/security, Vivado, literature/method, adversarial review, and reporting. Choose roles by distinct deliverable rather than generic job title.
 

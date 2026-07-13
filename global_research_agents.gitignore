@@ -51,6 +51,9 @@ build/
 .nuxt/
 coverage/
 
+# planned-work ledger: local by default; a project that wants tracked plans adds !.plans/ to its own .gitignore
+.plans/
+
 # Data / experiment outputs that should usually be versioned intentionally, not accidentally
 runs/
 wandb/
