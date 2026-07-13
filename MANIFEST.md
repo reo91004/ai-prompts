@@ -43,7 +43,7 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/planned-work/SKILL.md`
 - `claude-code/skills/planned-work/templates/plan.md`
 - `claude-code/skills/planned-work/templates/evidence.md`
-- `claude-code/skills/planned-work/templates/index_entry.md`
+- `claude-code/skills/planned-work/templates/ledger.json`
 - `claude-code/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
 - `claude-code/skills/no-placeholder-development/references/research_code_guard_policy.md`
 - `claude-code/skills/report-writer/SKILL.md`
@@ -93,7 +93,7 @@ This is the final universal research/development prompt kit.
 - `codex/skills/planned-work/SKILL.md`
 - `codex/skills/planned-work/templates/plan.md`
 - `codex/skills/planned-work/templates/evidence.md`
-- `codex/skills/planned-work/templates/index_entry.md`
+- `codex/skills/planned-work/templates/ledger.json`
 - `codex/skills/no-placeholder-development/references/placeholder_hardcoding_policy.md`
 - `codex/skills/no-placeholder-development/references/research_code_guard_policy.md`
 - `codex/skills/report-writer/SKILL.md`

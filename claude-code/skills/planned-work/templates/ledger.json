@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "active_work_id": "2026-01-01-A-example-slug",
+  "works": {
+    "2026-01-01-A-example-slug": {
+      "slug": "example-slug",
+      "status": "active",
+      "plan": "2026-01-01-A-example-slug/plan.md",
+      "constraints": ["only constraints the user stated, verbatim"],
+      "updated": "2026-01-01"
+    }
+  }
+}

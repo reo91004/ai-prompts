@@ -45,4 +45,4 @@ Includes `research-repo-design` skill and `research_repo_architect` agent. Use t
 
 Includes calibrated research-code guard policy. Adversarial review should require fixes for claim integrity, provenance, seed/config/run binding, synthetic/measured separation, fake-pass prevention, and user-data safety; production-only hardening stays optional unless production scope is requested.
 
-Includes `planned-work` skill. Use it for multi-session, claim-bearing, or handover-driven work: it keeps the user-inspectable plan and evidence ledger under the project's `.plans/` without LazyCodex-style forced delegation or multi-lane review.
+Includes `planned-work` skill. Use it for multi-session, claim-bearing, or handover-driven work: it keeps a user-inspectable plan and evidence ledger under the project's `.plans/` — a machine-readable `ledger.json` (active work, status, constraints) plus a `plan.md` TODO checklist — without LazyCodex-style forced delegation or multi-lane review.

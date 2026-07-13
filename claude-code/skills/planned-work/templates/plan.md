@@ -11,13 +11,16 @@
 
 - [검증된 가정은 근거와 함께, 미검증 가정은 명시적으로 표시]
 
-## Steps
+## TODO
 
-1. [단계 — 산출물과 확인 방법]
+Progress lives here. `[ ]` not started · `[x]` done · `[~]` in progress · `[!]` blocked.
+Numbers are stable identifiers; add new items at the end, never renumber.
+Check `[x]` only after evidence.md records a passing deterministic check.
 
-## Acceptance Criteria
-
-- [관찰 가능한 조건과 요구되는 deterministic evidence]
+- [ ] 1. [할 일 — 산출물·확인 방법]
+      - acceptance: [완료 판정 조건]
+- [ ] 2. [다음 할 일]
+      - acceptance: [...]
 
 ## Stop Conditions
 
