@@ -150,72 +150,185 @@ check_file "$HOME/.config/git/ignore"
 check_contains "$HOME/.config/git/ignore" "BEGIN UNIVERSAL RESEARCH AGENT KIT"
 check_contains "$HOME/.config/git/ignore" "END UNIVERSAL RESEARCH AGENT KIT"
 
-# Integration checks follow the profile the installer recorded. The default
-# core install manages no plugins and never inspects or removes user MCPs.
-integrations_profile="none"
-profile_file="$HOME/.universal-research-agent-kit/integrations.profile"
-if [ -f "$profile_file" ] && [ ! -L "$profile_file" ]; then
-  integrations_profile="$(sed -n '1p' "$profile_file")"
-fi
-if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
-  integrations_profile="none"
-fi
+# Integration checks follow the per-host states the installer recorded, so a
+# preserved user-owned Ponytail or a disabled legacy LazyCodex verifies as
+# the intended outcome rather than as a missing kit install.
+STATE_FILE="$HOME/.universal-research-agent-kit/integrations.state"
+KIT_MARKETPLACE_ROOT="$HOME/.universal-research-agent-kit/marketplaces"
+KIT_PONYTAIL_PATH="$KIT_MARKETPLACE_ROOT/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail"
 
-case "$integrations_profile" in
-  ponytail|ultra)
-    if command -v codex >/dev/null 2>&1; then
-      if ! codex plugin list --json | EXPECTED_PONYTAIL_PATH="$HOME/.universal-research-agent-kit/marketplaces/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail" node -e '
-        const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
-        const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
-        const valid = ponytail && ponytail.version === "4.8.4" &&
-          ponytail.installed === true && ponytail.enabled === true &&
-          ponytail.source?.source === "local" &&
-          ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
-        process.exit(valid ? 0 : 1);
-      '; then
+read_state() {
+  sed -n "s/^$1=//p" "$STATE_FILE" | sed -n '1p'
+}
+
+codex_usable() { command -v codex >/dev/null 2>&1 && command -v node >/dev/null 2>&1; }
+claude_usable() { command -v claude >/dev/null 2>&1 && command -v node >/dev/null 2>&1; }
+
+codex_ponytail_kit_enabled() {
+  codex plugin list --json | EXPECTED_PONYTAIL_PATH="$KIT_PONYTAIL_PATH" node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+    const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
+    const valid = ponytail && ponytail.version === "4.8.4" &&
+      ponytail.installed === true && ponytail.enabled === true &&
+      ponytail.source?.source === "local" &&
+      ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
+    process.exit(valid ? 0 : 1);
+  '
+}
+
+codex_ponytail_kit_owned_present() {
+  codex plugin list --json | KIT_MARKETPLACE_ROOT="$KIT_MARKETPLACE_ROOT" node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+    const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
+    const owned = ponytail && ponytail.installed === true &&
+      ponytail.source?.source === "local" &&
+      typeof ponytail.source.path === "string" &&
+      ponytail.source.path.startsWith(process.env.KIT_MARKETPLACE_ROOT + "/");
+    process.exit(owned ? 0 : 1);
+  '
+}
+
+codex_lazycodex_pinned_enabled() {
+  codex plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+    const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
+    process.exit(lazy && lazy.version === "4.17.0" && lazy.installed === true &&
+      lazy.enabled === true ? 0 : 1);
+  '
+}
+
+claude_ponytail_kit_enabled() {
+  claude plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const ponytail = plugins.find((item) =>
+      item.id === "ponytail@ponytail" && item.scope === "user");
+    process.exit(ponytail && ponytail.version === "4.8.4" &&
+      ponytail.enabled === true ? 0 : 1);
+  '
+}
+
+claude_ponytail_installed() {
+  claude plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const ponytail = plugins.find((item) =>
+      item.id === "ponytail@ponytail" && item.scope === "user");
+    process.exit(ponytail ? 0 : 1);
+  '
+}
+
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
+  echo "Skipped integration verification by explicit environment setting."
+elif [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
+  echo "No integrations state recorded (pre-migration install)."
+  if codex_usable && codex_lazycodex_pinned_enabled; then
+    echo "Legacy kit-pinned LazyCodex 4.17.0 is still enabled; run 'sh install.sh' to migrate."
+    missing=1
+  else
+    echo "OK integrations: no legacy kit-pinned LazyCodex detected"
+  fi
+else
+  requested_profile="$(read_state requested_profile)"
+  echo "Integrations profile: ${requested_profile:-unknown}"
+
+  codex_ponytail_state="$(read_state codex_ponytail)"
+  case "$codex_ponytail_state" in
+    installed_kit_owned)
+      if codex_usable && codex_ponytail_kit_enabled; then
+        echo "OK Codex integration: Ponytail (kit-owned)"
+      else
         echo "Missing Codex integration: Ponytail"
         missing=1
-      else
-        echo "OK Codex integration: Ponytail"
       fi
-      if [ "$integrations_profile" = "ultra" ]; then
-        if ! codex plugin list --json | node -e '
-          const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
-          const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
-          process.exit(lazy && lazy.version === "4.17.0" && lazy.installed === true &&
-            lazy.enabled === true ? 0 : 1);
-        '; then
-          echo "Missing Codex integration: LazyCodex"
-          missing=1
-        else
-          echo "OK Codex integration: LazyCodex"
-        fi
-      fi
-    fi
-
-    if command -v claude >/dev/null 2>&1; then
-      if ! claude plugin list --json | node -e '
-        const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
-        const ponytail = plugins.find((item) =>
-          item.id === "ponytail@ponytail" && item.scope === "user");
-        process.exit(ponytail && ponytail.version === "4.8.4" &&
-          ponytail.enabled === true ? 0 : 1);
-      '; then
-        echo "Missing Claude integration: Ponytail"
+      ;;
+    preserved_user_owned)
+      echo "OK Codex integration: user-owned Ponytail preserved"
+      ;;
+    removed_legacy|not_requested)
+      if codex_usable && codex_ponytail_kit_owned_present; then
+        echo "Kit-owned Codex Ponytail is still installed despite state '$codex_ponytail_state'."
         missing=1
       else
-        echo "OK Claude integration: Ponytail"
+        echo "OK Codex integration: Ponytail $codex_ponytail_state"
       fi
-    fi
-    ;;
-  none)
-    echo "OK integrations: none selected (core-only install)"
-    ;;
-  *)
-    echo "Unknown integrations profile: $integrations_profile"
-    missing=1
-    ;;
-esac
+      ;;
+    host_unavailable|skipped_env)
+      echo "Codex Ponytail: $codex_ponytail_state"
+      ;;
+    unverified_no_node)
+      echo "Warning: Codex Ponytail state is unverified (Node.js was unavailable at install time)."
+      ;;
+    *)
+      echo "Unknown Codex Ponytail state: $codex_ponytail_state"
+      missing=1
+      ;;
+  esac
+
+  claude_ponytail_state="$(read_state claude_ponytail)"
+  case "$claude_ponytail_state" in
+    installed_kit_owned)
+      if claude_usable && claude_ponytail_kit_enabled; then
+        echo "OK Claude integration: Ponytail (kit-owned)"
+      else
+        echo "Missing Claude integration: Ponytail"
+        missing=1
+      fi
+      ;;
+    preserved_user_owned)
+      echo "OK Claude integration: user-owned Ponytail preserved"
+      ;;
+    removed_legacy|not_requested)
+      if claude_usable && claude_ponytail_installed; then
+        echo "Claude Ponytail is still installed despite state '$claude_ponytail_state'."
+        missing=1
+      else
+        echo "OK Claude integration: Ponytail $claude_ponytail_state"
+      fi
+      ;;
+    host_unavailable|skipped_env)
+      echo "Claude Ponytail: $claude_ponytail_state"
+      ;;
+    unverified_no_node)
+      echo "Warning: Claude Ponytail state is unverified (Node.js was unavailable at install time)."
+      ;;
+    *)
+      echo "Unknown Claude Ponytail state: $claude_ponytail_state"
+      missing=1
+      ;;
+  esac
+
+  codex_lazycodex_state="$(read_state codex_lazycodex)"
+  case "$codex_lazycodex_state" in
+    installed_kit_owned)
+      if codex_usable && codex_lazycodex_pinned_enabled; then
+        echo "OK Codex integration: LazyCodex (ultra profile)"
+      else
+        echo "Missing Codex integration: LazyCodex"
+        missing=1
+      fi
+      ;;
+    disabled_legacy|not_requested)
+      if codex_usable && codex_lazycodex_pinned_enabled; then
+        echo "Kit-pinned LazyCodex 4.17.0 is enabled but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
+        missing=1
+      else
+        echo "OK Codex integration: LazyCodex $codex_lazycodex_state"
+      fi
+      ;;
+    user_owned_warned)
+      echo "Warning: a non-kit-pinned LazyCodex version is installed and was preserved as user-owned."
+      ;;
+    host_unavailable|skipped_env)
+      echo "Codex LazyCodex: $codex_lazycodex_state"
+      ;;
+    unverified_no_node)
+      echo "Warning: Codex LazyCodex state is unverified (Node.js was unavailable at install time)."
+      ;;
+    *)
+      echo "Unknown Codex LazyCodex state: $codex_lazycodex_state"
+      missing=1
+      ;;
+  esac
+fi
 
 if [ "$missing" -ne 0 ]; then
   echo "Install verification failed."

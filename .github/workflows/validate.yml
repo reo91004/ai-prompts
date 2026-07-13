@@ -48,6 +48,8 @@ jobs:
           esac
       - name: Test isolated repeat installation
         run: bash tests/test_install_regression.sh
+      - name: Test integration migration with mock CLIs
+        run: bash tests/test_integration_migration.sh
       - name: Check patch whitespace
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then

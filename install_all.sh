@@ -101,17 +101,6 @@ replace_managed_block() {
   mv "$tmp" "$target"
 }
 
-record_integrations_profile() {
-  local profile_file="$KIT_STATE_ROOT/integrations.profile"
-  local tmp
-
-  kit_require_regular_or_absent "$profile_file"
-  kit_backup_path "$profile_file" "state/integrations.profile"
-  tmp="$(mktemp "$profile_file.tmp.XXXXXX")"
-  printf '%s\n' "$INTEGRATIONS_PROFILE" > "$tmp"
-  mv "$tmp" "$profile_file"
-}
-
 echo "[1/5] Installing Claude Code global research protocol..."
 bash "$ROOT/claude-code/install.sh"
 
@@ -123,13 +112,13 @@ GLOBAL_IGNORE="$HOME/.config/git/ignore"
 replace_managed_block "$GLOBAL_IGNORE" "$ROOT/global_research_agents.gitignore"
 echo "Installed research agent ignore rules to $GLOBAL_IGNORE"
 
-echo "[4/5] Installing opt-in integrations (profile: $INTEGRATIONS_PROFILE)..."
-if [ "$INTEGRATIONS_PROFILE" = "none" ]; then
-  echo "Skipped external integrations; pass --integrations ponytail or --integrations ultra to opt in."
+echo "[4/5] Reconciling integrations (profile: $INTEGRATIONS_PROFILE)..."
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
+  echo "Skipped integration reconciliation by explicit environment setting."
+  kit_write_integrations_state "$INTEGRATIONS_PROFILE" "skipped_env" "skipped_env" "skipped_env"
 else
   bash "$ROOT/install_integrations.sh" "$INTEGRATIONS_PROFILE"
 fi
-record_integrations_profile
 
 echo "[5/5] Verifying install..."
 bash "$ROOT/verify_install.sh"

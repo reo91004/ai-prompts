@@ -58,29 +58,45 @@ min_value() {
   fi
 }
 
-# Degraded detection is not evidence of resource shortage: report the
-# configured ceiling, keep one heavy slot, and exit 3 so callers can see the
-# structured status instead of a fake concurrency measurement.
+# Degraded detection is not evidence of resource shortage: RESOURCE_UNKNOWN
+# reports the configured ceiling but authorizes read-only spawning only,
+# while a stale snapshot authorizes nothing until the detector is re-run.
+# Both exit 3 so callers see the structured status instead of a fake
+# concurrency measurement.
 emit_degraded() {
+  local degraded_slots="$ceiling"
+  local degraded_authorized="read_only"
+
+  if [ "$1" = "RESOURCE_STALE" ]; then
+    degraded_slots=0
+    degraded_authorized=0
+  fi
   echo "status=$1"
   echo "platform=${platform:-unknown}"
   echo "captured_epoch=${captured_epoch:-unavailable}"
   echo "snapshot_age_seconds=${snapshot_age_seconds:-unavailable}"
   echo "cgroup_v2=${cgroup_v2_state:-not_applicable}"
   echo "cgroup_path=${cgroup_path:-unavailable}"
-  echo "agent_slots=$ceiling"
+  echo "agent_slots=$degraded_slots"
   echo "writer_slots=1"
   echo "heavy_command_slots=1"
-  echo "concurrency=$ceiling"
+  echo "spawn_authorized=$degraded_authorized"
+  echo "concurrency=$degraded_slots"
   echo "warnings=none"
   echo "reason=$2"
   exit 3
 }
 
+# The degraded ceiling honors every user-supplied cap, not just max threads.
 ceiling=${HARNESS_MAX_THREADS:-6}
 if ! is_uint "$ceiling" || [ "$ceiling" -eq 0 ] || [ "$ceiling" -gt 6 ]; then
   ceiling=6
 fi
+ceiling_task=${HARNESS_TASK_CAP:-6}
+if ! is_uint "$ceiling_task" || [ "$ceiling_task" -eq 0 ] || [ "$ceiling_task" -gt 6 ]; then
+  ceiling_task=6
+fi
+if [ "$ceiling_task" -lt "$ceiling" ]; then ceiling=$ceiling_task; fi
 
 cpuset_count() {
   echo "$1" | awk -F, '
@@ -653,6 +669,7 @@ echo "cgroup_path=$cgroup_path"
 echo "agent_slots=$agent_slots"
 echo "writer_slots=1"
 echo "heavy_command_slots=$heavy_command_slots"
+echo "spawn_authorized=1"
 echo "concurrency=$agent_slots"
 echo "warnings=$warnings"
 echo "reason=$reasons"

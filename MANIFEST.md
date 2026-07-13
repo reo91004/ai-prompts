@@ -139,5 +139,6 @@ This is the final universal research/development prompt kit.
 - `tests/fixtures/resources/wsl/swapout_before`
 - `tests/fixtures/resources/wsl/total_bytes`
 - `tests/test_install_regression.sh`
+- `tests/test_integration_migration.sh`
 - `tests/test_resource_detector.sh`
 - `verify_install.sh`

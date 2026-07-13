@@ -46,8 +46,13 @@ for manifest in claude-agents claude-skills codex-agents codex-skills; do
   [ "$expected" = "$actual" ] || { echo "invalid manifest checksum: $manifest" >&2; exit 1; }
 done
 
-grep -Fqx 'none' "$TMP_HOME/.universal-research-agent-kit/integrations.profile" || {
-  echo "integrations profile was not recorded as none" >&2
+state_file="$TMP_HOME/.universal-research-agent-kit/integrations.state"
+grep -Fqx 'requested_profile=none' "$state_file" || {
+  echo "integrations state did not record profile none" >&2
+  exit 1
+}
+grep -Fqx 'codex_ponytail=skipped_env' "$state_file" || {
+  echo "integrations state did not record the env skip" >&2
   exit 1
 }
 [ ! -d "$TMP_HOME/.universal-research-agent-kit/.lock" ] || {
@@ -58,6 +63,68 @@ grep -Fqx 'none' "$TMP_HOME/.universal-research-agent-kit/integrations.profile" 
 [ -x "$TMP_HOME/.agents/skills/resource-aware-orchestration/scripts/detect_resources.sh" ]
 [ -x "$TMP_HOME/.claude/skills/resource-aware-orchestration/scripts/detect_resources.sh" ]
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/verify_install.sh"
+
+echo "Unit regression: kit_restore_entry must not delete a target without its backup"
+(
+  set -euo pipefail
+  source "$ROOT/lib/install_common.sh"
+  unit_dir="$(mktemp -d "${TMPDIR:-/tmp}/restore-unit.XXXXXX")"
+  printf 'precious\n' > "$unit_dir/target"
+  rc=0
+  kit_restore_entry "$unit_dir/target" "$unit_dir/missing-backup" || rc=$?
+  [ "$rc" -ne 0 ] || { echo "kit_restore_entry succeeded without a backup" >&2; exit 1; }
+  grep -Fqx 'precious' "$unit_dir/target" || { echo "kit_restore_entry destroyed the target" >&2; exit 1; }
+  rm -rf "$unit_dir"
+)
+
+echo "Backup-failure regression: a failed backup copy must leave the original intact"
+BACKUP_FAIL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-backupfail.XXXXXX")"
+mkdir -p "$BACKUP_FAIL_HOME/.claude/agents"
+printf 'user prompt\n' > "$BACKUP_FAIL_HOME/.claude/CLAUDE.md"
+printf 'user agent\n' > "$BACKUP_FAIL_HOME/.claude/agents/user-agent.md"
+claude_md_before="$(cksum "$BACKUP_FAIL_HOME/.claude/CLAUDE.md")"
+chmod 000 "$BACKUP_FAIL_HOME/.claude/agents"
+set +e
+HOME="$BACKUP_FAIL_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh" >/dev/null 2>&1
+backup_fail_rc=$?
+set -e
+chmod 700 "$BACKUP_FAIL_HOME/.claude/agents"
+[ "$backup_fail_rc" -ne 0 ] || { echo "install unexpectedly succeeded with an unreadable agents dir" >&2; rm -rf "$BACKUP_FAIL_HOME"; exit 1; }
+grep -Fqx 'user agent' "$BACKUP_FAIL_HOME/.claude/agents/user-agent.md" || {
+  echo "backup failure destroyed the original agents directory" >&2
+  rm -rf "$BACKUP_FAIL_HOME"
+  exit 1
+}
+claude_md_after="$(cksum "$BACKUP_FAIL_HOME/.claude/CLAUDE.md")"
+[ "$claude_md_before" = "$claude_md_after" ] || {
+  echo "backup failure altered the pre-existing CLAUDE.md" >&2
+  rm -rf "$BACKUP_FAIL_HOME"
+  exit 1
+}
+[ ! -d "$BACKUP_FAIL_HOME/.universal-research-agent-kit/.lock" ] || {
+  echo "install lock left behind after a backup failure" >&2
+  rm -rf "$BACKUP_FAIL_HOME"
+  exit 1
+}
+rm -rf "$BACKUP_FAIL_HOME"
+
+echo "Marker regression: a malformed gitignore marker pair must abort without changing the file"
+MARKER_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-marker.XXXXXX")"
+mkdir -p "$MARKER_HOME/.config/git"
+printf '%s\n' 'user rule' '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# BEGIN UNIVERSAL RESEARCH AGENT KIT' 'stale' '# END UNIVERSAL RESEARCH AGENT KIT' > "$MARKER_HOME/.config/git/ignore"
+ignore_before="$(cksum "$MARKER_HOME/.config/git/ignore")"
+set +e
+HOME="$MARKER_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh" >/dev/null 2>&1
+marker_rc=$?
+set -e
+[ "$marker_rc" -ne 0 ] || { echo "install unexpectedly succeeded with malformed markers" >&2; rm -rf "$MARKER_HOME"; exit 1; }
+ignore_after="$(cksum "$MARKER_HOME/.config/git/ignore")"
+[ "$ignore_before" = "$ignore_after" ] || {
+  echo "malformed marker handling modified the user gitignore" >&2
+  rm -rf "$MARKER_HOME"
+  exit 1
+}
+rm -rf "$MARKER_HOME"
 
 echo "Rollback regression: fail the gitignore phase and expect full restore"
 mkdir -p "$ROLLBACK_HOME/.claude/skills/third-party" "$ROLLBACK_HOME/.config/git/ignore"

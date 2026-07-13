@@ -28,21 +28,31 @@ sh install.sh
 
 `install.sh`는 POSIX sh bootstrap이라 `/bin/sh`가 dash인 Ubuntu에서도 그대로 실행됩니다. 내부 구현은 macOS 기본 Bash 3.2, Linux, WSL 호환 Bash입니다. Native Windows와 Git Bash는 지원 범위가 아닙니다.
 
-기본 설치는 **core prompts/agents/skills만** 설치합니다. 외부 플러그인은 opt-in입니다.
+선택한 profile이 곧 **최종 수렴 상태**입니다. 어느 컴퓨터에서든 같은 명령을 다시 실행하면 같은 상태로 수렴합니다.
 
 ```bash
-sh install.sh                          # core만 (기본)
+sh install.sh                          # core만 + kit 통합 잔재 정리 (기본)
 sh install.sh --integrations ponytail  # core + Ponytail
 sh install.sh --integrations ultra     # core + Ponytail + LazyCodex 워크플로
 ```
 
-LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치합니다. 통합 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`은 프로필과 무관하게 통합을 생략합니다.
+profile별 reconciliation 규칙:
+
+| 대상 | `none` | `ponytail` | `ultra` |
+|---|---|---|---|
+| kit-pinned LazyCodex(4.17.0) | 비활성화(`disabled_legacy`) | 비활성화 | 설치·활성 |
+| kit-owned Ponytail | plugin·marketplace 제거 | 설치·활성 | 설치·활성 |
+| user-owned Ponytail/LazyCodex | **불변** (보존 기록) | **불변** | **불변** |
+
+user-owned 판별: Ponytail은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지, LazyCodex는 kit-pinned 버전(4.17.0) 일치 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`disabled_legacy` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 비활성화된 LazyCodex는 `codex plugin enable omo@sisyphuslabs`로 언제든 복귀할 수 있습니다.
+
+LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치합니다. `ponytail`/`ultra` 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`은 프로필과 무관하게 통합 단계 전체(레거시 정리 포함)를 생략합니다.
 
 외부 코드는 설치 시점의 가변 `latest`나 기본 브랜치를 바로 실행하지 않습니다. LazyCodex는 검증된 `4.17.0` npm 릴리스로, Ponytail은 `4.8.4` 릴리스 커밋 `bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324`로 고정합니다.
 
 설치 스크립트는 기존 설정과 agents/skills 디렉터리를 전용 상태 디렉터리에 백업한 뒤, ownership manifest에 기록된 키트 소유 항목만 교체합니다. LazyCodex, Ponytail, 개인 스킬처럼 다른 이름을 사용하는 제3자 항목은 삭제하지 않습니다. 키트 소유 항목과 이름이 같은 파일이나 디렉터리는 백업 후 키트 버전으로 교체합니다. 사용자가 직접 등록한 MCP 서버는 어떤 프로필에서도 조회·수정·삭제하지 않으며, 사용자 소유의 ponytail marketplace가 이미 있으면 키트는 해당 호스트의 Ponytail 관리를 건너뛰고 보존합니다.
 
-설치 전체는 하나의 트랜잭션입니다. `umask 077`로 상태 디렉터리를 보호하고, 동시 설치를 lock으로 차단하며, 모든 변경을 journal에 기록해 어느 단계에서 실패하든 이전 단계까지의 변경을 자동으로 원상 복구합니다. gitignore managed block은 BEGIN/END marker 쌍을 검증한 뒤에만 교체합니다.
+설치는 journal 기반 트랜잭션입니다. `umask 077`로 상태 디렉터리를 보호하고, 동시 설치를 lock으로 차단하며, journal 기록은 백업 완료가 확인된 뒤에만 남습니다. 실패 시 **journal에 등록된 kit 관리 경로**는 자동으로 원상 복구됩니다. 외부 installer(npx 등)가 만드는 cache와 user-owned 통합 상태는 journal 범위 밖이므로 재작성하지 않습니다. gitignore managed block은 BEGIN/END marker 쌍을 검증한 뒤에만 교체합니다.
 
 보존:
 

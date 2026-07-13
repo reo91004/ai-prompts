@@ -197,6 +197,7 @@ assert_line "$output" 'status=OK'
 assert_line "$output" 'warnings=low_swap'
 assert_line "$output" 'agent_slots=6'
 assert_line "$output" 'heavy_command_slots=1'
+assert_line "$output" 'spawn_authorized=1'
 
 prepare_case cgroup-memory
 set_signal cgroup-memory cgroup_memory_max 4294967296
@@ -276,10 +277,18 @@ run_fixture 3 malformed
 assert_line "$output" 'status=RESOURCE_UNKNOWN'
 assert_line "$output" 'agent_slots=6'
 assert_line "$output" 'concurrency=6'
+assert_line "$output" 'spawn_authorized=read_only'
 
 prepare_case malformed-ceiling
 set_signal malformed-ceiling total_bytes invalid
 run_fixture 3 malformed-ceiling HARNESS_MAX_THREADS=2
+assert_line "$output" 'status=RESOURCE_UNKNOWN'
+assert_line "$output" 'agent_slots=2'
+
+# The degraded ceiling honors HARNESS_TASK_CAP too, not just max threads.
+prepare_case malformed-task-cap
+set_signal malformed-task-cap total_bytes invalid
+run_fixture 3 malformed-task-cap HARNESS_TASK_CAP=2
 assert_line "$output" 'status=RESOURCE_UNKNOWN'
 assert_line "$output" 'agent_slots=2'
 
@@ -300,7 +309,9 @@ run_fixture 3 stale
 assert_line "$output" 'status=RESOURCE_STALE'
 snapshot_age="$(printf '%s\n' "$output" | sed -n 's/^snapshot_age_seconds=//p')"
 [ "$snapshot_age" -ge 601 ] || { echo "stale snapshot age was $snapshot_age" >&2; exit 1; }
-assert_line "$output" 'agent_slots=6'
+assert_line "$output" 'agent_slots=0'
+assert_line "$output" 'concurrency=0'
+assert_line "$output" 'spawn_authorized=0'
 
 prepare_case fresh wsl
 run_fixture 0 fresh

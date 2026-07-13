@@ -1,0 +1,258 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+command -v node >/dev/null 2>&1 || { echo "node is required for the migration tests" >&2; exit 1; }
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/harness-migration.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+
+PONYTAIL_REVISION="bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324"
+MOCK_BIN="$WORK/bin"
+mkdir -p "$MOCK_BIN"
+
+# Mock CLIs replay plugin/marketplace state from JSON files and record every
+# invocation, so reconciliation logic is testable without real CLIs, network,
+# or a real plugin cache. Unhandled subcommands fail loudly.
+cat > "$MOCK_BIN/codex" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+STATE="${CODEX_MOCK_STATE:?}"
+cmd="$*"
+printf 'codex %s\n' "$cmd" >> "$STATE/calls.log"
+case "$cmd" in
+  "plugin list --json")
+    cat "$STATE/plugins.json"
+    ;;
+  "plugin marketplace list --json")
+    cat "$STATE/marketplaces.json"
+    ;;
+  "plugin disable omo@sisyphuslabs")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/plugins.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      for (const p of data.installed || []) {
+        if (p.pluginId === "omo@sisyphuslabs") p.enabled = false;
+      }
+      fs.writeFileSync(path, JSON.stringify(data));
+    ' "$STATE"
+    ;;
+  "plugin remove ponytail@ponytail")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/plugins.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      data.installed = (data.installed || []).filter((p) => p.pluginId !== "ponytail@ponytail");
+      fs.writeFileSync(path, JSON.stringify(data));
+    ' "$STATE"
+    ;;
+  "plugin marketplace remove ponytail")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/marketplaces.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "ponytail")));
+    ' "$STATE"
+    ;;
+  *)
+    echo "codex mock: unhandled command: $cmd" >&2
+    exit 1
+    ;;
+esac
+MOCK
+cat > "$MOCK_BIN/claude" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+STATE="${CLAUDE_MOCK_STATE:?}"
+cmd="$*"
+printf 'claude %s\n' "$cmd" >> "$STATE/calls.log"
+case "$cmd" in
+  "plugin list --json")
+    cat "$STATE/plugins.json"
+    ;;
+  "plugin marketplace list --json")
+    cat "$STATE/marketplaces.json"
+    ;;
+  "plugin uninstall ponytail@ponytail -s user")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/plugins.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      fs.writeFileSync(path, JSON.stringify(data.filter((p) => p.id !== "ponytail@ponytail")));
+    ' "$STATE"
+    ;;
+  "plugin marketplace remove ponytail")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/marketplaces.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "ponytail")));
+    ' "$STATE"
+    ;;
+  *)
+    echo "claude mock: unhandled command: $cmd" >&2
+    exit 1
+    ;;
+esac
+MOCK
+chmod +x "$MOCK_BIN/codex" "$MOCK_BIN/claude"
+
+state_value() {
+  sed -n "s/^$2=//p" "$1/.universal-research-agent-kit/integrations.state" | sed -n '1p'
+}
+
+seed_codex_mock_state() {
+  local state_dir="$1"
+  local home="$2"
+  local ownership="$3"
+  local kit_plugin_path="$home/.universal-research-agent-kit/marketplaces/ponytail-$PONYTAIL_REVISION/ponytail"
+  local market_path="$kit_plugin_path"
+
+  mkdir -p "$state_dir"
+  : > "$state_dir/calls.log"
+  if [ "$ownership" = "user" ]; then
+    kit_plugin_path="/opt/user-plugins/ponytail"
+    market_path="/opt/user-marketplace/ponytail"
+  fi
+  if [ "$ownership" = "empty" ]; then
+    printf '%s\n' '{"installed":[]}' > "$state_dir/plugins.json"
+    printf '%s\n' '[]' > "$state_dir/marketplaces.json"
+    return
+  fi
+  node -e '
+    const fs = require("fs");
+    const [dir, pluginPath, marketPath, withLazy] = process.argv.slice(1);
+    const plugins = {
+      installed: [
+        {
+          pluginId: "ponytail@ponytail",
+          version: "4.8.4",
+          installed: true,
+          enabled: true,
+          source: { source: "local", path: pluginPath },
+        },
+      ],
+    };
+    if (withLazy === "1") {
+      plugins.installed.push({
+        pluginId: "omo@sisyphuslabs",
+        version: "4.17.0",
+        installed: true,
+        enabled: true,
+        source: { source: "npm" },
+      });
+    }
+    fs.writeFileSync(dir + "/plugins.json", JSON.stringify(plugins));
+    fs.writeFileSync(dir + "/marketplaces.json", JSON.stringify([{ name: "ponytail", path: marketPath }]));
+  ' "$state_dir" "$kit_plugin_path" "$market_path" "$([ "$ownership" = "kit" ] && echo 1 || echo 0)"
+}
+
+seed_claude_mock_state() {
+  local state_dir="$1"
+  local home="$2"
+  local ownership="$3"
+  local market_path="$home/.universal-research-agent-kit/marketplaces/ponytail-$PONYTAIL_REVISION/ponytail"
+
+  mkdir -p "$state_dir"
+  : > "$state_dir/calls.log"
+  if [ "$ownership" = "user" ]; then
+    market_path="/opt/user-marketplace/ponytail"
+  fi
+  if [ "$ownership" = "empty" ]; then
+    printf '%s\n' '[]' > "$state_dir/plugins.json"
+    printf '%s\n' '[]' > "$state_dir/marketplaces.json"
+    return
+  fi
+  node -e '
+    const fs = require("fs");
+    const [dir, marketPath] = process.argv.slice(1);
+    fs.writeFileSync(dir + "/plugins.json", JSON.stringify([
+      { id: "ponytail@ponytail", scope: "user", version: "4.8.4", enabled: true },
+    ]));
+    fs.writeFileSync(dir + "/marketplaces.json", JSON.stringify([{ name: "ponytail", path: marketPath }]));
+  ' "$state_dir" "$market_path"
+}
+
+run_kit() {
+  local home="$1"
+  local codex_state="$2"
+  local claude_state="$3"
+  shift 3
+  HOME="$home" PATH="$MOCK_BIN:$PATH" \
+    CODEX_MOCK_STATE="$codex_state" CLAUDE_MOCK_STATE="$claude_state" \
+    "$@"
+}
+
+echo "Scenario A: legacy kit integrations reconcile to profile none"
+A_HOME="$WORK/home-a"
+A_CODEX="$WORK/mock-a-codex"
+A_CLAUDE="$WORK/mock-a-claude"
+mkdir -p "$A_HOME/.codex/plugins" "$A_HOME/.claude/plugins"
+seed_codex_mock_state "$A_CODEX" "$A_HOME" kit
+seed_claude_mock_state "$A_CLAUDE" "$A_HOME" kit
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+grep -Fqx 'codex plugin disable omo@sisyphuslabs' "$A_CODEX/calls.log" || {
+  echo "legacy LazyCodex was not disabled" >&2; exit 1; }
+grep -Fqx 'codex plugin remove ponytail@ponytail' "$A_CODEX/calls.log" || {
+  echo "kit-owned Codex Ponytail plugin was not removed" >&2; exit 1; }
+grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {
+  echo "kit-owned Codex ponytail marketplace was not removed" >&2; exit 1; }
+grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.log" || {
+  echo "kit-owned Claude Ponytail plugin was not removed" >&2; exit 1; }
+[ "$(state_value "$A_HOME" requested_profile)" = "none" ]
+[ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
+[ "$(state_value "$A_HOME" codex_ponytail)" = "removed_legacy" ]
+[ "$(state_value "$A_HOME" claude_ponytail)" = "removed_legacy" ]
+
+echo "Scenario A repeat: converged state stays converged and verifies"
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+[ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+
+echo "Scenario B: user-owned Ponytail is preserved and still verifies"
+B_HOME="$WORK/home-b"
+B_CODEX="$WORK/mock-b-codex"
+B_CLAUDE="$WORK/mock-b-claude"
+mkdir -p "$B_HOME/.codex/plugins" "$B_HOME/.claude/plugins" "$B_HOME/.universal-research-agent-kit/sources/ponytail-$PONYTAIL_REVISION/.git"
+seed_codex_mock_state "$B_CODEX" "$B_HOME" user
+seed_claude_mock_state "$B_CLAUDE" "$B_HOME" user
+cat > "$MOCK_BIN/git" <<MOCK
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="\$*"
+case "\$cmd" in
+  *"rev-parse HEAD") echo "$PONYTAIL_REVISION" ;;
+  *"status --porcelain"*) : ;;
+  *"archive HEAD") tar -cf - -T /dev/null ;;
+  *) echo "git mock: unhandled command: \$cmd" >&2; exit 1 ;;
+esac
+MOCK
+chmod +x "$MOCK_BIN/git"
+run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install_all.sh" --integrations ponytail >/dev/null
+rm -f "$MOCK_BIN/git"
+
+if grep -Eq 'remove|uninstall|disable' "$B_CODEX/calls.log" "$B_CLAUDE/calls.log"; then
+  echo "user-owned integrations were modified" >&2
+  exit 1
+fi
+[ "$(state_value "$B_HOME" codex_ponytail)" = "preserved_user_owned" ]
+[ "$(state_value "$B_HOME" claude_ponytail)" = "preserved_user_owned" ]
+[ "$(state_value "$B_HOME" codex_lazycodex)" = "not_requested" ]
+run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+
+echo "Scenario C: standalone install_integrations.sh records state"
+C_HOME="$WORK/home-c"
+C_CODEX="$WORK/mock-c-codex"
+C_CLAUDE="$WORK/mock-c-claude"
+mkdir -p "$C_HOME/.codex/plugins" "$C_HOME/.claude/plugins"
+seed_codex_mock_state "$C_CODEX" "$C_HOME" empty
+seed_claude_mock_state "$C_CLAUDE" "$C_HOME" empty
+run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" none >/dev/null
+[ "$(state_value "$C_HOME" requested_profile)" = "none" ]
+[ "$(state_value "$C_HOME" codex_ponytail)" = "not_requested" ]
+[ "$(state_value "$C_HOME" codex_lazycodex)" = "not_requested" ]
+[ "$(state_value "$C_HOME" claude_ponytail)" = "not_requested" ]
+
+echo "Integration migration tests passed."

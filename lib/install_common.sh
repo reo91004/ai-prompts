@@ -75,6 +75,28 @@ kit_init_state() {
   export KIT_STATE_ROOT KIT_BACKUP_ROOT KIT_MANIFEST_ROOT KIT_BACKUP_DIR KIT_JOURNAL
 }
 
+# Per-host integration outcomes; the verifier trusts these states instead of
+# assuming one global profile matches every host.
+kit_write_integrations_state() {
+  local profile="$1"
+  local codex_ponytail="$2"
+  local claude_ponytail="$3"
+  local codex_lazycodex="$4"
+  local state_file="$KIT_STATE_ROOT/integrations.state"
+  local tmp
+
+  kit_require_regular_or_absent "$state_file"
+  kit_backup_path "$state_file" "state/integrations.state"
+  tmp="$(mktemp "$state_file.tmp.XXXXXX")"
+  {
+    printf 'requested_profile=%s\n' "$profile"
+    printf 'codex_ponytail=%s\n' "$codex_ponytail"
+    printf 'claude_ponytail=%s\n' "$claude_ponytail"
+    printf 'codex_lazycodex=%s\n' "$codex_lazycodex"
+  } > "$tmp"
+  mv "$tmp" "$state_file"
+}
+
 kit_release_lock() {
   if [ "${KIT_LOCK_OWNED:-0}" = "1" ]; then
     rmdir "$KIT_LOCK_DIR" 2>/dev/null || true
@@ -112,20 +134,36 @@ kit_handle_exit() {
   exit "$status"
 }
 
+# Restore into a sibling temp first; the original target is removed only
+# after a complete copy of the backup exists next to it.
 kit_restore_entry() {
   local target="$1"
   local backup="$2"
+  local parent
+  local name
+  local temp
 
-  rm -rf -- "$target"
+  if [ ! -e "$backup" ] && [ ! -L "$backup" ]; then
+    return 1
+  fi
+  parent="$(dirname "$target")"
+  name="$(basename "$target")"
+  mkdir -p "$parent" || return 1
   if [ -L "$backup" ]; then
-    cp -P "$backup" "$target"
+    temp="$(mktemp "$parent/.$name.restore.XXXXXX")" || return 1
+    rm -f -- "$temp"
+    cp -P "$backup" "$temp" || { rm -rf -- "$temp"; return 1; }
   elif [ -d "$backup" ]; then
-    cp -Rp "$backup" "$target"
+    temp="$(mktemp -d "$parent/.$name.restore.XXXXXX")" || return 1
+    cp -Rp "$backup/." "$temp/" || { rm -rf -- "$temp"; return 1; }
   elif [ -f "$backup" ]; then
-    cp -p "$backup" "$target"
+    temp="$(mktemp "$parent/.$name.restore.XXXXXX")" || return 1
+    cp -p "$backup" "$temp" || { rm -f -- "$temp"; return 1; }
   else
     return 1
   fi
+  rm -rf -- "$target"
+  mv "$temp" "$target"
 }
 
 kit_rollback_run() {
@@ -153,30 +191,43 @@ EOF
   [ "$failed" -eq 0 ]
 }
 
+# The journal entry is written only after the backup is complete and in its
+# final location: a rollback must never see a restore entry whose backup does
+# not exist, or it would delete the original with nothing to restore from.
 kit_backup_path() {
   local source="$1"
   local relative="$2"
   local destination="$KIT_BACKUP_DIR/$relative"
+  local parent
+  local name
+  local temp
 
   if [ ! -e "$source" ] && [ ! -L "$source" ]; then
     kit_journal_entry absent "$source"
     return
   fi
-  kit_journal_entry restore "$source" "$destination"
 
-  kit_require_real_dir "$(dirname "$destination")"
+  parent="$(dirname "$destination")"
+  name="$(basename "$destination")"
+  kit_require_real_dir "$parent"
   if [ -e "$destination" ] || [ -L "$destination" ]; then
     kit_die "Backup destination already exists: $destination"
   fi
   if [ -L "$source" ]; then
-    cp -P "$source" "$destination"
+    temp="$(mktemp "$parent/.$name.tmp.XXXXXX")"
+    rm -f -- "$temp"
+    cp -P "$source" "$temp" || { rm -rf -- "$temp"; kit_die "Backup copy failed: $source"; }
   elif [ -f "$source" ]; then
-    cp -p "$source" "$destination"
+    temp="$(mktemp "$parent/.$name.tmp.XXXXXX")"
+    cp -p "$source" "$temp" || { rm -f -- "$temp"; kit_die "Backup copy failed: $source"; }
   elif [ -d "$source" ]; then
-    cp -Rp "$source" "$destination"
+    temp="$(mktemp -d "$parent/.$name.tmp.XXXXXX")"
+    cp -Rp "$source/." "$temp/" || { rm -rf -- "$temp"; kit_die "Backup copy failed: $source"; }
   else
     kit_die "Unsupported managed path type: $source"
   fi
+  mv "$temp" "$destination"
+  kit_journal_entry restore "$source" "$destination"
   echo "Backed up $source -> $destination"
 }
 

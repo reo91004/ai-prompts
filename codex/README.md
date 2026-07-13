@@ -6,7 +6,7 @@
 bash codex/install.sh
 ```
 
-플랫폼 설정만 설치하는 명령입니다. 저장소 루트의 `sh install.sh`는 기본적으로 core만 설치하고, Ponytail은 `--integrations ponytail`, LazyCodex까지는 `--integrations ultra`로 opt-in합니다.
+플랫폼 설정만 설치하는 명령입니다. 저장소 루트의 `sh install.sh`는 선택한 profile로 상태를 수렴시킵니다: 기본(none)은 core 설치와 함께 kit-pinned LazyCodex(4.17.0)를 비활성화하고 kit-owned Ponytail을 제거하며, Ponytail은 `--integrations ponytail`, LazyCodex까지는 `--integrations ultra`로 opt-in합니다. user-owned plugin/marketplace는 보존되고 결과는 `integrations.state`에 호스트별로 기록됩니다.
 
 설치 위치:
 

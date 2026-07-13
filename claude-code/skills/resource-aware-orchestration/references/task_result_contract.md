@@ -16,7 +16,7 @@ Every delegated task must contain:
 
 Two children may not own the same deliverable. A child must stop before acting outside its packet.
 
-The detector snapshot in `resource_budget` must include normalized `platform=macos|linux|wsl`, `captured_epoch`, `snapshot_age_seconds`, `agent_slots`, `writer_slots=1`, and `heavy_command_slots`. Linux/WSL evidence also records cgroup v2 discovery state and the resolved process cgroup path when available. Snapshots older than 600 seconds are stale and cannot authorize a spawn wave. `RESOURCE_UNKNOWN` and `RESOURCE_STALE` exit 3 and must stay visible as degraded detection states; they are not evidence of resource shortage and must not be converted to a successful detection.
+The detector snapshot in `resource_budget` must include normalized `platform=macos|linux|wsl`, `captured_epoch`, `snapshot_age_seconds`, `agent_slots`, `writer_slots=1`, `heavy_command_slots`, and `spawn_authorized`. Linux/WSL evidence also records cgroup v2 discovery state and the resolved process cgroup path when available. Snapshots older than 600 seconds are stale: they report `spawn_authorized=0` with zero agent slots and cannot authorize a spawn wave. `RESOURCE_UNKNOWN` reports `spawn_authorized=read_only` at the configured ceiling. Both exit 3 and must stay visible as degraded detection states; they are not evidence of resource shortage and must not be converted to a successful detection.
 
 ## Long-Running Work Declaration
 
