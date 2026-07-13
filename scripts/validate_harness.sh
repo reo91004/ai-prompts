@@ -158,6 +158,7 @@ repository_files="$(mktemp "${TMPDIR:-/tmp}/harness-files.XXXXXX")"
 sed -n 's/^- `\(.*\)`/\1/p' "$ROOT/MANIFEST.md" | sort > "$manifest_entries"
 find "$ROOT" -type f \
   -not -path "$ROOT/.git/*" \
+  -not -path "$ROOT/.plans/*" \
   -not -name '.DS_Store' \
   -not -name 'handover*.md' \
   | sed "s#^$ROOT/##" | sort > "$repository_files"

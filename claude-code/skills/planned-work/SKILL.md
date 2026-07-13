@@ -13,8 +13,8 @@ Keep one directory per work item inside the active project:
 
 ```text
 <project>/.plans/
-├── INDEX.md                     # one line per item: date, slug, status, next step
-└── <YYYY-MM-DD>-<slug>/
+├── INDEX.md                     # one line per item: date, letter, slug, status, next step
+└── <YYYY-MM-DD>-<L>-<slug>/     # L = A, B, C… in creation order within the day
     ├── handover.md              # the user's instructions, preserved verbatim
     ├── exploration.md           # files read, findings, assumptions, open questions
     ├── plan.md                  # the approved plan only — never drafts
@@ -22,7 +22,7 @@ Keep one directory per work item inside the active project:
     └── carry-over.md            # unresolved items and required next evidence
 ```
 
-Create only the files the work actually needs; never scaffold empty templates. `.plans/` is local by default (the kit's global gitignore excludes it); a project that wants version-tracked plans adds `!.plans/` to its own `.gitignore`.
+The day letter `<L>` is the first unused capital letter for that date (`A` for the day's first item, then `B`, `C`, …), so several plans opened on the same day keep a stable order. Create only the files the work actually needs; never scaffold empty templates. `.plans/` is local by default (the kit's global gitignore excludes it); a project that wants version-tracked plans adds `!.plans/` to its own `.gitignore`.
 
 ## Procedure
 
