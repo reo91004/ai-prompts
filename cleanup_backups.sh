@@ -32,6 +32,12 @@ if [ -L "$STATE_ROOT" ] || [ -L "$BACKUP_ROOT" ]; then
   exit 1
 fi
 
+# An active install depends on its run journal for automatic rollback.
+if [ -d "$STATE_ROOT/.lock" ]; then
+  echo "Refusing to clean backups while an install holds the kit lock: $STATE_ROOT/.lock" >&2
+  exit 1
+fi
+
 if [ ! -d "$BACKUP_ROOT" ]; then
   echo "No kit backup snapshots found."
   exit 0

@@ -3,7 +3,19 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/lib/install_common.sh"
+
+PROFILE="${1:-}"
+case "$PROFILE" in
+  ponytail|ultra) ;;
+  *)
+    echo "usage: install_integrations.sh ponytail|ultra" >&2
+    echo "Integrations are opt-in; the core installer never runs this script by default." >&2
+    exit 2
+    ;;
+esac
+
 kit_init_state
+kit_enable_rollback
 
 LAZYCODEX_VERSION="4.17.0"
 PONYTAIL_VERSION="4.8.4"
@@ -20,6 +32,18 @@ codex_plugin_installed() {
     const plugin = (data.installed || []).find((item) => item.pluginId === process.argv[1]);
     process.exit(plugin && plugin.installed === true ? 0 : 1);
   ' "$selector"
+}
+
+codex_plugin_kit_owned() {
+  local selector="$1"
+  codex plugin list --json | node -e '
+    const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const plugin = (data.installed || []).find((item) => item.pluginId === process.argv[1]);
+    const owned = plugin && plugin.source?.source === "local" &&
+      typeof plugin.source.path === "string" &&
+      plugin.source.path.startsWith(process.argv[2] + "/");
+    process.exit(owned ? 0 : 1);
+  ' "$selector" "$PONYTAIL_MARKETPLACE_ROOT"
 }
 
 codex_plugin_exact_enabled() {
@@ -139,13 +163,21 @@ JSON
   mv "$temp" "$PONYTAIL_MARKETPLACE"
 }
 
+# Only a marketplace registration that points into the kit state directory is
+# kit-owned. A ponytail marketplace registered by the user is preserved and
+# the kit skips its own Ponytail management for that host.
 configure_codex_marketplace() {
   local marketplaces
   marketplaces="$(codex plugin marketplace list --json)"
   if printf '%s\n' "$marketplaces" |
      grep -Eq '"name"[[:space:]]*:[[:space:]]*"ponytail"' &&
      ! printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE"; then
-    codex plugin marketplace remove ponytail
+    if printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE_ROOT/"; then
+      codex plugin marketplace remove ponytail
+    else
+      echo "Preserving user-owned ponytail marketplace in Codex; skipping kit Ponytail management."
+      return 1
+    fi
   fi
   marketplaces="$(codex plugin marketplace list --json)"
   if ! printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE"; then
@@ -159,30 +191,16 @@ configure_claude_marketplace() {
   if printf '%s\n' "$marketplaces" |
      grep -Eq '"name"[[:space:]]*:[[:space:]]*"ponytail"' &&
      ! printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE"; then
-    claude plugin marketplace remove ponytail
+    if printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE_ROOT/"; then
+      claude plugin marketplace remove ponytail
+    else
+      echo "Preserving user-owned ponytail marketplace in Claude Code; skipping kit Ponytail management."
+      return 1
+    fi
   fi
   marketplaces="$(claude plugin marketplace list --json)"
   if ! printf '%s\n' "$marketplaces" | grep -Fq "$PONYTAIL_MARKETPLACE"; then
     claude plugin marketplace add "$PONYTAIL_MARKETPLACE"
-  fi
-}
-
-remove_codex_mcp() {
-  local name="$1"
-  if (cd "$HOME" && codex mcp get "$name" >/dev/null 2>&1); then
-    (cd "$HOME" && codex mcp remove "$name")
-  fi
-}
-
-remove_claude_mcp() {
-  local name="$1"
-  local output
-
-  if output="$(claude mcp remove -s user "$name" 2>&1)"; then
-    printf '%s\n' "$output"
-  elif ! printf '%s\n' "$output" | grep -Fq 'No user-scoped MCP server found'; then
-    printf '%s\n' "$output" >&2
-    return 1
   fi
 }
 
@@ -216,56 +234,54 @@ if [ "$codex_available" -eq 1 ] || [ "$claude_available" -eq 1 ]; then
 fi
 
 if [ "$codex_available" -eq 1 ]; then
-  if ! codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION"; then
-    command -v node >/dev/null 2>&1 || kit_die "Node.js is required to install LazyCodex."
-    command -v npx >/dev/null 2>&1 || kit_die "npx is required to install LazyCodex."
-    npx --yes "lazycodex-ai@$LAZYCODEX_VERSION" install --no-tui --no-codex-autonomous
-  else
-    echo "LazyCodex is already installed; keeping the existing installation."
+  command -v node >/dev/null 2>&1 || kit_die "Node.js is required for Codex integrations."
+
+  if [ "$PROFILE" = "ultra" ]; then
+    if ! codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION"; then
+      command -v npx >/dev/null 2>&1 || kit_die "npx is required to install LazyCodex."
+      npx --yes "lazycodex-ai@$LAZYCODEX_VERSION" install --no-tui --no-codex-autonomous
+    else
+      echo "LazyCodex is already installed; keeping the existing installation."
+    fi
+    codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION" ||
+      kit_die "LazyCodex $LAZYCODEX_VERSION is not installed and enabled."
   fi
 
-  configure_codex_marketplace
-  command -v node >/dev/null 2>&1 || kit_die "Node.js is required for Ponytail."
-  if codex_plugin_installed "ponytail@ponytail" &&
-     ! codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail"; then
-    codex plugin remove ponytail@ponytail
+  if configure_codex_marketplace; then
+    if codex_plugin_installed "ponytail@ponytail" &&
+       ! codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail"; then
+      if codex_plugin_kit_owned "ponytail@ponytail"; then
+        codex plugin remove ponytail@ponytail
+      else
+        kit_die "Existing Codex ponytail plugin is not kit-owned; remove it manually or keep it and skip integrations."
+      fi
+    fi
+    if ! codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail"; then
+      codex plugin add ponytail@ponytail
+    else
+      echo "Ponytail for Codex is already installed and enabled."
+    fi
+    codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail" ||
+      kit_die "Codex Ponytail $PONYTAIL_VERSION is not installed and enabled."
   fi
-  if ! codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail"; then
-    codex plugin add ponytail@ponytail
-  else
-    echo "Ponytail for Codex is already installed and enabled."
-  fi
-
-  remove_codex_mcp arxiv
-  remove_codex_mcp semantic-scholar
-  remove_codex_mcp semantic_scholar
-
-  codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION" ||
-    kit_die "LazyCodex $LAZYCODEX_VERSION is not installed and enabled."
-  codex_plugin_exact_enabled "ponytail@ponytail" "$PONYTAIL_VERSION" 1 "$PONYTAIL_MARKETPLACE/ponytail" ||
-    kit_die "Codex Ponytail $PONYTAIL_VERSION is not installed and enabled."
 else
-  echo "Codex CLI not found; skipped LazyCodex and Codex Ponytail installation."
+  echo "Codex CLI not found; skipped Codex integrations."
 fi
 
 if [ "$claude_available" -eq 1 ]; then
-  configure_claude_marketplace
-  command -v node >/dev/null 2>&1 || kit_die "Node.js is required for Ponytail."
-  if claude_plugin_installed && ! claude_plugin_exact_enabled; then
-    claude plugin uninstall ponytail@ponytail -s user
-    claude plugin install ponytail@ponytail -s user
-  elif ! claude_plugin_installed; then
-    claude plugin install ponytail@ponytail -s user
-  else
-    echo "Ponytail for Claude Code is already installed and enabled."
+  command -v node >/dev/null 2>&1 || kit_die "Node.js is required for Claude Code integrations."
+  if configure_claude_marketplace; then
+    if claude_plugin_installed && ! claude_plugin_exact_enabled; then
+      claude plugin uninstall ponytail@ponytail -s user
+      claude plugin install ponytail@ponytail -s user
+    elif ! claude_plugin_installed; then
+      claude plugin install ponytail@ponytail -s user
+    else
+      echo "Ponytail for Claude Code is already installed and enabled."
+    fi
+    claude_plugin_exact_enabled ||
+      kit_die "Claude Ponytail $PONYTAIL_VERSION is not installed and enabled."
   fi
-
-  remove_claude_mcp arxiv
-  remove_claude_mcp semantic-scholar
-  remove_claude_mcp semantic_scholar
-
-  claude_plugin_exact_enabled ||
-    kit_die "Claude Ponytail $PONYTAIL_VERSION is not installed and enabled."
 else
-  echo "Claude Code CLI not found; skipped Claude Ponytail installation."
+  echo "Claude Code CLI not found; skipped Claude Code integrations."
 fi

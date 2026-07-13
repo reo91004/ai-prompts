@@ -6,7 +6,7 @@
 bash codex/install.sh
 ```
 
-플랫폼 설정만 설치하는 명령입니다. LazyCodex와 Ponytail까지 한 번에 설치하려면 저장소 루트에서 `bash install_all.sh`를 실행합니다.
+플랫폼 설정만 설치하는 명령입니다. 저장소 루트의 `sh install.sh`는 기본적으로 core만 설치하고, Ponytail은 `--integrations ponytail`, LazyCodex까지는 `--integrations ultra`로 opt-in합니다.
 
 설치 위치:
 
@@ -18,13 +18,13 @@ bash codex/install.sh
 
 Codex는 `AGENTS.md`를 전역 지침으로 읽고, `~/.codex/agents/*.toml`을 custom agent로 사용합니다. Codex skills는 `~/.agents/skills`에 설치되며, 관련 작업일 때 본문을 로드합니다.
 
-루트 통합 설치는 LazyCodex와 Ponytail을 설치하지만 Sequential Thinking MCP 자체는 별도 설치가 필요합니다.
+opt-in 통합은 LazyCodex와 Ponytail을 설치할 수 있지만 Sequential Thinking MCP 자체는 별도 설치가 필요합니다. 설치기는 사용자 MCP 등록을 조회하거나 변경하지 않습니다.
 
 ## Portable harness
 
-macOS, Linux, WSL을 지원하며 Native Windows와 Git Bash는 제외합니다. 작은 작업은 main-only입니다. 위임하면 비중복 child를 최소 2개 사용하고 detector가 동시성 1을 반환하면 순차 실행합니다. 기본 thread 상한은 6, depth는 1이며 writer와 heavy command는 각각 하나만 동시에 실행합니다.
+macOS, Linux, WSL을 지원하며 Native Windows와 Git Bash는 제외합니다. 작은 작업은 main-only입니다. child 수는 독립 산출물 수를 따르고 child 1개도 유효합니다. `max_threads = 6`은 목표가 아니라 ceiling이고 `max_depth = 1`입니다. writer는 shared worktree당 하나, heavy command는 한 번에 하나만 실행합니다. 장기 실행 작업은 progress/checkpoint 계약으로 관리하며 경과 시간만으로 중단하지 않습니다.
 
-`config.toml.example`의 `max_threads = 6`, `max_depth = 1` harness 예시는 `codex/install.sh`가 사용자 `~/.codex/config.toml`에 자동 병합하지 않습니다. 다만 루트 `install_all.sh`는 승인된 LazyCodex·Ponytail plugin/marketplace 등록과 기존 `arxiv`, `semantic-scholar`, `semantic_scholar` MCP 제거를 Codex CLI로 수행할 수 있으므로 해당 사용자 설정은 변경될 수 있습니다. `resource-aware-orchestration` detector는 각 spawn wave 전에 실행하고 컴퓨터별 CPU·메모리·swap·PSI·cgroup 상태에 따라 동시성을 낮춥니다.
+`config.toml.example`의 `max_threads = 6`, `max_depth = 1` harness 예시는 `codex/install.sh`가 사용자 `~/.codex/config.toml`에 자동 병합하지 않습니다. 다만 opt-in 통합(`--integrations ponytail|ultra`)은 승인된 LazyCodex·Ponytail plugin/marketplace 등록을 Codex CLI로 수행하므로 해당 사용자 설정은 변경될 수 있습니다. 이때도 키트 소유가 아닌 marketplace/plugin은 보존합니다. `resource-aware-orchestration` detector는 각 spawn wave 전에 실행하고, 지속적인 압박 신호가 확인될 때만 slot을 낮추며 감지 실패는 자원 부족으로 해석하지 않습니다.
 
 `review-budget`은 deterministic verifier 다음에 한 semantic reviewer를 배치하고 기본 2회 이내의 최초/delta review를 관리합니다. `evidence-gate`가 evidence와 claim scope의 기준이며 물리 capture에만 `hardware-capture-integrity`를 추가합니다.
 

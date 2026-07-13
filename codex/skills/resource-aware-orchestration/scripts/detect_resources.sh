@@ -58,6 +58,30 @@ min_value() {
   fi
 }
 
+# Degraded detection is not evidence of resource shortage: report the
+# configured ceiling, keep one heavy slot, and exit 3 so callers can see the
+# structured status instead of a fake concurrency measurement.
+emit_degraded() {
+  echo "status=$1"
+  echo "platform=${platform:-unknown}"
+  echo "captured_epoch=${captured_epoch:-unavailable}"
+  echo "snapshot_age_seconds=${snapshot_age_seconds:-unavailable}"
+  echo "cgroup_v2=${cgroup_v2_state:-not_applicable}"
+  echo "cgroup_path=${cgroup_path:-unavailable}"
+  echo "agent_slots=$ceiling"
+  echo "writer_slots=1"
+  echo "heavy_command_slots=1"
+  echo "concurrency=$ceiling"
+  echo "warnings=none"
+  echo "reason=$2"
+  exit 3
+}
+
+ceiling=${HARNESS_MAX_THREADS:-6}
+if ! is_uint "$ceiling" || [ "$ceiling" -eq 0 ] || [ "$ceiling" -gt 6 ]; then
+  ceiling=6
+fi
+
 cpuset_count() {
   echo "$1" | awk -F, '
     function valid_int(value) { return value ~ /^[0-9]+$/ }
@@ -453,113 +477,53 @@ else
       oom_after=${oom_after:-0}
       ;;
     *)
-      echo "status=RESOURCE_DETECTION_FAILED"
-      echo "detected_platform=${detected_platform:-unknown}"
-      echo "concurrency=1"
-      echo "reason=unsupported_platform"
-      exit 3
+      emit_degraded RESOURCE_UNKNOWN unsupported_platform
       ;;
   esac
   captured_epoch=$(date +%s 2>/dev/null || true)
 fi
 
 if [ -n "$collector_error" ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=${platform:-unknown}"
-  echo "captured_epoch=${captured_epoch:-unavailable}"
-  echo "snapshot_age_seconds=0"
-  echo "cgroup_v2=$cgroup_v2_state"
-  echo "cgroup_path=$cgroup_path"
-  echo "writer_slots=1"
-  echo "heavy_command_slots=1"
-  echo "concurrency=1"
-  echo "reason=$collector_error"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN "$collector_error"
 fi
 
 case $platform in
   macos|linux|wsl) ;;
   *)
-    echo "status=RESOURCE_DETECTION_FAILED"
-    echo "detected_platform=${platform:-unknown}"
-    echo "concurrency=1"
-    echo "reason=unsupported_platform"
-    exit 3
+    emit_degraded RESOURCE_UNKNOWN unsupported_platform
     ;;
 esac
 
 current_epoch=$(date +%s 2>/dev/null || true)
 if ! is_uint "$captured_epoch" || ! is_uint "$current_epoch" || [ "$captured_epoch" -gt "$current_epoch" ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=$platform"
-  echo "captured_epoch=${captured_epoch:-unavailable}"
-  echo "snapshot_age_seconds=unavailable"
-  echo "concurrency=1"
-  echo "reason=malformed_capture_time"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN malformed_capture_time
 fi
 snapshot_age_seconds=$((current_epoch - captured_epoch))
 if [ "$snapshot_age_seconds" -gt 600 ]; then
-  echo "status=RESOURCE_STALE"
-  echo "platform=$platform"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=stale_snapshot"
-  exit 3
+  emit_degraded RESOURCE_STALE stale_snapshot
 fi
 
 if ! is_uint "$total_bytes" || ! is_uint "$available_bytes" || ! is_uint "$cpu_count" || [ "$total_bytes" -eq 0 ] || [ "$cpu_count" -eq 0 ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=${platform:-unknown}"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=malformed_primary_signal"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN malformed_primary_signal
 fi
 
 if [ "$available_bytes" -gt "$total_bytes" ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=$platform"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=inconsistent_memory_signal"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN inconsistent_memory_signal
 fi
 
 if ! is_uint "$swap_total_bytes" || ! is_uint "$swap_free_bytes" || ! is_uint "$swapout_before" || ! is_uint "$swapout_after" || ! is_uint "$oom_before" || ! is_uint "$oom_after"; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=$platform"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=malformed_pressure_signal"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN malformed_pressure_signal
 fi
 
 if [ "$swap_total_bytes" -eq 0 ] && [ "$swap_free_bytes" -ne 0 ] || [ "$swap_total_bytes" -gt 0 ] && [ "$swap_free_bytes" -gt "$swap_total_bytes" ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=$platform"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=inconsistent_swap_signal"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN inconsistent_swap_signal
 fi
 
 effective_total=$total_bytes
 effective_available=$available_bytes
 if [ -n "$cgroup_memory_max" ] && [ "$cgroup_memory_max" != "max" ]; then
   if ! is_uint "$cgroup_memory_max" || ! is_uint "$cgroup_memory_current" || [ "$cgroup_memory_max" -eq 0 ]; then
-    echo "status=RESOURCE_DETECTION_FAILED"
-    echo "platform=$platform"
-    echo "captured_epoch=$captured_epoch"
-    echo "snapshot_age_seconds=$snapshot_age_seconds"
-    echo "concurrency=1"
-    echo "reason=malformed_cgroup_memory"
-    exit 3
+    emit_degraded RESOURCE_UNKNOWN malformed_cgroup_memory
   fi
   if [ "$cgroup_memory_max" -lt "$effective_total" ]; then
     effective_total=$cgroup_memory_max
@@ -575,13 +539,7 @@ fi
 effective_cpu=$cpu_count
 if [ -n "$cgroup_cpu_quota" ] && [ "$cgroup_cpu_quota" != "max" ]; then
   if ! is_uint "$cgroup_cpu_quota" || ! is_uint "$cgroup_cpu_period" || [ "$cgroup_cpu_period" -eq 0 ]; then
-    echo "status=RESOURCE_DETECTION_FAILED"
-    echo "platform=$platform"
-    echo "captured_epoch=$captured_epoch"
-    echo "snapshot_age_seconds=$snapshot_age_seconds"
-    echo "concurrency=1"
-    echo "reason=malformed_cgroup_cpu"
-    exit 3
+    emit_degraded RESOURCE_UNKNOWN malformed_cgroup_cpu
   fi
   quota_cpu=$((cgroup_cpu_quota / cgroup_cpu_period))
   if [ "$quota_cpu" -lt 1 ]; then quota_cpu=1; fi
@@ -590,57 +548,46 @@ fi
 if [ -n "$cpuset_cpus" ]; then
   cpuset_cpu=$(cpuset_count "$cpuset_cpus" || true)
   if ! is_uint "$cpuset_cpu" || [ "$cpuset_cpu" -eq 0 ]; then
-    echo "status=RESOURCE_DETECTION_FAILED"
-    echo "platform=$platform"
-    echo "captured_epoch=$captured_epoch"
-    echo "snapshot_age_seconds=$snapshot_age_seconds"
-    echo "concurrency=1"
-    echo "reason=malformed_cpuset"
-    exit 3
+    emit_degraded RESOURCE_UNKNOWN malformed_cpuset
   fi
   effective_cpu=$(min_value "$effective_cpu" "$cpuset_cpu")
 fi
 
 available_pct=$((effective_available * 100 / effective_total))
-if [ "$available_pct" -lt 20 ]; then
-  memory_bucket=1
-elif [ "$available_pct" -lt 35 ]; then
-  memory_bucket=2
-elif [ "$available_pct" -lt 50 ]; then
-  memory_bucket=3
-elif [ "$available_pct" -lt 65 ]; then
-  memory_bucket=4
-else
-  memory_bucket=6
-fi
+# One agent slot per 2 GiB of absolute headroom, clamped to 1-6. The percent
+# value stays diagnostic: a large host with a small free ratio can still hold
+# several agents, and a tiny host with a large ratio cannot.
+memory_bucket=$((effective_available / 2147483648))
+if [ "$memory_bucket" -lt 1 ]; then memory_bucket=1; fi
+if [ "$memory_bucket" -gt 6 ]; then memory_bucket=6; fi
 
 cpu_cap=$((effective_cpu / 2))
 if [ "$cpu_cap" -lt 1 ]; then cpu_cap=1; fi
 max_threads=${HARNESS_MAX_THREADS:-6}
 task_cap=${HARNESS_TASK_CAP:-6}
 if ! is_uint "$max_threads" || ! is_uint "$task_cap" || [ "$max_threads" -eq 0 ] || [ "$task_cap" -eq 0 ]; then
-  echo "status=RESOURCE_DETECTION_FAILED"
-  echo "platform=$platform"
-  echo "captured_epoch=$captured_epoch"
-  echo "snapshot_age_seconds=$snapshot_age_seconds"
-  echo "concurrency=1"
-  echo "reason=malformed_concurrency_cap"
-  exit 3
+  emit_degraded RESOURCE_UNKNOWN malformed_concurrency_cap
 fi
 if [ "$max_threads" -gt 6 ]; then max_threads=6; fi
 if [ "$task_cap" -gt 6 ]; then task_cap=6; fi
-concurrency=$(min_value "$memory_bucket" "$cpu_cap")
-concurrency=$(min_value "$concurrency" "$max_threads")
-concurrency=$(min_value "$concurrency" "$task_cap")
+agent_slots=$(min_value "$memory_bucket" "$cpu_cap")
+agent_slots=$(min_value "$agent_slots" "$max_threads")
+agent_slots=$(min_value "$agent_slots" "$task_cap")
+heavy_command_slots=1
 
-constrained=""
+# Warnings never serialize agents; only sampled pressure growth or critical
+# PSI does, and OOM growth is the only signal that forces one slot.
+warnings=""
 if [ "$swap_total_bytes" -gt 0 ]; then
   swap_free_pct=$((swap_free_bytes * 100 / swap_total_bytes))
-  if [ "$swap_free_pct" -lt 10 ]; then constrained="low_swap"; fi
+  if [ "$swap_free_pct" -lt 10 ]; then warnings="low_swap"; fi
 else
   swap_free_pct="not_configured"
 fi
-if [ "$swapout_after" -gt "$swapout_before" ]; then constrained="${constrained:+$constrained,}swapout_growth"; fi
+if [ "$available_pct" -lt 10 ]; then warnings="${warnings:+$warnings,}low_memory_pct"; fi
+
+constrained=""
+if [ "$swapout_after" -gt "$swapout_before" ]; then constrained="swapout_growth"; fi
 if [ "$oom_after" -gt "$oom_before" ]; then constrained="${constrained:+$constrained,}oom_growth"; fi
 if [ -n "$psi_text" ]; then
   if echo "$psi_text" | awk '
@@ -668,21 +615,25 @@ if [ -n "$psi_text" ]; then
     if [ "$psi_code" -eq 3 ]; then
       constrained="${constrained:+$constrained,}critical_psi"
     else
-      echo "status=RESOURCE_DETECTION_FAILED"
-      echo "platform=$platform"
-      echo "captured_epoch=$captured_epoch"
-      echo "snapshot_age_seconds=$snapshot_age_seconds"
-      echo "concurrency=1"
-      echo "reason=malformed_psi"
-      exit 3
+      emit_degraded RESOURCE_UNKNOWN malformed_psi
     fi
   fi
 fi
 if [ -n "$constrained" ]; then
   status="RESOURCE_CONSTRAINED"
   reasons=$constrained
-  concurrency=1
+  heavy_command_slots=0
+  case ",$constrained," in
+    *,oom_growth,*)
+      agent_slots=1
+      ;;
+    *)
+      agent_slots=$((agent_slots - 1))
+      if [ "$agent_slots" -lt 1 ]; then agent_slots=1; fi
+      ;;
+  esac
 fi
+if [ -z "$warnings" ]; then warnings="none"; fi
 
 echo "status=$status"
 echo "platform=$platform"
@@ -699,7 +650,9 @@ echo "task_cap=$task_cap"
 echo "swap_free_pct=$swap_free_pct"
 echo "cgroup_v2=$cgroup_v2_state"
 echo "cgroup_path=$cgroup_path"
+echo "agent_slots=$agent_slots"
 echo "writer_slots=1"
-echo "heavy_command_slots=1"
-echo "concurrency=$concurrency"
+echo "heavy_command_slots=$heavy_command_slots"
+echo "concurrency=$agent_slots"
+echo "warnings=$warnings"
 echo "reason=$reasons"

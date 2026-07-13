@@ -36,6 +36,7 @@ kit_require_regular_or_absent() {
 
 kit_init_state() {
   kit_validate_home
+  umask 077
   KIT_STATE_ROOT="$HOME/.universal-research-agent-kit"
   KIT_BACKUP_ROOT="$KIT_STATE_ROOT/backups"
   KIT_MANIFEST_ROOT="$KIT_STATE_ROOT/manifests"
@@ -43,6 +44,16 @@ kit_init_state() {
   kit_require_real_dir "$KIT_STATE_ROOT"
   kit_require_real_dir "$KIT_BACKUP_ROOT"
   kit_require_real_dir "$KIT_MANIFEST_ROOT"
+
+  KIT_LOCK_DIR="$KIT_STATE_ROOT/.lock"
+  if [ "${KIT_LOCK_HELD:-0}" = "1" ]; then
+    KIT_LOCK_OWNED=0
+  elif mkdir "$KIT_LOCK_DIR" 2>/dev/null; then
+    KIT_LOCK_OWNED=1
+    export KIT_LOCK_HELD=1
+  else
+    kit_die "Another kit install appears to be running (lock: $KIT_LOCK_DIR). Remove the lock directory only after confirming no installer is active."
+  fi
 
   if [ -n "${KIT_BACKUP_DIR:-}" ]; then
     if [ "$(dirname "$KIT_BACKUP_DIR")" != "$KIT_BACKUP_ROOT" ]; then
@@ -54,11 +65,92 @@ kit_init_state() {
     esac
     [ -d "$KIT_BACKUP_DIR" ] && [ ! -L "$KIT_BACKUP_DIR" ] ||
       kit_die "Shared backup directory is unavailable: $KIT_BACKUP_DIR"
+    KIT_RUN_OWNER=0
   else
     KIT_BACKUP_DIR="$(mktemp -d "$KIT_BACKUP_ROOT/run.$(date +%Y%m%d_%H%M%S).XXXXXX")"
+    KIT_RUN_OWNER=1
   fi
+  KIT_JOURNAL="$KIT_BACKUP_DIR/journal.tsv"
 
-  export KIT_STATE_ROOT KIT_BACKUP_ROOT KIT_MANIFEST_ROOT KIT_BACKUP_DIR
+  export KIT_STATE_ROOT KIT_BACKUP_ROOT KIT_MANIFEST_ROOT KIT_BACKUP_DIR KIT_JOURNAL
+}
+
+kit_release_lock() {
+  if [ "${KIT_LOCK_OWNED:-0}" = "1" ]; then
+    rmdir "$KIT_LOCK_DIR" 2>/dev/null || true
+    KIT_LOCK_OWNED=0
+    export KIT_LOCK_HELD=0
+  fi
+}
+
+kit_journal_entry() {
+  printf '%s\t%s\t%s\n' "$1" "$2" "${3:-}" >> "$KIT_JOURNAL"
+}
+
+# The run owner rolls back every journaled change on any failure or signal so
+# a partial install never leaves the home configuration half-replaced.
+kit_enable_rollback() {
+  [ "${KIT_RUN_OWNER:-0}" = "1" ] || return 0
+  trap 'kit_handle_exit $?' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+}
+
+kit_handle_exit() {
+  local status="$1"
+  trap - EXIT
+  if [ "$status" -ne 0 ]; then
+    echo "Install failed with status $status; rolling back journaled changes." >&2
+    if kit_rollback_run; then
+      echo "Rollback complete. Backups remain in $KIT_BACKUP_DIR" >&2
+    else
+      echo "Warning: automatic rollback incomplete; restore manually from $KIT_BACKUP_DIR" >&2
+    fi
+  fi
+  kit_release_lock
+  exit "$status"
+}
+
+kit_restore_entry() {
+  local target="$1"
+  local backup="$2"
+
+  rm -rf -- "$target"
+  if [ -L "$backup" ]; then
+    cp -P "$backup" "$target"
+  elif [ -d "$backup" ]; then
+    cp -Rp "$backup" "$target"
+  elif [ -f "$backup" ]; then
+    cp -p "$backup" "$target"
+  else
+    return 1
+  fi
+}
+
+kit_rollback_run() {
+  local tab action source destination failed=0
+
+  [ -f "$KIT_JOURNAL" ] || return 0
+  tab="$(printf '\t')"
+  # Newest-first replay so later changes are undone before earlier ones.
+  while IFS="$tab" read -r action source destination; do
+    case "$action" in
+      restore)
+        kit_restore_entry "$source" "$destination" || failed=1
+        ;;
+      absent)
+        rm -rf -- "$source" || failed=1
+        ;;
+      *)
+        failed=1
+        ;;
+    esac
+  done <<EOF
+$(sed -n '1!G;h;$p' "$KIT_JOURNAL")
+EOF
+  mv "$KIT_JOURNAL" "$KIT_JOURNAL.rolled-back"
+  [ "$failed" -eq 0 ]
 }
 
 kit_backup_path() {
@@ -67,8 +159,10 @@ kit_backup_path() {
   local destination="$KIT_BACKUP_DIR/$relative"
 
   if [ ! -e "$source" ] && [ ! -L "$source" ]; then
+    kit_journal_entry absent "$source"
     return
   fi
+  kit_journal_entry restore "$source" "$destination"
 
   kit_require_real_dir "$(dirname "$destination")"
   if [ -e "$destination" ] || [ -L "$destination" ]; then

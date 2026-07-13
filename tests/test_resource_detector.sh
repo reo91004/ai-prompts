@@ -63,8 +63,8 @@ prepare_cgroup_system_root() {
     "$root/proc/sys/kernel" \
     "$root/sys/fs/cgroup/team/slice"
   printf '%s\n' \
-    'MemTotal:       1000000 kB' \
-    'MemAvailable:    800000 kB' \
+    'MemTotal:       33554432 kB' \
+    'MemAvailable:   16777216 kB' \
     'SwapTotal:              0 kB' \
     'SwapFree:               0 kB' > "$root/proc/meminfo"
   while [ "$index" -lt 12 ]; do
@@ -103,16 +103,17 @@ assert_line "$output" 'cgroup_v2=detected'
 assert_line "$output" 'cgroup_path=/sys/fs/cgroup/team/slice'
 assert_line "$output" 'available_pct=10'
 assert_line "$output" 'effective_cpu=2'
+assert_line "$output" 'agent_slots=1'
 assert_line "$output" 'concurrency=1'
 
 printf '%s\n' '0::/tenant' > "$system_root/proc/self/cgroup"
 root_output="$($DETECTOR --system-root "$system_root")"
 assert_line "$root_output" 'cgroup_path=/sys/fs/cgroup'
-assert_line "$root_output" 'concurrency=6'
+assert_line "$root_output" 'agent_slots=6'
 printf '%s\n' '0::/tenant/team/slice' > "$system_root/proc/self/cgroup"
 slice_output="$($DETECTOR --system-root "$system_root")"
 assert_line "$slice_output" 'cgroup_path=/sys/fs/cgroup/team/slice'
-assert_line "$slice_output" 'concurrency=1'
+assert_line "$slice_output" 'agent_slots=1'
 
 parser_failures=0
 printf '%s\n' max > "$system_root/sys/fs/cgroup/team/slice/cpu.max"
@@ -145,117 +146,151 @@ unsafe_output="$($DETECTOR --system-root "$system_root" 2>&1)"
 unsafe_rc=$?
 set -e
 [ "$unsafe_rc" -eq 3 ] || { echo "unsafe cgroup path returned $unsafe_rc" >&2; exit 1; }
-assert_line "$unsafe_output" 'status=RESOURCE_DETECTION_FAILED'
+assert_line "$unsafe_output" 'status=RESOURCE_UNKNOWN'
 assert_line "$unsafe_output" 'reason=unsafe_cgroup_membership_path'
 
-for point in 19:1 20:2 34:2 35:3 49:3 50:4 64:4 65:6; do
-  pct=${point%%:*}
+# Absolute headroom buckets: one slot per 2 GiB available, clamped to 1-6.
+for point in 1073741824:1 2147483648:1 4294967295:1 4294967296:2 6442450944:3 8589934592:4 10737418240:5 12884901888:6; do
+  bytes=${point%%:*}
   expected=${point##*:}
-  prepare_case "bucket-$pct"
-  set_signal "bucket-$pct" available_bytes "$pct"
-  run_fixture 0 "bucket-$pct"
+  prepare_case "bucket-$expected-$bytes"
+  set_signal "bucket-$expected-$bytes" available_bytes "$bytes"
+  run_fixture 0 "bucket-$expected-$bytes"
   assert_line "$output" "memory_bucket=$expected"
+  assert_line "$output" "agent_slots=$expected"
   assert_line "$output" "concurrency=$expected"
 done
+
+# Low absolute-percentage headroom warns without serializing.
+prepare_case low-memory-pct
+set_signal low-memory-pct available_bytes 1073741824
+run_fixture 0 low-memory-pct
+assert_line "$output" 'status=OK'
+assert_line "$output" 'warnings=low_memory_pct'
+assert_line "$output" 'agent_slots=1'
 
 prepare_case cpu-cap
 set_signal cpu-cap cpu_count 4
 run_fixture 0 cpu-cap
-assert_line "$output" 'concurrency=2'
+assert_line "$output" 'agent_slots=2'
 
 prepare_case thread-cap
 run_fixture 0 thread-cap HARNESS_MAX_THREADS=4
-assert_line "$output" 'concurrency=4'
+assert_line "$output" 'agent_slots=4'
 
 prepare_case task-cap
 run_fixture 0 task-cap HARNESS_TASK_CAP=3
-assert_line "$output" 'concurrency=3'
+assert_line "$output" 'agent_slots=3'
 
 prepare_case no-swap
 run_fixture 0 no-swap
 assert_line "$output" 'swap_free_pct=not_configured'
 assert_line "$output" 'status=OK'
+assert_line "$output" 'warnings=none'
 
+# Low swap alone is a warning, never a serialization signal.
 prepare_case low-swap
 set_signal low-swap swap_total_bytes 100
 set_signal low-swap swap_free_bytes 9
 run_fixture 0 low-swap
-assert_line "$output" 'status=RESOURCE_CONSTRAINED'
-assert_line "$output" 'concurrency=1'
-assert_line "$output" 'reason=low_swap'
+assert_line "$output" 'status=OK'
+assert_line "$output" 'warnings=low_swap'
+assert_line "$output" 'agent_slots=6'
+assert_line "$output" 'heavy_command_slots=1'
 
 prepare_case cgroup-memory
-set_signal cgroup-memory total_bytes 1000
-set_signal cgroup-memory available_bytes 800
-set_signal cgroup-memory cgroup_memory_max 500
-set_signal cgroup-memory cgroup_memory_current 400
+set_signal cgroup-memory cgroup_memory_max 4294967296
+set_signal cgroup-memory cgroup_memory_current 2147483648
 run_fixture 0 cgroup-memory
-assert_line "$output" 'available_pct=20'
-assert_line "$output" 'concurrency=2'
+assert_line "$output" 'available_pct=50'
+assert_line "$output" 'agent_slots=1'
 
 prepare_case cgroup-cpu
 set_signal cgroup-cpu cgroup_cpu_quota 200000
 set_signal cgroup-cpu cgroup_cpu_period 100000
 run_fixture 0 cgroup-cpu
 assert_line "$output" 'effective_cpu=2'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'agent_slots=1'
 
 prepare_case cpuset
 set_signal cpuset cpuset_cpus '0-3,6'
 run_fixture 0 cpuset
 assert_line "$output" 'effective_cpu=5'
-assert_line "$output" 'concurrency=2'
+assert_line "$output" 'agent_slots=2'
 
 prepare_case psi-boundary
 set_signal psi-boundary psi 'some avg10=19.99 avg60=0.00 avg300=0.00 total=0
 full avg10=0.99 avg60=0.00 avg300=0.00 total=0'
 run_fixture 0 psi-boundary
 assert_line "$output" 'status=OK'
+assert_line "$output" 'agent_slots=6'
 
+# Critical PSI and swapout growth reduce slots one step and hold heavy work.
 prepare_case psi-full-critical
 set_signal psi-full-critical psi 'full avg10=1.00 avg60=0.00 avg300=0.00 total=0'
 run_fixture 0 psi-full-critical
 assert_line "$output" 'status=RESOURCE_CONSTRAINED'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'agent_slots=5'
+assert_line "$output" 'heavy_command_slots=0'
 assert_line "$output" 'reason=critical_psi'
 
 prepare_case psi-some-critical
 set_signal psi-some-critical psi 'some avg10=20.00 avg60=0.00 avg300=0.00 total=0'
 run_fixture 0 psi-some-critical
 assert_line "$output" 'status=RESOURCE_CONSTRAINED'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'agent_slots=5'
 assert_line "$output" 'reason=critical_psi'
-
-prepare_case oom-growth
-set_signal oom-growth oom_before 1
-set_signal oom-growth oom_after 2
-run_fixture 0 oom-growth
-assert_line "$output" 'status=RESOURCE_CONSTRAINED'
-assert_line "$output" 'concurrency=1'
-assert_line "$output" 'reason=oom_growth'
 
 prepare_case swapout-growth
 set_signal swapout-growth swapout_before 1
 set_signal swapout-growth swapout_after 2
 run_fixture 0 swapout-growth
 assert_line "$output" 'status=RESOURCE_CONSTRAINED'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'agent_slots=5'
+assert_line "$output" 'heavy_command_slots=0'
 assert_line "$output" 'reason=swapout_growth'
 
+# The one-step reduction never drops below one slot.
+prepare_case constrained-floor
+set_signal constrained-floor available_bytes 1073741824
+set_signal constrained-floor psi 'full avg10=1.00 avg60=0.00 avg300=0.00 total=0'
+run_fixture 0 constrained-floor
+assert_line "$output" 'status=RESOURCE_CONSTRAINED'
+assert_line "$output" 'agent_slots=1'
+
+# OOM growth is the only signal that forces a single slot.
+prepare_case oom-growth
+set_signal oom-growth oom_before 1
+set_signal oom-growth oom_after 2
+run_fixture 0 oom-growth
+assert_line "$output" 'status=RESOURCE_CONSTRAINED'
+assert_line "$output" 'agent_slots=1'
+assert_line "$output" 'heavy_command_slots=0'
+assert_line "$output" 'reason=oom_growth'
+
+# Detection failure is RESOURCE_UNKNOWN at the configured ceiling, not a
+# fake shortage measurement.
 prepare_case malformed
 set_signal malformed total_bytes invalid
 run_fixture 3 malformed
-assert_line "$output" 'status=RESOURCE_DETECTION_FAILED'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'status=RESOURCE_UNKNOWN'
+assert_line "$output" 'agent_slots=6'
+assert_line "$output" 'concurrency=6'
+
+prepare_case malformed-ceiling
+set_signal malformed-ceiling total_bytes invalid
+run_fixture 3 malformed-ceiling HARNESS_MAX_THREADS=2
+assert_line "$output" 'status=RESOURCE_UNKNOWN'
+assert_line "$output" 'agent_slots=2'
 
 prepare_case windows windows
 run_fixture 3 windows
-assert_line "$output" 'status=RESOURCE_DETECTION_FAILED'
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'status=RESOURCE_UNKNOWN'
+assert_line "$output" 'agent_slots=6'
 
 prepare_case cgroup-zero cgroup-zero
 run_fixture 3 cgroup-zero
-assert_line "$output" 'status=RESOURCE_DETECTION_FAILED'
+assert_line "$output" 'status=RESOURCE_UNKNOWN'
 assert_line "$output" 'reason=malformed_cgroup_memory'
 
 prepare_case stale
@@ -265,7 +300,7 @@ run_fixture 3 stale
 assert_line "$output" 'status=RESOURCE_STALE'
 snapshot_age="$(printf '%s\n' "$output" | sed -n 's/^snapshot_age_seconds=//p')"
 [ "$snapshot_age" -ge 601 ] || { echo "stale snapshot age was $snapshot_age" >&2; exit 1; }
-assert_line "$output" 'concurrency=1'
+assert_line "$output" 'agent_slots=6'
 
 prepare_case fresh wsl
 run_fixture 0 fresh

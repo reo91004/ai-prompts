@@ -21,18 +21,30 @@ The more specific layer may refine the layer above it but must not weaken safety
 - Separate deterministic Quality Gates from semantic Review Gates. A failed deterministic gate cannot be approved by an LLM review.
 - Treat comments as explanation, never evidence. Keep comments synchronized with current behavior.
 - Preserve research integrity: provenance, seeds, config/run binding, artifacts, evidence scope, and synthetic/simulated/measured separation.
+- Start at the lowest model and reasoning effort that fits the task; escalate only on failure or revealed ambiguity.
 - Use Sequential Thinking MCP only for genuinely hard or ambiguous planning, unclear debugging, expensive experiment design, or claim acceptance. If unavailable when warranted, record the limitation.
 
 ## Delegation Contract
 
-- Handle small local tasks in the main agent without delegation.
-- Delegate only when at least two independent child deliverables exist. Once delegation is chosen, use at least two child agents; a one-child delegation is invalid.
-- Run the `resource-aware-orchestration` detector before every spawn wave. A concurrency result of one means run the required children sequentially, not that the second child may be omitted.
-- Allow at most one writing child and one heavy command at a time.
+- Keep small or tightly coupled work in the main agent. Delegate only when a child has one bounded specialist deliverable and delegation has a clear net benefit.
+- One child is valid. Never create a second child merely to satisfy a minimum agent count.
+- Treat `agents.max_threads` as a ceiling, not a target. Start from the configured or host default ceiling and reduce it only after confirmed, sustained resource pressure.
+- Low free swap, one noisy sample, a stale snapshot, or detector failure alone does not prove resource pressure and must not force all agent concurrency to one.
+- Run the `resource-aware-orchestration` detector before a spawn wave. A new resource recommendation applies to new work; do not cancel healthy existing work merely because the recommended concurrency decreased.
+- Allow one writer per shared worktree. Multiple writers require isolated worktrees, disjoint ownership, and an explicit merge plan. Run at most one heavy command at a time.
 - Child agents must not delegate or spawn nested agents. Keep `max_depth = 1`.
 - Every child task packet must define objective, allowed and forbidden scope, write permission, acceptance criteria, resource and review budget, stop condition, and output contract.
 - Every child result must report status, evidence, commands and exit codes, artifacts, deviations, and remaining risks.
 - A failed step blocks its dependents and final acceptance, while unrelated analysis and evidence preservation may continue. Mark the whole task `BLOCKED` only after a scoped retry cannot achieve the goal.
+
+## Liveness And Cancellation
+
+- Elapsed time and mailbox wait timeouts alone are never failure or cancellation reasons.
+- Long-running work must declare its progress probe, expected artifact, checkpoint path, resume procedure, graceful cancellation procedure, and cleanup procedure.
+- Treat a worker as alive while its process, heartbeat, log, artifact, CPU, or I/O state shows progress.
+- Stop work only for user cancellation, an explicit deadline, an unrecoverable error, confirmed sustained no-progress after repeated liveness probes, or a resource or equipment emergency.
+- Before stopping, request a checkpoint, preserve logs and partial artifacts, record the process and resource state, and attempt graceful termination. Force termination is a last resort.
+- Diagnose the failure class before retrying. Permit one bounded retry by default and preserve the first attempt's evidence.
 
 ## Skills And Agents
 
@@ -42,7 +54,9 @@ Available agents cover context exploration, sequential reasoning, implementation
 
 ## Acceptance
 
+- Run cheap deterministic checks directly. Do not spawn an agent merely to run a command that the main agent can run safely.
 - Run relevant syntax, type, lint, build, test, data, reproducibility, proof, synthesis, analysis, and artifact checks.
 - Apply the Review Necessity Gate. Use one semantic reviewer, then at most one targeted delta re-review by default.
 - Classify review findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`.
+- Third-party skills and plugins may not increase delegation, review, retry, or resource budgets unless the selected profile explicitly authorizes that behavior.
 - Approve only when the artifact, deterministic evidence, semantic review, current comments/documentation, and claim scope agree.

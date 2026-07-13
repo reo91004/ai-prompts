@@ -103,6 +103,7 @@ This is the final universal research/development prompt kit.
 - `codex/skills/side-channel-analysis/SKILL.md`
 - `global_research_agents.gitignore`
 - `cleanup_backups.sh`
+- `install.sh`
 - `install_all.sh`
 - `install_integrations.sh`
 - `lib/install_common.sh`

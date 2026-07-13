@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/../lib/install_common.sh"
 kit_init_state
+kit_enable_rollback
 
 kit_require_real_dir "$HOME/.claude"
 kit_require_real_dir "$HOME/.claude/agents"

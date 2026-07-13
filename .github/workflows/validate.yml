@@ -15,6 +15,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - name: Check POSIX bootstrap syntax
+        if: runner.os == 'Linux'
+        run: dash -n install.sh
       - name: Validate harness contracts
         run: bash scripts/validate_harness.sh
       - name: Test resource detector including WSL fixtures
@@ -27,10 +30,13 @@ jobs:
           bash codex/skills/resource-aware-orchestration/scripts/detect_resources.sh > "$output_file"
           cat "$output_file"
           grep -Eq '^status=(OK|RESOURCE_CONSTRAINED)$' "$output_file"
+          agent_slots="$(sed -n 's/^agent_slots=//p' "$output_file")"
+          case "$agent_slots" in 1|2|3|4|5|6) ;; *) exit 1 ;; esac
           concurrency="$(sed -n 's/^concurrency=//p' "$output_file")"
-          case "$concurrency" in 1|2|3|4|5|6) ;; *) exit 1 ;; esac
+          [ "$concurrency" = "$agent_slots" ]
           grep -Fxq 'writer_slots=1' "$output_file"
-          grep -Fxq 'heavy_command_slots=1' "$output_file"
+          grep -Eq '^heavy_command_slots=(0|1)$' "$output_file"
+          grep -Eq '^warnings=' "$output_file"
           case "$RUNNER_OS" in
             macOS) grep -Fxq 'platform=macos' "$output_file" ;;
             Linux)

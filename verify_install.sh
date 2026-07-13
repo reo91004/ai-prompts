@@ -150,64 +150,72 @@ check_file "$HOME/.config/git/ignore"
 check_contains "$HOME/.config/git/ignore" "BEGIN UNIVERSAL RESEARCH AGENT KIT"
 check_contains "$HOME/.config/git/ignore" "END UNIVERSAL RESEARCH AGENT KIT"
 
-if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != "1" ]; then
-  if command -v codex >/dev/null 2>&1; then
-    codex_plugins="$(codex plugin list --json)"
-    if ! printf '%s\n' "$codex_plugins" | EXPECTED_PONYTAIL_PATH="$HOME/.universal-research-agent-kit/marketplaces/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail" node -e '
-      const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
-      const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
-      const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
-      const valid = lazy && lazy.version === "4.17.0" && lazy.installed === true &&
-        lazy.enabled === true && ponytail && ponytail.version === "4.8.4" &&
-        ponytail.installed === true && ponytail.enabled === true &&
-        ponytail.source?.source === "local" &&
-        ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
-      process.exit(valid ? 0 : 1);
-    '; then
-      echo "Missing Codex integration: LazyCodex or Ponytail"
-      missing=1
-    else
-      echo "OK Codex integrations: LazyCodex and Ponytail"
-    fi
-    for name in arxiv semantic-scholar semantic_scholar; do
-      if (cd "$HOME" && codex mcp get "$name" >/dev/null 2>&1); then
-        echo "Unexpected Codex paper-search MCP: $name"
-        missing=1
-      fi
-    done
-  fi
-
-  if command -v claude >/dev/null 2>&1; then
-    if ! claude plugin list --json | node -e '
-      const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
-      const ponytail = plugins.find((item) =>
-        item.id === "ponytail@ponytail" && item.scope === "user");
-      process.exit(ponytail && ponytail.version === "4.8.4" &&
-        ponytail.enabled === true ? 0 : 1);
-    '; then
-      echo "Missing Claude integration: Ponytail"
-      missing=1
-    else
-      echo "OK Claude integration: Ponytail"
-    fi
-    if ! command -v node >/dev/null 2>&1; then
-      echo "Cannot verify Claude user MCP configuration without Node.js"
-      missing=1
-    elif ! CLAUDE_USER_CONFIG="$HOME/.claude.json" node -e '
-      const fs = require("fs");
-      const path = process.env.CLAUDE_USER_CONFIG;
-      if (!fs.existsSync(path)) process.exit(0);
-      const config = JSON.parse(fs.readFileSync(path, "utf8"));
-      const servers = config.mcpServers || {};
-      const blocked = ["arxiv", "semantic-scholar", "semantic_scholar"];
-      const hasOwn = (name) => Object.prototype.hasOwnProperty.call(servers, name);
-      process.exit(blocked.some(hasOwn) ? 1 : 0);
-    '; then
-      echo "Unexpected Claude user paper-search MCP configuration"
-      missing=1
-    fi
-  fi
+# Integration checks follow the profile the installer recorded. The default
+# core install manages no plugins and never inspects or removes user MCPs.
+integrations_profile="none"
+profile_file="$HOME/.universal-research-agent-kit/integrations.profile"
+if [ -f "$profile_file" ] && [ ! -L "$profile_file" ]; then
+  integrations_profile="$(sed -n '1p' "$profile_file")"
 fi
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
+  integrations_profile="none"
+fi
+
+case "$integrations_profile" in
+  ponytail|ultra)
+    if command -v codex >/dev/null 2>&1; then
+      if ! codex plugin list --json | EXPECTED_PONYTAIL_PATH="$HOME/.universal-research-agent-kit/marketplaces/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail" node -e '
+        const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+        const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
+        const valid = ponytail && ponytail.version === "4.8.4" &&
+          ponytail.installed === true && ponytail.enabled === true &&
+          ponytail.source?.source === "local" &&
+          ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
+        process.exit(valid ? 0 : 1);
+      '; then
+        echo "Missing Codex integration: Ponytail"
+        missing=1
+      else
+        echo "OK Codex integration: Ponytail"
+      fi
+      if [ "$integrations_profile" = "ultra" ]; then
+        if ! codex plugin list --json | node -e '
+          const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+          const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
+          process.exit(lazy && lazy.version === "4.17.0" && lazy.installed === true &&
+            lazy.enabled === true ? 0 : 1);
+        '; then
+          echo "Missing Codex integration: LazyCodex"
+          missing=1
+        else
+          echo "OK Codex integration: LazyCodex"
+        fi
+      fi
+    fi
+
+    if command -v claude >/dev/null 2>&1; then
+      if ! claude plugin list --json | node -e '
+        const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
+        const ponytail = plugins.find((item) =>
+          item.id === "ponytail@ponytail" && item.scope === "user");
+        process.exit(ponytail && ponytail.version === "4.8.4" &&
+          ponytail.enabled === true ? 0 : 1);
+      '; then
+        echo "Missing Claude integration: Ponytail"
+        missing=1
+      else
+        echo "OK Claude integration: Ponytail"
+      fi
+    fi
+    ;;
+  none)
+    echo "OK integrations: none selected (core-only install)"
+    ;;
+  *)
+    echo "Unknown integrations profile: $integrations_profile"
+    missing=1
+    ;;
+esac
 
 if [ "$missing" -ne 0 ]; then
   echo "Install verification failed."

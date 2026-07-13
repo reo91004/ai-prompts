@@ -2,6 +2,9 @@
 .DS_Store
 Thumbs.db
 
+# Local working notes exchanged with review sessions
+handover*.md
+
 # Agent caches, logs, and temporary state
 .agent_logs/
 .agent_tmp/
