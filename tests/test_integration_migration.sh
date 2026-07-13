@@ -22,21 +22,30 @@ cmd="$*"
 printf 'codex %s\n' "$cmd" >> "$STATE/calls.log"
 case "$cmd" in
   "plugin list --json")
-    cat "$STATE/plugins.json"
+    # Like the real CLI, the enabled flag is overlaid from the
+    # [plugins."<id>"] sections of ~/.codex/config.toml.
+    node -e '
+      const fs = require("fs");
+      const data = JSON.parse(fs.readFileSync(process.argv[1] + "/plugins.json", "utf8"));
+      const config = process.env.HOME + "/.codex/config.toml";
+      if (fs.existsSync(config)) {
+        const text = fs.readFileSync(config, "utf8");
+        for (const p of data.installed || []) {
+          const header = "[plugins.\"" + p.pluginId + "\"]";
+          const start = text.indexOf(header);
+          if (start < 0) continue;
+          const rest = text.slice(start + header.length);
+          const end = rest.search(/\n\[/);
+          const section = end >= 0 ? rest.slice(0, end) : rest;
+          const flag = section.match(/^enabled[ \t]*=[ \t]*(true|false)/m);
+          if (flag) p.enabled = flag[1] === "true";
+        }
+      }
+      console.log(JSON.stringify(data));
+    ' "$STATE"
     ;;
   "plugin marketplace list --json")
     cat "$STATE/marketplaces.json"
-    ;;
-  "plugin disable omo@sisyphuslabs")
-    node -e '
-      const fs = require("fs");
-      const path = process.argv[1] + "/plugins.json";
-      const data = JSON.parse(fs.readFileSync(path, "utf8"));
-      for (const p of data.installed || []) {
-        if (p.pluginId === "omo@sisyphuslabs") p.enabled = false;
-      }
-      fs.writeFileSync(path, JSON.stringify(data));
-    ' "$STATE"
     ;;
   "plugin remove ponytail@ponytail")
     node -e '
@@ -193,8 +202,9 @@ seed_codex_mock_state "$A_CODEX" "$A_HOME" kit
 seed_claude_mock_state "$A_CLAUDE" "$A_HOME" kit
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 
-grep -Fqx 'codex plugin disable omo@sisyphuslabs' "$A_CODEX/calls.log" || {
-  echo "legacy LazyCodex was not disabled" >&2; exit 1; }
+disabled_line="$(grep -A1 '^\[plugins."omo@sisyphuslabs"\]$' "$A_HOME/.codex/config.toml" | sed -n '2p')"
+[ "$disabled_line" = "enabled = false" ] || {
+  echo "legacy LazyCodex was not disabled in config.toml" >&2; exit 1; }
 grep -Fqx 'codex plugin remove ponytail@ponytail' "$A_CODEX/calls.log" || {
   echo "kit-owned Codex Ponytail plugin was not removed" >&2; exit 1; }
 grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {

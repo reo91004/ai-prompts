@@ -44,7 +44,7 @@ profile별 reconciliation 규칙:
 | kit-owned Ponytail | plugin·marketplace 제거 | 설치·활성 | 설치·활성 |
 | user-owned Ponytail/LazyCodex | **불변** (보존 기록) | **불변** | **불변** |
 
-user-owned 판별: Ponytail은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지, LazyCodex는 kit-pinned 버전(4.17.0) 일치 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`disabled_legacy` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 비활성화된 LazyCodex는 `codex plugin enable omo@sisyphuslabs`로 언제든 복귀할 수 있습니다.
+user-owned 판별: Ponytail은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지, LazyCodex는 kit-pinned 버전(4.17.0) 일치 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`disabled_legacy` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 비활성화된 LazyCodex는 `~/.codex/config.toml`의 `[plugins."omo@sisyphuslabs"]` 섹션에서 `enabled = true`로 되돌리면 언제든 복귀합니다(Codex CLI에는 plugin enable/disable 서브커맨드가 없어 config 키로 관리됩니다).
 
 LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치합니다. `ponytail`/`ultra` 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`은 프로필과 무관하게 통합 단계 전체(레거시 정리 포함)를 생략합니다.
 

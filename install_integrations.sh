@@ -68,6 +68,42 @@ codex_plugin_exact_enabled() {
   ' "$selector" "$version" "$require_local" "$expected_path"
 }
 
+# Codex has no plugin enable/disable subcommand: the enabled flag lives in
+# ~/.codex/config.toml [plugins."<id>"] sections and `codex plugin list`
+# reflects it. Subsections like [plugins."<id>".mcp_servers.*] are untouched.
+codex_set_plugin_enabled() {
+  local plugin="$1"
+  local value="$2"
+  local config="$HOME/.codex/config.toml"
+  local tmp
+
+  kit_require_regular_or_absent "$config"
+  if [ ! -f "$config" ]; then
+    printf '' > "$config"
+  fi
+  tmp="$(mktemp "$config.tmp.XXXXXX")"
+  awk -v value="$value" -v header="[plugins.\"$plugin\"]" '
+    $0 == header { in_section = 1; found = 1; print; next }
+    /^\[/ {
+      if (in_section && !wrote) { print "enabled = " value; wrote = 1 }
+      in_section = 0
+      print
+      next
+    }
+    in_section && /^enabled[[:space:]]*=/ { print "enabled = " value; wrote = 1; next }
+    { print }
+    END {
+      if (in_section && !wrote) print "enabled = " value
+      if (!found) {
+        print ""
+        print header
+        print "enabled = " value
+      }
+    }
+  ' "$config" > "$tmp"
+  mv "$tmp" "$config"
+}
+
 # Prints "<version> enabled|disabled" for an installed plugin, or "absent".
 codex_plugin_status() {
   local selector="$1"
@@ -256,8 +292,8 @@ reconcile_codex_lazycodex() {
     return
   fi
   if [ "$enablement" = "enabled" ]; then
-    echo "Disabling kit-installed legacy LazyCodex $LAZYCODEX_VERSION (profile: $PROFILE). Re-enable with: codex plugin enable omo@sisyphuslabs"
-    codex plugin disable omo@sisyphuslabs
+    echo "Disabling kit-installed legacy LazyCodex $LAZYCODEX_VERSION (profile: $PROFILE). Re-enable by setting enabled = true under [plugins.\"omo@sisyphuslabs\"] in ~/.codex/config.toml"
+    codex_set_plugin_enabled "omo@sisyphuslabs" false
     [ "$(codex_plugin_status "omo@sisyphuslabs")" = "$LAZYCODEX_VERSION disabled" ] ||
       kit_die "Failed to disable legacy LazyCodex."
   else
