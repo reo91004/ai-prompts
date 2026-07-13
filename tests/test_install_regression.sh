@@ -78,6 +78,7 @@ echo "Unit regression: kit_restore_entry must not delete a target without its ba
 )
 
 echo "Backup-failure regression: a failed backup copy must leave the original intact"
+# chmod 000 only blocks non-root readers; this scenario requires a non-root run.
 BACKUP_FAIL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-backupfail.XXXXXX")"
 mkdir -p "$BACKUP_FAIL_HOME/.claude/agents"
 printf 'user prompt\n' > "$BACKUP_FAIL_HOME/.claude/CLAUDE.md"

@@ -242,6 +242,22 @@ fi
 [ "$(state_value "$B_HOME" codex_lazycodex)" = "not_requested" ]
 run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
 
+echo "Scenario A follow-up: a user-installed non-pinned Ponytail after removal still verifies"
+node -e '
+  const fs = require("fs");
+  const dir = process.argv[1];
+  fs.writeFileSync(dir + "/plugins.json", JSON.stringify([
+    { id: "ponytail@ponytail", scope: "user", version: "9.9.9", enabled: true },
+  ]));
+  fs.writeFileSync(dir + "/marketplaces.json", JSON.stringify([
+    { name: "ponytail", path: "/opt/user-marketplace/ponytail" },
+  ]));
+' "$A_CLAUDE"
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null || {
+  echo "verify failed after the user installed their own non-pinned Ponytail" >&2
+  exit 1
+}
+
 echo "Scenario C: standalone install_integrations.sh records state"
 C_HOME="$WORK/home-c"
 C_CODEX="$WORK/mock-c-codex"

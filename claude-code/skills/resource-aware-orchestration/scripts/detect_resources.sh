@@ -66,10 +66,12 @@ min_value() {
 emit_degraded() {
   local degraded_slots="$ceiling"
   local degraded_authorized="read_only"
+  local degraded_heavy=1
 
   if [ "$1" = "RESOURCE_STALE" ]; then
     degraded_slots=0
     degraded_authorized=0
+    degraded_heavy=0
   fi
   echo "status=$1"
   echo "platform=${platform:-unknown}"
@@ -79,7 +81,7 @@ emit_degraded() {
   echo "cgroup_path=${cgroup_path:-unavailable}"
   echo "agent_slots=$degraded_slots"
   echo "writer_slots=1"
-  echo "heavy_command_slots=1"
+  echo "heavy_command_slots=$degraded_heavy"
   echo "spawn_authorized=$degraded_authorized"
   echo "concurrency=$degraded_slots"
   echo "warnings=none"

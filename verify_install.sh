@@ -207,6 +207,17 @@ claude_ponytail_kit_enabled() {
   '
 }
 
+# Claude plugin listings expose no source path, so ownership uses the same
+# heuristic as LazyCodex: only the kit-pinned version counts as a kit remnant.
+claude_ponytail_pinned_installed() {
+  claude plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const ponytail = plugins.find((item) =>
+      item.id === "ponytail@ponytail" && item.scope === "user");
+    process.exit(ponytail && ponytail.version === "4.8.4" ? 0 : 1);
+  '
+}
+
 claude_ponytail_installed() {
   claude plugin list --json | node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
@@ -277,9 +288,11 @@ else
       echo "OK Claude integration: user-owned Ponytail preserved"
       ;;
     removed_legacy|not_requested)
-      if claude_usable && claude_ponytail_installed; then
-        echo "Claude Ponytail is still installed despite state '$claude_ponytail_state'."
+      if claude_usable && claude_ponytail_pinned_installed; then
+        echo "Kit-pinned Claude Ponytail 4.8.4 is installed despite state '$claude_ponytail_state'; run 'sh install.sh' to reconcile."
         missing=1
+      elif claude_usable && claude_ponytail_installed; then
+        echo "OK Claude integration: non-pinned user-owned Ponytail detected and preserved (state '$claude_ponytail_state')."
       else
         echo "OK Claude integration: Ponytail $claude_ponytail_state"
       fi

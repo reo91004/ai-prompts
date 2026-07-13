@@ -312,6 +312,7 @@ snapshot_age="$(printf '%s\n' "$output" | sed -n 's/^snapshot_age_seconds=//p')"
 assert_line "$output" 'agent_slots=0'
 assert_line "$output" 'concurrency=0'
 assert_line "$output" 'spawn_authorized=0'
+assert_line "$output" 'heavy_command_slots=0'
 
 prepare_case fresh wsl
 run_fixture 0 fresh
