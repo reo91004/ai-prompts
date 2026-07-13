@@ -6,7 +6,7 @@
 bash claude-code/install.sh
 ```
 
-플랫폼 설정만 설치하는 명령입니다. 저장소 루트의 `sh install.sh`는 선택한 profile로 상태를 수렴시킵니다: 기본(none)은 core 설치와 함께 kit-owned 통합 잔재를 정리하고, Ponytail은 `--integrations ponytail`(또는 `ultra`)로 opt-in합니다. user-owned plugin/marketplace는 보존하고 그 결과를 `integrations.state`에 기록합니다. LazyCodex는 Codex 전용이므로 Claude Code에는 설치하지 않습니다. 설치기는 사용자 MCP 등록을 조회하거나 변경하지 않습니다.
+플랫폼 설정만 설치하는 명령입니다. 저장소 루트의 `sh install.sh`는 선택한 profile로 상태를 수렴시킵니다: 기본(none)은 core 설치와 함께 kit-owned 통합 잔재를 정리하고, Ponytail은 `--integrations ponytail`(또는 `ultra`)로 opt-in합니다. user-owned plugin/marketplace는 보존하고 그 결과를 `integrations.state`에 기록합니다. LazyCodex는 Codex 전용이므로 Claude Code에는 설치하지 않습니다. Sequential Thinking MCP는 없을 때만 자동 등록되고, 그 외 사용자 MCP 등록은 수정·삭제하지 않습니다.
 
 설치 위치:
 
@@ -18,7 +18,7 @@ bash claude-code/install.sh
 
 `CLAUDE.md`는 항상 로드됩니다. `agents`는 subagent 정의입니다. `skills`는 관련 작업일 때만 본문이 로드되어 세부 템플릿과 도메인 규칙을 필요할 때 적용합니다.
 
-Sequential Thinking MCP는 별도로 관리하며 genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용합니다. 필요하지만 사용할 수 없으면 성공으로 간주하지 않고 limitation을 기록합니다. Codex MCP는 이 harness의 필수 조건이 아니며 project overlay나 명시된 작업이 요구할 때만 사용합니다.
+Sequential Thinking MCP는 설치기가 없을 때만 pin 버전으로 자동 등록하며 genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용합니다. 필요하지만 사용할 수 없으면 성공으로 간주하지 않고 limitation을 기록합니다. Codex MCP는 이 harness의 필수 조건이 아니며 project overlay나 명시된 작업이 요구할 때만 사용합니다.
 
 ## Portable harness
 

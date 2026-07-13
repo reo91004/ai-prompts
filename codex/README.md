@@ -18,7 +18,7 @@ bash codex/install.sh
 
 Codex는 `AGENTS.md`를 전역 지침으로 읽고, `~/.codex/agents/*.toml`을 custom agent로 사용합니다. Codex skills는 `~/.agents/skills`에 설치되며, 관련 작업일 때 본문을 로드합니다.
 
-opt-in 통합은 LazyCodex와 Ponytail을 설치할 수 있지만 Sequential Thinking MCP 자체는 별도 설치가 필요합니다. 설치기는 사용자 MCP 등록을 조회하거나 변경하지 않습니다.
+opt-in 통합은 LazyCodex와 Ponytail을 설치할 수 있고, Sequential Thinking MCP는 profile과 무관하게 없을 때만 pin 버전으로 자동 등록됩니다. 설치기는 그 외의 사용자 MCP 등록을 수정하거나 삭제하지 않습니다.
 
 ## Portable harness
 

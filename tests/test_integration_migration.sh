@@ -64,6 +64,12 @@ case "$cmd" in
       fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "ponytail")));
     ' "$STATE"
     ;;
+  "mcp get sequential_thinking")
+    [ -f "$STATE/mcp_sequential" ]
+    ;;
+  "mcp add sequential_thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2026.7.4")
+    : > "$STATE/mcp_sequential"
+    ;;
   *)
     echo "codex mock: unhandled command: $cmd" >&2
     exit 1
@@ -98,6 +104,12 @@ case "$cmd" in
       const data = JSON.parse(fs.readFileSync(path, "utf8"));
       fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "ponytail")));
     ' "$STATE"
+    ;;
+  "mcp get sequential-thinking")
+    [ -f "$STATE/mcp_sequential" ]
+    ;;
+  "mcp add -s user sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2026.7.4")
+    : > "$STATE/mcp_sequential"
     ;;
   *)
     echo "claude mock: unhandled command: $cmd" >&2
@@ -215,10 +227,14 @@ grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.l
 [ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
 [ "$(state_value "$A_HOME" codex_ponytail)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" claude_ponytail)" = "removed_legacy" ]
+[ "$(state_value "$A_HOME" codex_sequential_thinking)" = "registered_kit" ]
+[ "$(state_value "$A_HOME" claude_sequential_thinking)" = "registered_kit" ]
 
 echo "Scenario A repeat: converged state stays converged and verifies"
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 [ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
+[ "$(state_value "$A_HOME" codex_sequential_thinking)" = "preexisting" ]
+[ "$(state_value "$A_HOME" claude_sequential_thinking)" = "preexisting" ]
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
 
 echo "Scenario B: user-owned Ponytail is preserved and still verifies"
@@ -280,5 +296,7 @@ run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" no
 [ "$(state_value "$C_HOME" codex_ponytail)" = "not_requested" ]
 [ "$(state_value "$C_HOME" codex_lazycodex)" = "not_requested" ]
 [ "$(state_value "$C_HOME" claude_ponytail)" = "not_requested" ]
+[ "$(state_value "$C_HOME" codex_sequential_thinking)" = "registered_kit" ]
+[ "$(state_value "$C_HOME" claude_sequential_thinking)" = "registered_kit" ]
 
 echo "Integration migration tests passed."

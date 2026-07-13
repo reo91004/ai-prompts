@@ -20,6 +20,7 @@ kit_enable_rollback
 LAZYCODEX_VERSION="4.17.0"
 PONYTAIL_VERSION="4.8.4"
 PONYTAIL_REVISION="bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324"
+SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@2026.7.4"
 PONYTAIL_SOURCE_ROOT="$KIT_STATE_ROOT/sources"
 PONYTAIL_SOURCE="$PONYTAIL_SOURCE_ROOT/ponytail-$PONYTAIL_REVISION"
 PONYTAIL_MARKETPLACE_ROOT="$KIT_STATE_ROOT/marketplaces"
@@ -28,6 +29,36 @@ PONYTAIL_MARKETPLACE="$PONYTAIL_MARKETPLACE_ROOT/ponytail-$PONYTAIL_REVISION"
 CODEX_PONYTAIL_STATE="host_unavailable"
 CLAUDE_PONYTAIL_STATE="host_unavailable"
 CODEX_LAZYCODEX_STATE="host_unavailable"
+CODEX_SEQTHINK_STATE="host_unavailable"
+CLAUDE_SEQTHINK_STATE="host_unavailable"
+
+# Sequential Thinking MCP is add-only: a registration under any existing
+# name or version is never inspected further, replaced, or removed.
+ensure_codex_sequential_thinking() {
+  if (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1); then
+    echo "Codex sequential_thinking MCP is already registered; leaving it unchanged."
+    CODEX_SEQTHINK_STATE="preexisting"
+    return
+  fi
+  echo "Registering the pinned Sequential Thinking MCP for Codex."
+  (cd "$HOME" && codex mcp add sequential_thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE")
+  (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1) ||
+    kit_die "Failed to register the Codex sequential_thinking MCP."
+  CODEX_SEQTHINK_STATE="registered_kit"
+}
+
+ensure_claude_sequential_thinking() {
+  if claude mcp get sequential-thinking >/dev/null 2>&1; then
+    echo "Claude sequential-thinking MCP is already registered; leaving it unchanged."
+    CLAUDE_SEQTHINK_STATE="preexisting"
+    return
+  fi
+  echo "Registering the pinned Sequential Thinking MCP for Claude Code."
+  claude mcp add -s user sequential-thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE"
+  claude mcp get sequential-thinking >/dev/null 2>&1 ||
+    kit_die "Failed to register the Claude sequential-thinking MCP."
+  CLAUDE_SEQTHINK_STATE="registered_kit"
+}
 
 codex_plugin_installed() {
   local selector="$1"
@@ -391,11 +422,13 @@ if [ "$node_available" -eq 0 ] && { [ "$codex_available" -eq 1 ] || [ "$claude_a
     if [ "$codex_available" -eq 1 ]; then
       CODEX_PONYTAIL_STATE="unverified_no_node"
       CODEX_LAZYCODEX_STATE="unverified_no_node"
+      ensure_codex_sequential_thinking
     fi
     if [ "$claude_available" -eq 1 ]; then
       CLAUDE_PONYTAIL_STATE="unverified_no_node"
+      ensure_claude_sequential_thinking
     fi
-    kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE"
+    kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
     exit 0
   fi
   kit_die "Node.js is required for the $PROFILE integrations profile."
@@ -469,5 +502,12 @@ else
   echo "Claude Code CLI not found; skipped Claude Code integrations."
 fi
 
-kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE"
+if [ "$codex_available" -eq 1 ]; then
+  ensure_codex_sequential_thinking
+fi
+if [ "$claude_available" -eq 1 ]; then
+  ensure_claude_sequential_thinking
+fi
+
+kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
 echo "Recorded integrations state (profile: $PROFILE)."

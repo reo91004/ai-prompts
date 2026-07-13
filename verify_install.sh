@@ -341,6 +341,44 @@ else
       missing=1
       ;;
   esac
+
+  codex_seqthink_state="$(read_state codex_sequential_thinking)"
+  case "$codex_seqthink_state" in
+    registered_kit|preexisting)
+      if command -v codex >/dev/null 2>&1 && ! (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1); then
+        echo "Missing Codex MCP: sequential_thinking (state '$codex_seqthink_state')"
+        missing=1
+      else
+        echo "OK Codex MCP: sequential_thinking ($codex_seqthink_state)"
+      fi
+      ;;
+    host_unavailable|skipped_env|unverified_no_node|"")
+      echo "Codex sequential_thinking MCP: ${codex_seqthink_state:-not_recorded}"
+      ;;
+    *)
+      echo "Unknown Codex sequential_thinking state: $codex_seqthink_state"
+      missing=1
+      ;;
+  esac
+
+  claude_seqthink_state="$(read_state claude_sequential_thinking)"
+  case "$claude_seqthink_state" in
+    registered_kit|preexisting)
+      if command -v claude >/dev/null 2>&1 && ! claude mcp get sequential-thinking >/dev/null 2>&1; then
+        echo "Missing Claude MCP: sequential-thinking (state '$claude_seqthink_state')"
+        missing=1
+      else
+        echo "OK Claude MCP: sequential-thinking ($claude_seqthink_state)"
+      fi
+      ;;
+    host_unavailable|skipped_env|unverified_no_node|"")
+      echo "Claude sequential-thinking MCP: ${claude_seqthink_state:-not_recorded}"
+      ;;
+    *)
+      echo "Unknown Claude sequential-thinking state: $claude_seqthink_state"
+      missing=1
+      ;;
+  esac
 fi
 
 if [ "$missing" -ne 0 ]; then

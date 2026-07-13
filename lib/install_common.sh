@@ -82,6 +82,8 @@ kit_write_integrations_state() {
   local codex_ponytail="$2"
   local claude_ponytail="$3"
   local codex_lazycodex="$4"
+  local codex_seqthink="$5"
+  local claude_seqthink="$6"
   local state_file="$KIT_STATE_ROOT/integrations.state"
   local tmp
 
@@ -93,6 +95,8 @@ kit_write_integrations_state() {
     printf 'codex_ponytail=%s\n' "$codex_ponytail"
     printf 'claude_ponytail=%s\n' "$claude_ponytail"
     printf 'codex_lazycodex=%s\n' "$codex_lazycodex"
+    printf 'codex_sequential_thinking=%s\n' "$codex_seqthink"
+    printf 'claude_sequential_thinking=%s\n' "$claude_seqthink"
   } > "$tmp"
   mv "$tmp" "$state_file"
 }

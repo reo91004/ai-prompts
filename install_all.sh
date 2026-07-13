@@ -115,7 +115,7 @@ echo "Installed research agent ignore rules to $GLOBAL_IGNORE"
 echo "[4/5] Reconciling integrations (profile: $INTEGRATIONS_PROFILE)..."
 if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
   echo "Skipped integration reconciliation by explicit environment setting."
-  kit_write_integrations_state "$INTEGRATIONS_PROFILE" "skipped_env" "skipped_env" "skipped_env"
+  kit_write_integrations_state "$INTEGRATIONS_PROFILE" "skipped_env" "skipped_env" "skipped_env" "skipped_env" "skipped_env"
 else
   bash "$ROOT/install_integrations.sh" "$INTEGRATIONS_PROFILE"
 fi
