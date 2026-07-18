@@ -38,6 +38,8 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/evidence-gate/references/acceptance_gate.md`
 - `claude-code/skills/evidence-gate/references/evidence_contract.md`
 - `claude-code/skills/hardware-capture-integrity/SKILL.md`
+- `claude-code/skills/hardware-capture-integrity/references/capture_run_layout.md`
+- `claude-code/skills/hardware-capture-integrity/references/first_trigger_recovery.md`
 - `claude-code/skills/hardware-vivado/SKILL.md`
 - `claude-code/skills/no-placeholder-development/SKILL.md`
 - `claude-code/skills/planned-work/SKILL.md`
@@ -88,6 +90,8 @@ This is the final universal research/development prompt kit.
 - `codex/skills/evidence-gate/references/acceptance_gate.md`
 - `codex/skills/evidence-gate/references/evidence_contract.md`
 - `codex/skills/hardware-capture-integrity/SKILL.md`
+- `codex/skills/hardware-capture-integrity/references/capture_run_layout.md`
+- `codex/skills/hardware-capture-integrity/references/first_trigger_recovery.md`
 - `codex/skills/hardware-vivado/SKILL.md`
 - `codex/skills/no-placeholder-development/SKILL.md`
 - `codex/skills/planned-work/SKILL.md`

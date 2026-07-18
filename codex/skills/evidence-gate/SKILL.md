@@ -10,6 +10,8 @@ Read `references/evidence_contract.md` to classify evidence and `references/acce
 
 A review without artifact-specific evidence is incomplete.
 
+Keep evidence and metric rigor in full, but do not let it grow into production-style defensive code, duplicated validation, or framework machinery — see `no-placeholder-development/references/research_code_guard_policy.md` for the Keep-vs-Simplify boundary.
+
 ## Output
 State, for the claim under review:
 

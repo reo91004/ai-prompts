@@ -1,5 +1,7 @@
 # Plan: [work item title]
 
+<!-- TODO 전용. artifact 경로·SHA·status 서술을 여기 쌓지 마라 — 증거는 evidence/t<NN>-*, 상태는 ledger.json. -->
+
 **Status**: [approved | superseded — reason]
 **Handover**: [handover.md 참조 또는 "직접 요청"]
 
@@ -18,9 +20,9 @@ Numbers are stable identifiers; add new items at the end, never renumber.
 Check `[x]` only after evidence.md records a passing deterministic check.
 
 - [ ] 1. [할 일 — 산출물·확인 방법]
-      - acceptance: [완료 판정 조건]
+      - acceptance: [완료 판정 조건 · 원본은 evidence/t01-*]
 - [ ] 2. [다음 할 일]
-      - acceptance: [...]
+      - acceptance: [... · evidence/t02-*]
 
 ## Stop Conditions
 

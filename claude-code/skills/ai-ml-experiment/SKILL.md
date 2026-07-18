@@ -7,6 +7,8 @@ Apply AI/ML experiment gates. Check dataset version, preprocessing, split logic,
 
 When creating or refactoring an AI/ML research repository, also use `research-repo-design` before accepting the structure.
 
+Keep the reproducibility gates above in full, but implement them as the simplest experiment code that supports the claim — no production-style defensive layers, duplicated checks, or framework machinery (`no-placeholder-development/references/research_code_guard_policy.md`).
+
 ## Output
 - Dataset:
 - Split:

@@ -18,6 +18,7 @@ The more specific layer may refine the layer above it but must not weaken safety
 
 - Use evidence before confidence and reply in Korean unless the user asks otherwise.
 - Use the smallest complete solution. Reject placeholders, silent fallbacks, fake outputs, test-only hardcoding, stale comments, and speculative framework machinery.
+- Research code and process surfaces default to the simplest form that supports the claim. Remove over-engineering, code bloat, and duplicated documents — but never cut the logging, seeds, provenance, or verification metrics that exact reproduction and the claim require. Simplify complexity, not evidence.
 - Separate deterministic Quality Gates from semantic Review Gates. A failed deterministic gate cannot be approved by an LLM review.
 - Treat comments as explanation, never evidence. Keep comments synchronized with current behavior.
 - Preserve research integrity: provenance, seeds, config/run binding, artifacts, evidence scope, and synthetic/simulated/measured separation.
