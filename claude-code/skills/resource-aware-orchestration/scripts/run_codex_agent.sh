@@ -77,6 +77,16 @@ case "$sandbox_mode" in
     ;;
 esac
 
+if [ "$agent_name" = "experiment_monitor" ]; then
+  if [ "$model" != "gpt-5.6-luna" ] || [ "$reasoning_effort" != "low" ] || [ "$sandbox_mode" != "danger-full-access" ]; then
+    echo "experiment_monitor must use gpt-5.6-luna, low effort, and danger-full-access" >&2
+    exit 1
+  fi
+elif [ "$sandbox_mode" = "danger-full-access" ]; then
+  echo "danger-full-access is reserved for experiment_monitor" >&2
+  exit 1
+fi
+
 if [ "$#" -gt 0 ]; then
   task="$*"
 elif [ ! -t 0 ]; then
@@ -92,12 +102,20 @@ fi
 echo "requested_agent=$agent_name"
 echo "declared_model=$model"
 echo "declared_reasoning_effort=$reasoning_effort"
+echo "declared_sandbox_mode=$sandbox_mode"
 echo "spawn_transport=isolated_codex_cli"
+
+set --
+if [ "$sandbox_mode" = "danger-full-access" ]; then
+  set -- --config 'approval_policy="never"'
+  echo "requested_approval_policy=never"
+fi
 
 exec codex exec \
   --ephemeral \
   --model "$model" \
   --sandbox "$sandbox_mode" \
+  "$@" \
   --config "model_reasoning_effort=\"$reasoning_effort\"" \
   --config "developer_instructions='''$developer_instructions'''" \
   -- "$task"

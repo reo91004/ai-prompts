@@ -1,6 +1,6 @@
 # AGENTS.md — Portable Research & Development Harness
 
-**Last Updated**: 2026-07-13
+**Last Updated**: 2026-07-20
 **Scope**: User-global Codex instructions
 **Platforms**: macOS, Linux, WSL
 
@@ -47,21 +47,22 @@ The more specific layer may refine the layer above it but must not weaken safety
 
 ## Liveness And Cancellation
 
-- Long training, synthesis, and hardware capture must use completion-driven coordination. Parent agents must not repeatedly poll PIDs, logs, task status, or mailboxes. Current Codex background terminals require a later session wait or `write_stdin` to surface completion; when work can outlive one blocking wait, give one child ownership of launch, monitoring, and final evidence, then wait on the native agent completion or mailbox event at the dependency boundary.
-- The worker uses a shell-native blocking wait or the longest policy-allowed tool wait. A worker-side monitor may inspect process state internally, but it emits model-visible output only for completion, failure, a permission request, confirmed sustained no-progress, a resource or equipment emergency, or required operator intervention. A mailbox wait timeout causes another wait without re-analysis; timeout alone is neither a progress probe nor failure.
+- Long training, synthesis, and hardware capture must use completion-driven coordination. Parent agents must not repeatedly poll PIDs, logs, task status, or mailboxes. For a fully specified long-running experiment command, use the pinned `experiment_monitor` through `resource-aware-orchestration/scripts/run_codex_agent.sh`: it runs Luna at low effort with full access and owns launch, blocking wait, and terminal evidence. It must not design the experiment, invent the command, interpret results, accept claims, or choose an undeclared retry; use the matching specialist before launch when those judgments remain. Do not substitute an unpinned native child merely to obtain device access.
+- Current Codex background terminals do not push completion to the parent. Continue independent work, then block on the isolated runner session with a session wait or `write_stdin` at the dependency boundary. A wait timeout causes another wait without re-analysis; it is not a progress probe or failure.
+- The worker uses a shell-native blocking wait or the longest policy-allowed tool wait. A worker-side monitor may inspect process state internally, but it emits model-visible output only for completion, failure, a permission request, confirmed sustained no-progress, a resource or equipment emergency, or required operator intervention. A runner-session wait timeout causes another wait without re-analysis; native-agent mailbox waits apply only outside the `experiment_monitor` path. Timeout alone is neither a progress probe nor failure.
 - Resume dependent parent work as soon as the completion event arrives, then verify exit status, checkpoints, logs, and expected artifacts. Completion proves that the process ended, not that training or capture succeeded. Scheduled polling is not the default substitute; use it only when the user explicitly accepts cadence-based checks or the original session cannot remain alive.
-- Elapsed time and mailbox wait timeouts alone are never failure or cancellation reasons.
+- Elapsed time and completion-transport wait timeouts alone are never failure or cancellation reasons.
 - Long-running work must declare its progress probe, expected artifact, checkpoint path, resume procedure, graceful cancellation procedure, and cleanup procedure.
 - Treat a worker as alive while its process, heartbeat, log, artifact, CPU, or I/O state shows progress.
 - Stop work only for user cancellation, an explicit deadline, an unrecoverable error, confirmed sustained no-progress after repeated liveness probes, or a resource or equipment emergency.
 - Before stopping, request a checkpoint, preserve logs and partial artifacts, record the process and resource state, and attempt graceful termination. Force termination is a last resort.
-- Diagnose the failure class before retrying. Permit one bounded retry by default and preserve the first attempt's evidence.
+- Diagnose the failure class before retrying. `experiment_monitor` defaults to no retry and may retry only when its task packet declares one exact command, trigger, and attempt limit. Other work permits one bounded retry by default. Preserve the first attempt's evidence.
 
 ## Skills And Agents
 
 Select only relevant skills. Route research domains through `research-domain-router`; use `resource-aware-orchestration` for delegation, `review-budget` for semantic review, and `evidence-gate` as the evidence contract authority. Use `hardware-capture-integrity` only for physical capture work. Route multi-session, claim-bearing, or handover-driven work through `planned-work`, which keeps the user-inspectable plan and evidence ledger under the project's `.plans/`; small local tasks do not open a ledger entry.
 
-Available agents cover context exploration, sequential reasoning, implementation, debugging, software and research architecture, deterministic quality gates, comment hygiene, AI/ML, statistics, side-channel/security, Vivado, literature/method, adversarial review, and reporting. Choose roles by distinct deliverable rather than generic job title.
+Available agents cover context exploration, sequential reasoning, implementation, debugging, software and research architecture, deterministic quality gates, comment hygiene, AI/ML, statistics, side-channel/security, Vivado, literature/method, adversarial review, reporting, and mechanical long-experiment monitoring. Choose roles by distinct deliverable rather than generic job title.
 
 ## Acceptance
 

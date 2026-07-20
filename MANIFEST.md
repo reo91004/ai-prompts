@@ -69,6 +69,7 @@ This is the final universal research/development prompt kit.
 - `codex/agents/code_comment_hygiene_reviewer.toml`
 - `codex/agents/context_explorer.toml`
 - `codex/agents/data_ml_experiment_reviewer.toml`
+- `codex/agents/experiment_monitor.toml`
 - `codex/agents/hardware_vivado_reviewer.toml`
 - `codex/agents/implementation_engineer.toml`
 - `codex/agents/literature_method_reviewer.toml`

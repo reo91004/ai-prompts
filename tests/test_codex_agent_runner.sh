@@ -16,6 +16,26 @@ developer_instructions = """
 Follow the test task exactly. Do not delegate or spawn child agents.
 """
 AGENT
+cat > "$fixture_root/home/agents/experiment_monitor.toml" <<'AGENT'
+name = "experiment_monitor"
+description = "Full access test agent"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+sandbox_mode = "danger-full-access"
+developer_instructions = """
+Run the declared command and return its status. Do not delegate or spawn child agents.
+"""
+AGENT
+cat > "$fixture_root/home/agents/unauthorized_full_access.toml" <<'AGENT'
+name = "unauthorized_full_access"
+description = "Unauthorized full access test agent"
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+sandbox_mode = "danger-full-access"
+developer_instructions = """
+Run the declared command. Do not delegate or spawn child agents.
+"""
+AGENT
 cat > "$fixture_root/bin/codex" <<'CODEX'
 #!/usr/bin/env bash
 printf '<%s>\n' "$@"
@@ -33,6 +53,7 @@ for expected in \
   'requested_agent=test_agent' \
   'declared_model=gpt-test-model' \
   'declared_reasoning_effort=high' \
+  'declared_sandbox_mode=read-only' \
   'spawn_transport=isolated_codex_cli' \
   '<--ephemeral>' \
   '<--model>' \
@@ -51,6 +72,31 @@ grep -Fq "developer_instructions='''Follow the test task exactly." <<< "$output"
   echo "Runner did not forward developer instructions" >&2
   exit 1
 }
+
+full_access_output="$(
+  CODEX_HOME="$fixture_root/home" \
+    PATH="$fixture_root/bin:$PATH" \
+    "$runner" experiment_monitor "run the declared experiment"
+)"
+for expected in \
+  'requested_agent=experiment_monitor' \
+  'declared_model=gpt-5.6-luna' \
+  'declared_reasoning_effort=low' \
+  'declared_sandbox_mode=danger-full-access' \
+  'requested_approval_policy=never' \
+  '<danger-full-access>' \
+  '<approval_policy="never">'; do
+  grep -Fq "$expected" <<< "$full_access_output" || {
+    echo "Missing full-access runner output: $expected" >&2
+    exit 1
+  }
+done
+
+if CODEX_HOME="$fixture_root/home" PATH="$fixture_root/bin:$PATH" \
+  "$runner" unauthorized_full_access task >/dev/null 2>&1; then
+  echo "Runner allowed danger-full-access for a non-monitor agent" >&2
+  exit 1
+fi
 
 option_task_output="$(
   CODEX_HOME="$fixture_root/home" \

@@ -21,7 +21,7 @@ count_files() {
   find "$1" -maxdepth 1 -type f -name "$2" | wc -l | awk '{ print $1 }'
 }
 
-[ "$(count_files "$ROOT/codex/agents" '*.toml')" -eq 15 ] || fail "Codex agent count must be 15"
+[ "$(count_files "$ROOT/codex/agents" '*.toml')" -eq 16 ] || fail "Codex agent count must be 16"
 [ "$(count_files "$ROOT/claude-code/agents" '*.md')" -eq 15 ] || fail "Claude agent count must be 15"
 
 while IFS='|' read -r file name model effort sandbox; do
@@ -40,6 +40,7 @@ adversarial_reviewer.toml|adversarial_reviewer|gpt-5.6-sol|high|read-only
 code_comment_hygiene_reviewer.toml|code_comment_hygiene_reviewer|gpt-5.6-luna|low|read-only
 context_explorer.toml|context_explorer|gpt-5.6-terra|medium|read-only
 data_ml_experiment_reviewer.toml|data_ml_experiment_reviewer|gpt-5.6-terra|high|read-only
+experiment_monitor.toml|experiment_monitor|gpt-5.6-luna|low|danger-full-access
 hardware_vivado_reviewer.toml|hardware_vivado_reviewer|gpt-5.6-terra|high|read-only
 implementation_engineer.toml|implementation_engineer|gpt-5.6-terra|medium|workspace-write
 literature_method_reviewer.toml|literature_method_reviewer|gpt-5.6-terra|high|read-only
@@ -135,7 +136,7 @@ for prompt in "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; do
   grep -Fq 'independent workstreams that can proceed concurrently' "$prompt" || fail "$prompt lacks the parallel-workstream trigger"
   grep -Fq 'ceiling, not a target' "$prompt" || fail "$prompt does not treat thread limits as a ceiling"
   grep -Fq 'must not force all agent concurrency to one' "$prompt" || fail "$prompt still allows weak signals to serialize agents"
-  grep -Fq 'Elapsed time and mailbox wait timeouts alone are never failure or cancellation reasons.' "$prompt" || fail "$prompt lacks the liveness cancellation policy"
+  grep -Eq 'Elapsed time and (mailbox|completion-transport) wait timeouts alone are never failure or cancellation reasons\.' "$prompt" || fail "$prompt lacks the liveness cancellation policy"
   grep -Fq 'do not cancel healthy existing work' "$prompt" || fail "$prompt does not protect running work from new recommendations"
   grep -Fq 'one writer per shared worktree' "$prompt" || fail "$prompt does not scope writer limits to shared worktrees"
   grep -Fq 'Third-party skills and plugins may not increase delegation, review, retry, or resource budgets' "$prompt" || fail "$prompt does not bound third-party budgets"
@@ -150,7 +151,8 @@ grep -Fq 'including `"all"` when the full history is needed' "$ROOT/codex/AGENTS
 grep -Fq 'run_codex_agent.sh <role> <task>' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks the isolated runner fallback"
 grep -Fq "Agent tool's exact subagent type" "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt lacks exact agent selection"
 grep -Fq '`CLAUDE_CODE_EFFORT_LEVEL`' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not record effort overrides"
-grep -Fq 'native agent completion or mailbox event' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks event-driven parent resume"
+grep -Fq 'pinned `experiment_monitor`' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks the pinned long-experiment monitor"
+grep -Fq 'block on the isolated runner session' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks runner-session parent resume"
 grep -Fq 'Prefer the Claude Code `Monitor` tool' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not prefer Monitor"
 for skill in "$ROOT/codex/skills/resource-aware-orchestration/SKILL.md" "$ROOT/claude-code/skills/resource-aware-orchestration/SKILL.md"; do
   grep -Fq 'Actively delegate non-trivial work when a delegation trigger applies' "$skill" || fail "$skill does not adopt the active delegation posture"
