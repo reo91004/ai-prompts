@@ -22,6 +22,8 @@ jobs:
         run: bash scripts/validate_harness.sh
       - name: Test resource detector including WSL fixtures
         run: bash tests/test_resource_detector.sh
+      - name: Test explicit Codex agent dispatch
+        run: bash tests/test_codex_agent_runner.sh
       - name: Exercise the live resource detector
         shell: bash
         run: |

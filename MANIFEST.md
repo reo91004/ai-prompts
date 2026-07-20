@@ -1,6 +1,6 @@
 # MANIFEST.md
 
-**최종 갱신**: 2026-07-13
+**최종 갱신**: 2026-07-20
 
 This is the final universal research/development prompt kit.
 
@@ -58,6 +58,7 @@ This is the final universal research/development prompt kit.
 - `claude-code/skills/resource-aware-orchestration/SKILL.md`
 - `claude-code/skills/resource-aware-orchestration/references/task_result_contract.md`
 - `claude-code/skills/resource-aware-orchestration/scripts/detect_resources.sh`
+- `claude-code/skills/resource-aware-orchestration/scripts/run_codex_agent.sh`
 - `claude-code/skills/review-budget/SKILL.md`
 - `claude-code/skills/sequential-thinking-mcp/SKILL.md`
 - `claude-code/skills/side-channel-analysis/SKILL.md`
@@ -110,6 +111,7 @@ This is the final universal research/development prompt kit.
 - `codex/skills/resource-aware-orchestration/SKILL.md`
 - `codex/skills/resource-aware-orchestration/references/task_result_contract.md`
 - `codex/skills/resource-aware-orchestration/scripts/detect_resources.sh`
+- `codex/skills/resource-aware-orchestration/scripts/run_codex_agent.sh`
 - `codex/skills/review-budget/SKILL.md`
 - `codex/skills/sequential-thinking-mcp/SKILL.md`
 - `codex/skills/side-channel-analysis/SKILL.md`
@@ -151,6 +153,7 @@ This is the final universal research/development prompt kit.
 - `tests/fixtures/resources/wsl/swapout_before`
 - `tests/fixtures/resources/wsl/total_bytes`
 - `tests/test_install_regression.sh`
+- `tests/test_codex_agent_runner.sh`
 - `tests/test_integration_migration.sh`
 - `tests/test_resource_detector.sh`
 - `verify_install.sh`

@@ -9,6 +9,15 @@ Use semantic review when a change affects architecture, security, user data, a r
 
 Before semantic review, require relevant deterministic checks to pass. A missing or failed required check blocks review approval.
 
+## Deterministic Validation Budget
+
+- Prompt or documentation-only changes: run one focused static or contract check. Do not run full suites or install regression unless executable behavior, installation, or generated artifacts changed.
+- Focused code changes: run applicable syntax or type checks and the smallest targeted test that exercises the changed path.
+- Installer, manifest, copy semantics, or executable-permission changes: add install regression. Integration migration runs only when integration code or its persisted state schema changed.
+- Claim-bearing research, benchmark, security, hardware, or user-data-safety changes: run every deterministic gate required by the claim and evidence contract. Physical safety and capture-integrity checks apply to every physical capture, including diagnostic runs.
+
+Do not rerun an unaffected passing suite after a narrow delta. Recheck the changed path and expand only after a failure or newly revealed cross-cutting risk. More available time or agents does not increase this budget.
+
 ## Budget
 
 - Use exactly one semantic reviewer for a review round.

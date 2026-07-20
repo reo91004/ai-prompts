@@ -9,6 +9,22 @@ Actively delegate non-trivial work when a delegation trigger applies; assign eac
 
 Delegate by default for: a bounded implementation or refactoring slice with explicit ownership; exploration of an unfamiliar subsystem before acting; high-volume searches, tests, logs, traces, or document retrieval whose raw output would pollute parent context; domain-sensitive design, implementation change, evidence interpretation, or claim review; final acceptance of a material claim; and independent workstreams that can proceed concurrently. For high-volume work, keep raw output in an artifact and return only a concise synthesis with evidence pointers. Detected slots are a ceiling, not a target.
 
+## Dispatch Integrity
+
+For native Codex delegation, set the exact `agent_type`; a task label does not select a role. In a spawn call that also sets role, model, or reasoning overrides, use `fork_turns = "none"` or a bounded positive turn count because current Multi-Agent V2 full-history mode rejects override-bearing calls. Without overrides, select the context range independently and allow `"all"` when full history is needed. Pass the agent's declared `model` and `reasoning_effort` when the tool exposes those fields. If this runtime hides the selector or model controls, run `scripts/run_codex_agent.sh <role> <task>` from this skill for an isolated Codex child, or report the limitation. Do not describe a generic child as the configured specialist.
+
+For Claude Code, select the exact subagent type through the Agent tool or an explicit `@agent-name` mention. Record `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_EFFORT_LEVEL` when present because they can change the declared assignment.
+
+In both runtimes, distinguish requested and declared settings from effective runtime identity. Effective role, model, and effort require runtime evidence; otherwise record `unverified`.
+
+## Completion-Driven Long Work
+
+Parent agents must not repeatedly poll long training, synthesis, hardware capture, PIDs, logs, task lists, or mailboxes. Keep routine progress in durable logs and checkpoints; emit a model-visible event only for completion, failure, a permission request, confirmed sustained no-progress, a resource or equipment emergency, or required operator intervention. After an event, the parent verifies exit status and expected artifacts before continuing dependent work.
+
+In Claude Code, prefer `Monitor` with a watcher that emits only terminal events. Explicitly request a background subagent when parallel work is useful, but rely on its completion notification only when the running version documents reliable completion semantics. If `Monitor` is unavailable, use a foreground blocking subagent or report the limitation rather than creating an LLM polling loop.
+
+In Codex, direct background terminals require a later session wait or `write_stdin` to surface completion. If the command can outlive one blocking wait, delegate launch, monitoring, and evidence to one child; the parent continues independent work, then blocks on the native agent completion or mailbox event at the dependency boundary. The worker uses a shell-native blocking wait or the longest policy-allowed tool wait. A wait timeout causes another wait without re-analysis and is not failure. Scheduled polling is opt-in only when the user accepts cadence-based checks or the original session cannot remain alive.
+
 Run `scripts/detect_resources.sh` before a spawn wave, when the previous snapshot is older than 600 seconds, after a heavy command, after `RESOURCE_*`, after exit 137 or SIGKILL, and after a cgroup OOM counter increase. A new snapshot applies to new spawns only; do not cancel healthy running work because the recommendation decreased. Allow one writer per shared worktree and one heavy command at a time. After pressure clears, restore slots one step per fresh snapshot rather than jumping straight back to the ceiling.
 
 ## Detector Contract

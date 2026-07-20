@@ -137,6 +137,8 @@ done
 
 check_executable "$HOME/.claude/skills/resource-aware-orchestration/scripts/detect_resources.sh"
 check_executable "$HOME/.agents/skills/resource-aware-orchestration/scripts/detect_resources.sh"
+check_executable "$HOME/.claude/skills/resource-aware-orchestration/scripts/run_codex_agent.sh"
+check_executable "$HOME/.agents/skills/resource-aware-orchestration/scripts/run_codex_agent.sh"
 
 check_same_file "$ROOT/claude-code/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 check_same_file "$ROOT/codex/AGENTS.md" "$HOME/.codex/AGENTS.md"

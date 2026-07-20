@@ -5,6 +5,9 @@
 Every delegated task must contain:
 
 - `objective`: one bounded deliverable;
+- `requested_agent`: the exact role name, or `main` when no child is used;
+- `declared_model` and `declared_reasoning_effort`: values read from the selected agent definition, not inferred from its description;
+- `spawn_transport`: `native_agent_tool` or `isolated_codex_cli`; native Codex delegation also records `fork_mode`, and Claude delegation records any model or effort environment overrides;
 - `allowed_scope`: files, systems, data, and actions the child may inspect or change;
 - `forbidden_scope`: explicit exclusions and protected state;
 - `write_permission`: `read-only` or the exact writable paths;
@@ -29,12 +32,18 @@ Any child command expected to run long (training, synthesis, capture, large trac
 - `command`: the exact long-running command;
 - `expected_artifacts`: paths the command should produce or extend;
 - `progress_probe`: how liveness is observed (log tail, artifact growth, CPU/I/O, heartbeat);
+- `completion_transport`: `claude_monitor`, `claude_subagent_notification`, `codex_agent_mailbox`, or `foreground_blocking_wait`;
+- `parent_resume_condition`: the terminal event and result fields that unblock dependent parent work;
+- `event_emission`: which completion, failure, permission, sustained-no-progress, resource or equipment emergency, or operator-intervention events may enter model context; routine progress remains in artifacts;
+- `wait_budget`: the longest policy-allowed blocking wait and the no-analysis re-wait behavior after a timeout;
 - `checkpoint_path`: where resumable state is written, or `none` with justification;
 - `resume_command`: how to continue from the checkpoint;
 - `graceful_cancel`: the tool-native or signal-based cancellation procedure;
 - `cleanup_command`: how to release resources and temporary state;
 - `resource_class`: `cpu_heavy`, `io_heavy`, `gpu`, or `instrument`;
 - `claim_bearing`: whether the output feeds a research claim.
+
+The long-running result also records `completion_event`: observed transport, timestamp, exit status, and terminal condition.
 
 Elapsed time or a mailbox wait timeout alone never fails or cancels a declared long-running command. Cancel only for user request, an explicit deadline in the packet, an unrecoverable error, confirmed no-progress across repeated probes, or a resource or equipment emergency — and checkpoint, preserve logs and partial artifacts, and attempt graceful termination first.
 
@@ -43,6 +52,8 @@ Elapsed time or a mailbox wait timeout alone never fails or cancels a declared l
 Every child result must contain:
 
 - `status`: `PASS`, `FAIL`, `BLOCKED`, or a specific `RESOURCE_*` status;
+- `dispatch_provenance`: requested agent, declared model and effort, spawn transport, fork mode or environment overrides;
+- `effective_agent`, `effective_model`, and `effective_reasoning_effort`: runtime-observed values, or the literal `unverified` when the runtime does not expose them; declarations are not runtime evidence;
 - `evidence`: artifact-specific observations supporting the status;
 - `commands`: commands with exit codes, including failed and unavailable checks;
 - `artifacts`: created or inspected artifact paths;

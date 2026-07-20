@@ -62,6 +62,8 @@ grep -Fqx 'codex_ponytail=skipped_env' "$state_file" || {
 
 [ -x "$TMP_HOME/.agents/skills/resource-aware-orchestration/scripts/detect_resources.sh" ]
 [ -x "$TMP_HOME/.claude/skills/resource-aware-orchestration/scripts/detect_resources.sh" ]
+[ -x "$TMP_HOME/.agents/skills/resource-aware-orchestration/scripts/run_codex_agent.sh" ]
+[ -x "$TMP_HOME/.claude/skills/resource-aware-orchestration/scripts/run_codex_agent.sh" ]
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/verify_install.sh"
 
 echo "Unit regression: kit_restore_entry must not delete a target without its backup"

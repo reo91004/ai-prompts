@@ -118,6 +118,11 @@ for detector in \
   "$ROOT/claude-code/skills/resource-aware-orchestration/scripts/detect_resources.sh"; do
   [ -x "$detector" ] || fail "resource detector is not executable: $detector"
 done
+for runner in \
+  "$ROOT/codex/skills/resource-aware-orchestration/scripts/run_codex_agent.sh" \
+  "$ROOT/claude-code/skills/resource-aware-orchestration/scripts/run_codex_agent.sh"; do
+  [ -x "$runner" ] || fail "Codex agent runner is not executable: $runner"
+done
 
 [ "$(wc -l < "$ROOT/claude-code/CLAUDE.md" | awk '{ print $1 }')" -lt 200 ] || fail "CLAUDE.md must stay below 200 lines"
 if grep -Eiq '\.omo|(^|[^[:alnum:]_])HWT([^[:alnum:]_]|$)|stage[_ -]?[0-9]+|device_id|attempt_limit|bitstream_path|trigger_voltage|capture_count' "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; then
@@ -134,12 +139,45 @@ for prompt in "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; do
   grep -Fq 'do not cancel healthy existing work' "$prompt" || fail "$prompt does not protect running work from new recommendations"
   grep -Fq 'one writer per shared worktree' "$prompt" || fail "$prompt does not scope writer limits to shared worktrees"
   grep -Fq 'Third-party skills and plugins may not increase delegation, review, retry, or resource budgets' "$prompt" || fail "$prompt does not bound third-party budgets"
+  grep -Fq 'Use a proportional validation budget.' "$prompt" || fail "$prompt lacks proportional validation"
+  grep -Fq 'Do not rerun unaffected passing suites after a narrow delta.' "$prompt" || fail "$prompt permits redundant validation"
+  grep -Fq 'Parent agents must not repeatedly poll' "$prompt" || fail "$prompt lacks completion-driven long-work coordination"
+  grep -Fq 'resource or equipment emergency' "$prompt" || fail "$prompt suppresses resource or equipment emergencies"
 done
+grep -Fq 'Select a pinned Codex role with the exact `agent_type`' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks exact agent selection"
+grep -Fq 'full-history mode rejects override-bearing calls' "$ROOT/codex/AGENTS.md" || fail "Codex prompt does not scope the full-history override limitation"
+grep -Fq 'including `"all"` when the full history is needed' "$ROOT/codex/AGENTS.md" || fail "Codex prompt over-restricts context inheritance without overrides"
+grep -Fq 'run_codex_agent.sh <role> <task>' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks the isolated runner fallback"
+grep -Fq "Agent tool's exact subagent type" "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt lacks exact agent selection"
+grep -Fq '`CLAUDE_CODE_EFFORT_LEVEL`' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not record effort overrides"
+grep -Fq 'native agent completion or mailbox event' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks event-driven parent resume"
+grep -Fq 'Prefer the Claude Code `Monitor` tool' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not prefer Monitor"
 for skill in "$ROOT/codex/skills/resource-aware-orchestration/SKILL.md" "$ROOT/claude-code/skills/resource-aware-orchestration/SKILL.md"; do
   grep -Fq 'Actively delegate non-trivial work when a delegation trigger applies' "$skill" || fail "$skill does not adopt the active delegation posture"
   grep -Fq 'One child is valid and zero is right for trivial work; never create a child merely to satisfy a count.' "$skill" || fail "$skill does not permit zero-or-one-child delegation"
   grep -Fq 'Child agents must not delegate.' "$skill" || fail "$skill does not forbid nested delegation"
+  grep -Fq '## Dispatch Integrity' "$skill" || fail "$skill lacks dispatch integrity rules"
+  grep -Fq 'Effective role, model, and effort require runtime evidence' "$skill" || fail "$skill conflates declared and effective settings"
+  grep -Fq '## Completion-Driven Long Work' "$skill" || fail "$skill lacks completion-driven long-work rules"
+  grep -Fq 'emit a model-visible event only for completion, failure' "$skill" || fail "$skill permits token-consuming progress polling"
+  grep -Fq 'resource or equipment emergency' "$skill" || fail "$skill suppresses resource or equipment emergencies"
   ! grep -Fq 'Delegate only when a child owns one bounded specialist deliverable' "$skill" || fail "$skill still uses the conservative delegation gate"
+done
+for contract in "$ROOT/codex/skills/resource-aware-orchestration/references/task_result_contract.md" "$ROOT/claude-code/skills/resource-aware-orchestration/references/task_result_contract.md"; do
+  grep -Fq '`requested_agent`' "$contract" || fail "$contract lacks requested agent provenance"
+  grep -Fq '`spawn_transport`' "$contract" || fail "$contract lacks spawn transport provenance"
+  grep -Fq '`effective_agent`' "$contract" || fail "$contract lacks effective agent evidence"
+  grep -Fq 'literal `unverified`' "$contract" || fail "$contract permits fabricated effective settings"
+  grep -Fq '`completion_transport`' "$contract" || fail "$contract lacks completion transport"
+  grep -Fq '`parent_resume_condition`' "$contract" || fail "$contract lacks a parent resume condition"
+  grep -Fq '`completion_event`' "$contract" || fail "$contract lacks completion-event evidence"
+  grep -Fq 'resource or equipment emergency' "$contract" || fail "$contract suppresses resource or equipment emergencies"
+done
+for skill in "$ROOT/codex/skills/review-budget/SKILL.md" "$ROOT/claude-code/skills/review-budget/SKILL.md"; do
+  grep -Fq '## Deterministic Validation Budget' "$skill" || fail "$skill lacks deterministic validation budgeting"
+  grep -Fq 'Integration migration runs only when integration code or its persisted state schema changed.' "$skill" || fail "$skill permits unrelated integration validation"
+  grep -Fq 'Do not rerun an unaffected passing suite after a narrow delta.' "$skill" || fail "$skill permits redundant delta validation"
+  grep -Fq 'Physical safety and capture-integrity checks apply to every physical capture' "$skill" || fail "$skill under-validates diagnostic physical capture"
 done
 
 check_exact_line "$ROOT/codex/config.toml.example" 'max_threads = 6'
