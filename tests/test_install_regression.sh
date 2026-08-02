@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REAL_HOME="$HOME"
+export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
 ROLLBACK_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-rollback.XXXXXX")"
 trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME"' EXIT HUP INT TERM

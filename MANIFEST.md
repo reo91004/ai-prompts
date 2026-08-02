@@ -1,6 +1,6 @@
 # MANIFEST.md
 
-**최종 갱신**: 2026-07-20
+**최종 갱신**: 2026-08-03
 
 This is the final universal research/development prompt kit.
 
@@ -117,10 +117,12 @@ This is the final universal research/development prompt kit.
 - `codex/skills/sequential-thinking-mcp/SKILL.md`
 - `codex/skills/side-channel-analysis/SKILL.md`
 - `global_research_agents.gitignore`
+- `headroom/auto-wrap.sh`
 - `cleanup_backups.sh`
 - `install.sh`
 - `install_all.sh`
 - `install_integrations.sh`
+- `install_tooling.sh`
 - `lib/install_common.sh`
 - `scripts/validate_harness.sh`
 - `tests/fixtures/resources/base/available_bytes`
@@ -154,6 +156,7 @@ This is the final universal research/development prompt kit.
 - `tests/fixtures/resources/wsl/swapout_before`
 - `tests/fixtures/resources/wsl/total_bytes`
 - `tests/test_install_regression.sh`
+- `tests/test_tooling_install.sh`
 - `tests/test_codex_agent_runner.sh`
 - `tests/test_integration_migration.sh`
 - `tests/test_resource_detector.sh`

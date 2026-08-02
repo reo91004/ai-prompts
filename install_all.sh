@@ -6,7 +6,7 @@ source "$ROOT/lib/install_common.sh"
 usage() {
   echo "usage: install_all.sh [--integrations none|ponytail|ultra]"
   echo "  ponytail  core plus pinned Ponytail and Sequential Thinking MCP (default)"
-  echo "  none      core only; also reconciles away kit and legacy integrations"
+  echo "  none      core plus Graphify/Headroom; reconciles away kit and legacy integrations"
   echo "  ultra     ponytail plus the pinned LazyCodex workflow"
 }
 
@@ -38,81 +38,18 @@ fi
 kit_init_state
 kit_enable_rollback
 
-replace_managed_block() {
-  local target="$1"
-  local block="$2"
-  local tmp
-  local begin_count
-  local end_count
-  local begin_line
-  local end_line
-
-  kit_require_real_dir "$(dirname "$target")"
-  [ ! -L "$target" ] || kit_die "Refusing to replace a symlinked gitignore file: $target"
-  if [ -e "$target" ] && [ ! -f "$target" ]; then
-    kit_die "Global gitignore path is not a regular file: $target"
-  fi
-  if [ ! -e "$target" ]; then
-    printf '' > "$target"
-  fi
-
-  begin_count="$(grep -c '# BEGIN UNIVERSAL RESEARCH AGENT KIT' "$target" || true)"
-  end_count="$(grep -c '# END UNIVERSAL RESEARCH AGENT KIT' "$target" || true)"
-  if [ "$begin_count" -ne 0 ] || [ "$end_count" -ne 0 ]; then
-    if [ "$begin_count" -ne 1 ] || [ "$end_count" -ne 1 ]; then
-      kit_die "Malformed kit marker pair in $target (begin=$begin_count end=$end_count); repair the markers before reinstalling."
-    fi
-    begin_line="$(grep -n '# BEGIN UNIVERSAL RESEARCH AGENT KIT' "$target" | cut -d: -f1)"
-    end_line="$(grep -n '# END UNIVERSAL RESEARCH AGENT KIT' "$target" | cut -d: -f1)"
-    if [ "$begin_line" -ge "$end_line" ]; then
-      kit_die "Kit end marker precedes the begin marker in $target; repair the markers before reinstalling."
-    fi
-  fi
-
-  kit_backup_path "$target" "git/ignore"
-  tmp="$(mktemp "$target.tmp.XXXXXX")"
-
-  if [ "$begin_count" -eq 1 ]; then
-    awk -v block_file="$block" '
-      BEGIN {
-        while ((getline line < block_file) > 0) {
-          managed = managed line ORS
-        }
-      }
-      /# BEGIN UNIVERSAL RESEARCH AGENT KIT/ {
-        printf "%s", managed
-        in_block = 1
-        next
-      }
-      /# END UNIVERSAL RESEARCH AGENT KIT/ {
-        in_block = 0
-        next
-      }
-      !in_block { print }
-    ' "$target" > "$tmp"
-  else
-    cat "$target" > "$tmp"
-    if [ -s "$target" ]; then
-      printf "\n" >> "$tmp"
-    fi
-    cat "$block" >> "$tmp"
-  fi
-
-  mv "$tmp" "$target"
-}
-
-echo "[1/5] Installing Claude Code global research protocol..."
+echo "[1/6] Installing Claude Code global research protocol..."
 bash "$ROOT/claude-code/install.sh"
 
-echo "[2/5] Installing Codex global research protocol..."
+echo "[2/6] Installing Codex global research protocol..."
 bash "$ROOT/codex/install.sh"
 
-echo "[3/5] Installing global gitignore block..."
+echo "[3/6] Installing global gitignore block..."
 GLOBAL_IGNORE="$HOME/.config/git/ignore"
-replace_managed_block "$GLOBAL_IGNORE" "$ROOT/global_research_agents.gitignore"
+kit_replace_managed_block "$GLOBAL_IGNORE" "$ROOT/global_research_agents.gitignore" "git/ignore" '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
 echo "Installed research agent ignore rules to $GLOBAL_IGNORE"
 
-echo "[4/5] Reconciling integrations (profile: $INTEGRATIONS_PROFILE)..."
+echo "[4/6] Reconciling integrations (profile: $INTEGRATIONS_PROFILE)..."
 if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
   echo "Skipped integration reconciliation by explicit environment setting."
   kit_write_integrations_state "$INTEGRATIONS_PROFILE" "skipped_env" "skipped_env" "skipped_env" "skipped_env" "skipped_env"
@@ -120,7 +57,15 @@ else
   bash "$ROOT/install_integrations.sh" "$INTEGRATIONS_PROFILE"
 fi
 
-echo "[5/5] Verifying install..."
+echo "[5/6] Installing Graphify and Headroom tooling..."
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = "1" ]; then
+  echo "Skipped tooling installation by explicit environment setting."
+  kit_write_tooling_state "skipped_env" "skipped_env" "skipped_env" "skipped_env" "-" "-" "$HOME/.universal-research-agent-kit/tooling/bin"
+else
+  bash "$ROOT/install_tooling.sh"
+fi
+
+echo "[6/6] Verifying install..."
 bash "$ROOT/verify_install.sh"
 
 echo "Done. Restart Claude Code and Codex sessions to ensure all global instructions, agents, and skills are discovered."

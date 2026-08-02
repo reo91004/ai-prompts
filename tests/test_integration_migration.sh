@@ -201,6 +201,7 @@ run_kit() {
   local claude_state="$3"
   shift 3
   HOME="$home" PATH="$MOCK_BIN:$PATH" \
+    UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 \
     CODEX_MOCK_STATE="$codex_state" CLAUDE_MOCK_STATE="$claude_state" \
     "$@"
 }

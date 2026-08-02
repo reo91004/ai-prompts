@@ -101,6 +101,102 @@ kit_write_integrations_state() {
   mv "$tmp" "$state_file"
 }
 
+kit_write_tooling_state() {
+  local status="$1"
+  local graphify="$2"
+  local headroom="$3"
+  local wrapper="$4"
+  local graphify_version="$5"
+  local headroom_version="$6"
+  local tool_bin_dir="$7"
+  local state_file="$KIT_STATE_ROOT/tooling.state"
+  local tmp
+
+  kit_require_regular_or_absent "$state_file"
+  kit_backup_path "$state_file" "state/tooling.state"
+  tmp="$(mktemp "$state_file.tmp.XXXXXX")"
+  {
+    printf 'status=%s\n' "$status"
+    printf 'graphify=%s\n' "$graphify"
+    printf 'graphify_version=%s\n' "$graphify_version"
+    printf 'headroom=%s\n' "$headroom"
+    printf 'headroom_version=%s\n' "$headroom_version"
+    printf 'headroom_wrapper=%s\n' "$wrapper"
+    printf 'tool_bin_dir=%s\n' "$tool_bin_dir"
+  } > "$tmp"
+  mv "$tmp" "$state_file"
+}
+
+kit_replace_managed_block() {
+  local target="$1"
+  local block="$2"
+  local backup_relative="$3"
+  local begin_marker="$4"
+  local end_marker="$5"
+  local tmp
+  local begin_count
+  local end_count
+  local begin_line
+  local end_line
+
+  kit_require_real_dir "$(dirname "$target")"
+  [ ! -L "$target" ] || kit_die "Refusing to replace a symlinked managed file: $target"
+  if [ -e "$target" ] && [ ! -f "$target" ]; then
+    kit_die "Managed block target is not a regular file: $target"
+  fi
+  if [ -e "$target" ]; then
+    begin_count="$(grep -Fxc -- "$begin_marker" "$target" || true)"
+    end_count="$(grep -Fxc -- "$end_marker" "$target" || true)"
+  else
+    begin_count=0
+    end_count=0
+  fi
+  if [ "$begin_count" -ne 0 ] || [ "$end_count" -ne 0 ]; then
+    if [ "$begin_count" -ne 1 ] || [ "$end_count" -ne 1 ]; then
+      kit_die "Malformed kit marker pair in $target (begin=$begin_count end=$end_count); repair the markers before reinstalling."
+    fi
+    begin_line="$(grep -Fnx -- "$begin_marker" "$target" | cut -d: -f1)"
+    end_line="$(grep -Fnx -- "$end_marker" "$target" | cut -d: -f1)"
+    if [ "$begin_line" -ge "$end_line" ]; then
+      kit_die "Kit end marker precedes the begin marker in $target; repair the markers before reinstalling."
+    fi
+  fi
+
+  kit_backup_path "$target" "$backup_relative"
+  if [ ! -e "$target" ]; then
+    printf '' > "$target"
+  fi
+  tmp="$(mktemp "$target.tmp.XXXXXX")"
+
+  if [ "$begin_count" -eq 1 ]; then
+    awk -v block_file="$block" -v begin_marker="$begin_marker" -v end_marker="$end_marker" '
+      BEGIN {
+        while ((getline line < block_file) > 0) {
+          managed = managed line ORS
+        }
+      }
+      $0 == begin_marker {
+        printf "%s", managed
+        in_block = 1
+        next
+      }
+      $0 == end_marker {
+        in_block = 0
+        next
+      }
+      !in_block { print }
+    ' "$target" > "$tmp"
+  else
+    cat "$target" > "$tmp"
+    if [ -s "$target" ]; then
+      printf "\n" >> "$tmp"
+    fi
+    cat "$block" >> "$tmp"
+  fi
+
+  mv "$tmp" "$target"
+}
+
 kit_release_lock() {
   if [ "${KIT_LOCK_OWNED:-0}" = "1" ]; then
     rmdir "$KIT_LOCK_DIR" 2>/dev/null || true
