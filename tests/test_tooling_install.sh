@@ -116,6 +116,17 @@ grep -Fqx 'headroom wrap codex -- prompt' "$CALLS"
 grep -Fqx 'claude prompt' "$CALLS"
 grep -Fqx 'codex prompt' "$CALLS"
 
+SHADOW_BIN="$TMP_ROOT/shadow-bin"
+mkdir -p "$SHADOW_BIN"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "shadow headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' > "$SHADOW_BIN/headroom"
+chmod +x "$SHADOW_BIN/headroom"
+HOME="$TMP_HOME" PATH="$SHADOW_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" bash -c '
+  source "$HOME/.config/headroom/auto-wrap.sh"
+  codex shadowed
+'
+grep -Fqx 'headroom wrap codex -- shadowed' "$CALLS"
+! grep -Fq 'shadow headroom' "$CALLS"
+
 HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" zsh -fc '
   source "$HOME/.zshrc"
   claude zsh-prompt

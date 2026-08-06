@@ -2,13 +2,13 @@ _universal_research_agent_kit_headroom_command() {
   local headroom_bin
   local python_headroom_bin
 
+  if [ -x "$HOME/.universal-research-agent-kit/tooling/bin/headroom" ]; then
+    command "$HOME/.universal-research-agent-kit/tooling/bin/headroom" "$@"
+    return
+  fi
   headroom_bin="$(command -v headroom 2>/dev/null || true)"
   if [ -n "$headroom_bin" ]; then
     command "$headroom_bin" "$@"
-    return
-  fi
-  if [ -x "$HOME/.universal-research-agent-kit/tooling/bin/headroom" ]; then
-    command "$HOME/.universal-research-agent-kit/tooling/bin/headroom" "$@"
     return
   fi
   if [ -x "$HOME/.local/bin/headroom" ]; then

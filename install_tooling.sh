@@ -209,12 +209,12 @@ SHELL_BLOCK="$KIT_BACKUP_DIR/headroom-shell-block"
 cat > "$SHELL_BLOCK" <<'EOF'
 # BEGIN UNIVERSAL RESEARCH AGENT KIT HEADROOM
 case ":$PATH:" in
-  *:"$HOME/.universal-research-agent-kit/tooling/bin":*) ;;
-  *) PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH" ; export PATH ;;
-esac
-case ":$PATH:" in
   *:"$HOME/.local/bin":*) ;;
   *) PATH="$HOME/.local/bin:$PATH" ; export PATH ;;
+esac
+case ":$PATH:" in
+  *:"$HOME/.universal-research-agent-kit/tooling/bin":*) ;;
+  *) PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH" ; export PATH ;;
 esac
 [ -f "$HOME/.config/headroom/auto-wrap.sh" ] && source "$HOME/.config/headroom/auto-wrap.sh"
 # END UNIVERSAL RESEARCH AGENT KIT HEADROOM
