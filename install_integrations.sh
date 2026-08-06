@@ -32,6 +32,38 @@ CODEX_LAZYCODEX_STATE="host_unavailable"
 CODEX_SEQTHINK_STATE="host_unavailable"
 CLAUDE_SEQTHINK_STATE="host_unavailable"
 
+repair_duplicate_headroom_mcp() {
+  local config="$HOME/.codex/config.toml"
+  local headroom_sections
+  local tmp
+
+  [ -f "$config" ] || return 0
+  if (cd "$HOME" && codex mcp list >/dev/null 2>&1); then
+    return 0
+  fi
+
+  headroom_sections="$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)"
+  [ "$headroom_sections" -gt 1 ] ||
+    kit_die "Codex config is invalid and is not the known duplicate Headroom MCP case: $config"
+
+  tmp="$(mktemp "$config.tmp.XXXXXX")"
+  awk '
+    $0 == "# --- Headroom MCP server ---" { next }
+    $0 == "# --- end Headroom MCP server ---" { next }
+    $0 == "[mcp_servers.headroom]" || $0 == "[mcp_servers.headroom.env]" {
+      skip = 1
+      next
+    }
+    skip && /^\[/ { skip = 0 }
+    !skip { print }
+  ' "$config" > "$tmp"
+  mv "$tmp" "$config"
+
+  (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
+    kit_die "Removing duplicate Headroom MCP sections did not produce a valid Codex config: $config"
+  echo "Removed $headroom_sections duplicate Headroom MCP sections from ~/.codex/config.toml; Headroom wrap will register one canonical entry."
+}
+
 # Sequential Thinking MCP is add-only: a registration under any existing
 # name or version is never inspected further, replaced, or removed.
 ensure_codex_sequential_thinking() {
@@ -418,6 +450,7 @@ if [ "$codex_available" -eq 1 ]; then
   kit_require_real_dir "$HOME/.codex/plugins"
   kit_require_regular_or_absent "$HOME/.codex/config.toml"
   kit_backup_path "$HOME/.codex/config.toml" "integrations/codex-config.toml"
+  repair_duplicate_headroom_mcp
 fi
 if [ "$claude_available" -eq 1 ]; then
   kit_require_real_dir "$HOME/.claude"

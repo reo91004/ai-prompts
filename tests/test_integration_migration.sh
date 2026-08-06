@@ -70,6 +70,10 @@ case "$cmd" in
   "mcp add sequential_thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2026.7.4")
     : > "$STATE/mcp_sequential"
     ;;
+  "mcp list")
+    config="$HOME/.codex/config.toml"
+    [ ! -f "$config" ] || [ "$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)" -le 1 ]
+    ;;
   *)
     echo "codex mock: unhandled command: $cmd" >&2
     exit 1
@@ -341,5 +345,39 @@ d_disabled_line="$(grep -A1 '^\[plugins."omo@sisyphuslabs"\]$' "$D_HOME/.codex/c
 d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
 [ "$d_threads_line" = "max_threads = 6" ] || {
   echo "agents.max_threads was not capped to 6" >&2; exit 1; }
+
+echo "Scenario E: duplicate Headroom MCP sections are repaired before Codex CLI use"
+E_HOME="$WORK/home-e"
+E_CODEX="$WORK/mock-e-codex"
+E_CLAUDE="$WORK/mock-e-claude"
+mkdir -p "$E_HOME/.codex/plugins" "$E_HOME/.claude/plugins"
+seed_codex_mock_state "$E_CODEX" "$E_HOME" empty
+seed_claude_mock_state "$E_CLAUDE" "$E_HOME" empty
+printf '%s\n' \
+  'model = "gpt-5.6-sol"' \
+  '' \
+  '# --- Headroom MCP server ---' \
+  '[mcp_servers.headroom]' \
+  'command = "/old/headroom"' \
+  'args = ["mcp", "serve"]' \
+  '# --- end Headroom MCP server ---' \
+  '' \
+  '[mcp_servers.zotero]' \
+  'command = "zotero-mcp"' \
+  '' \
+  '# --- Headroom MCP server ---' \
+  '[mcp_servers.headroom]' \
+  'command = "/managed/headroom"' \
+  'args = ["mcp", "serve"]' \
+  '' \
+  '[mcp_servers.headroom.env]' \
+  'HEADROOM_PROXY_URL = "http://127.0.0.1:8787"' \
+  '# --- end Headroom MCP server ---' > "$E_HOME/.codex/config.toml"
+run_kit "$E_HOME" "$E_CODEX" "$E_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+[ "$(grep -Fxc '[mcp_servers.headroom]' "$E_HOME/.codex/config.toml" || true)" -eq 0 ]
+grep -Fqx 'model = "gpt-5.6-sol"' "$E_HOME/.codex/config.toml"
+grep -Fqx '[mcp_servers.zotero]' "$E_HOME/.codex/config.toml"
+grep -Fqx 'command = "zotero-mcp"' "$E_HOME/.codex/config.toml"
 
 echo "Integration migration tests passed."
