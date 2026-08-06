@@ -3,7 +3,8 @@ _universal_research_agent_kit_headroom_command() {
   local python_headroom_bin
 
   if [ -x "$HOME/.universal-research-agent-kit/tooling/bin/headroom" ]; then
-    command "$HOME/.universal-research-agent-kit/tooling/bin/headroom" "$@"
+    PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH" \
+      command "$HOME/.universal-research-agent-kit/tooling/bin/headroom" "$@"
     return
   fi
   headroom_bin="$(command -v headroom 2>/dev/null || true)"

@@ -55,7 +55,7 @@ case "$*" in
     chmod +x "$MOCK_TOOL_BIN/graphify"
     ;;
   *headroom-ai*)
-    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
+    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
     ;;
 esac
@@ -125,6 +125,7 @@ HOME="$TMP_HOME" PATH="$SHADOW_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOO
   codex shadowed
 '
 grep -Fqx 'headroom wrap codex -- shadowed' "$CALLS"
+grep -Fqx "headroom-resolved $TMP_HOME/.universal-research-agent-kit/tooling/bin/headroom" "$CALLS"
 ! grep -Fq 'shadow headroom' "$CALLS"
 
 HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" zsh -fc '

@@ -34,17 +34,27 @@ CLAUDE_SEQTHINK_STATE="host_unavailable"
 
 repair_duplicate_headroom_mcp() {
   local config="$HOME/.codex/config.toml"
+  local expected_command="command = \"$HOME/.universal-research-agent-kit/tooling/bin/headroom\""
   local headroom_sections
+  local managed_block
+  local needs_repair=0
   local tmp
 
   [ -f "$config" ] || return 0
-  if (cd "$HOME" && codex mcp list >/dev/null 2>&1); then
-    return 0
+  headroom_sections="$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)"
+  if [ "$headroom_sections" -gt 1 ]; then
+    needs_repair=1
+  elif [ "$headroom_sections" -eq 1 ] &&
+       grep -Fqx '# --- Headroom MCP server ---' "$config"; then
+    managed_block="$(sed -n '/^# --- Headroom MCP server ---$/,/^# --- end Headroom MCP server ---$/p' "$config")"
+    printf '%s\n' "$managed_block" | grep -Fqx "$expected_command" || needs_repair=1
   fi
 
-  headroom_sections="$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)"
-  [ "$headroom_sections" -gt 1 ] ||
-    kit_die "Codex config is invalid and is not the known duplicate Headroom MCP case: $config"
+  if [ "$needs_repair" -eq 0 ]; then
+    (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
+      kit_die "Codex config is invalid and is not a repairable Headroom MCP case: $config"
+    return 0
+  fi
 
   tmp="$(mktemp "$config.tmp.XXXXXX")"
   awk '
@@ -61,7 +71,7 @@ repair_duplicate_headroom_mcp() {
 
   (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
     kit_die "Removing duplicate Headroom MCP sections did not produce a valid Codex config: $config"
-  echo "Removed $headroom_sections duplicate Headroom MCP sections from ~/.codex/config.toml; Headroom wrap will register one canonical entry."
+  echo "Removed $headroom_sections stale or duplicate Headroom MCP section(s) from ~/.codex/config.toml; Headroom wrap will register one canonical entry."
 }
 
 # Sequential Thinking MCP is add-only: a registration under any existing
