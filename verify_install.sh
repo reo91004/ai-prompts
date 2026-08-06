@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 EXPECTED_GRAPHIFY_VERSION="0.9.32"
-EXPECTED_HEADROOM_VERSION="0.33.0"
+EXPECTED_HEADROOM_VERSION="0.34.0"
 TOOLING_STATE_FILE="$HOME/.universal-research-agent-kit/tooling.state"
 read_tooling_state() {
   sed -n "s/^$1=//p" "$TOOLING_STATE_FILE" | sed -n '1p'

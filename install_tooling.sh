@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/lib/install_common.sh"
 
 GRAPHIFY_VERSION="0.9.32"
-HEADROOM_VERSION="0.33.0"
+HEADROOM_VERSION="0.34.0"
 GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
 HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
 

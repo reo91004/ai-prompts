@@ -55,7 +55,7 @@ case "$*" in
     chmod +x "$MOCK_TOOL_BIN/graphify"
     ;;
   *headroom-ai*)
-    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.33.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
+    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
     ;;
 esac
@@ -80,7 +80,7 @@ UV_TOOL_BIN_DIR="$TMP_ROOT/tool-bin"
 run_tooling
 
 grep -Fqx 'uv tool install --upgrade graphifyy==0.9.32' "$CALLS"
-grep -Fqx 'uv tool install --python 3.13 --upgrade headroom-ai[all]==0.33.0' "$CALLS"
+grep -Fqx 'uv tool install --python 3.13 --upgrade headroom-ai[all]==0.34.0' "$CALLS"
 grep -Fqx 'graphify install --platform claude' "$CALLS"
 grep -Fqx 'graphify install --platform codex' "$CALLS"
 grep -Fqx 'status=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
@@ -88,7 +88,7 @@ grep -Fqx 'graphify=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.
 grep -Fqx 'headroom=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom_wrapper=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'graphify_version=0.9.32' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'headroom_version=0.33.0' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'headroom_version=0.34.0' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx "tool_bin_dir=$TMP_HOME/.universal-research-agent-kit/tooling/bin" "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 [ -f "$TMP_HOME/.claude/skills/graphify/SKILL.md" ]
 [ -f "$TMP_HOME/.codex/skills/graphify/SKILL.md" ]
@@ -135,7 +135,7 @@ BAD_VERSION_HOME="$TMP_ROOT/bad-version-home"
 BAD_VERSION_BIN="$TMP_ROOT/bad-version-bin"
 mkdir -p "$BAD_VERSION_HOME" "$BAD_VERSION_BIN"
 printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "graphify 0.9.320"' > "$BAD_VERSION_BIN/graphify"
-printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom, version 10.33.0-dev"' > "$BAD_VERSION_BIN/headroom"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom, version 10.34.0-dev"' > "$BAD_VERSION_BIN/headroom"
 chmod +x "$BAD_VERSION_BIN/graphify" "$BAD_VERSION_BIN/headroom"
 HOME="$BAD_VERSION_HOME" PATH="$BAD_VERSION_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
@@ -155,7 +155,7 @@ HOME="$FULL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   }
 grep -Fqx 'status=installed' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'graphify_version=0.9.32' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'headroom_version=0.33.0' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'headroom_version=0.34.0' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
 [ -f "$FULL_HOME/.claude/skills/graphify/SKILL.md" ]
 [ -f "$FULL_HOME/.codex/skills/graphify/SKILL.md" ]
 [ -f "$FULL_HOME/.config/headroom/auto-wrap.sh" ]
