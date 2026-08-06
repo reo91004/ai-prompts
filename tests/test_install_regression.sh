@@ -6,7 +6,8 @@ REAL_HOME="$HOME"
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
 ROLLBACK_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-rollback.XXXXXX")"
-trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME"' EXIT HUP INT TERM
+VALIDATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/harness-validation.XXXXXX")"
+trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME" "$VALIDATION_ROOT"' EXIT HUP INT TERM
 
 home_prompt_signature() {
   for path in "$REAL_HOME/.codex/AGENTS.md" "$REAL_HOME/.claude/CLAUDE.md"; do
@@ -19,6 +20,14 @@ home_prompt_signature() {
 }
 
 before_signature="$(home_prompt_signature)"
+
+echo "Validation regression: local Serena state must not require manifest entries"
+tar -C "$ROOT" --exclude=.git --exclude=.serena -cf - . | tar -C "$VALIDATION_ROOT" -xf -
+mkdir -p "$VALIDATION_ROOT/.serena/cache/bash"
+printf '%s\n' 'generated cache' > "$VALIDATION_ROOT/.serena/cache/bash/document_symbols.pkl"
+printf '%s\n' 'generated project state' > "$VALIDATION_ROOT/.serena/project.local.yml"
+bash "$VALIDATION_ROOT/scripts/validate_harness.sh"
+
 mkdir -p \
   "$TMP_HOME/.codex/agents" \
   "$TMP_HOME/.agents/skills/third-party" \

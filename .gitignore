@@ -9,6 +9,7 @@ handover*.md
 .agent_logs/
 .agent_tmp/
 .agent_cache/
+.serena/
 *.agent.log
 *.agent.tmp
 *.agent.jsonl
