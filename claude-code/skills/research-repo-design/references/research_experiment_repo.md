@@ -2,257 +2,74 @@
 
 Use this reference when a repository exists to test a research idea through experiments, measurements, model training, simulation, hardware runs, or side-channel traces. The goal is not to build a reusable framework first. The goal is to make the first real experiment easy to run, audit, reproduce, compare, and hand off.
 
-A research repository proves a claim; it is not a product. A repository may grow large, but each added file must protect claim validity, reproducibility, or provenance. If a file only makes the work feel more like production, do not create it yet.
+A research repository proves a claim; it is not a product. It may grow large, but each added file must protect claim validity, reproducibility, or provenance. If a file only makes the work feel more like production, do not create it.
 
-## Minimal Creation Rule
+## The Layout
 
-Create the smallest repository that can run the first real experiment.
-
-Before creating any file or directory, classify it as one of:
-
-- required for the first run;
-- required for reproducibility of the first run;
-- required for current documentation;
-- optional later.
-
-Create only the first three. Do not create empty future folders. For every file you create, state in one line why it is needed now. If the reason is "later," do not create it.
-
-## Choose The Center
-
-Keep the philosophy stable, but choose the center of the repository from the domain:
+One layout, always the same, so a path never has to be guessed — by the author or by an agent reading the repo cold.
 
 ```text
-Hardware / side-channel:  target/, capture + analyze, runs/
-AI / ML:                  data (when real), train + eval, runs/
-LLM / prompt evaluation:  prompts/, run_eval + judge, runs/ (save raw outputs)
-RL:                       envs, policy + rollout, train + eval, runs/
-Simulation / theory:      simulate + eval, runs/
-```
-
-Do not copy a hardware layout into an AI project because it worked for a hardware paper. Keep the roles and change the folders.
-
-## Levels
-
-Pick the lowest level that fits. Default to Level 1 unless the user asks for paper-artifact quality or the first run needs hardware, real data, or model-training stages.
-
-### Level 0: Scratch Hypothesis
-
-Use when the user needs to check whether an idea is plausible, often within a day, with no data, no baseline, and no paper artifact yet.
-
-```text
-README.md
-requirements.txt
-run.py
-notes.md
-```
-
-Do not create `scripts/`, `configs/`, `docs/`, `tests/`, `data/`, `src/`, or any package unless the first run needs them. A small self-check inside `run.py` is enough.
-
-### Level 1: Small Repeatable Experiment (default)
-
-Use when the user needs repeated runs and saved results, but not paper-level rigor yet.
-
-```text
-README.md
-requirements.txt
-Makefile
-experiment.py
-eval.py
-configs/
-  base.yaml
-runs/
-  .gitkeep
-docs/
-  handoff.md
-```
-
-No package directory yet. No `data.py`, `model.py`, or `metrics.py` yet; split them out when they actually appear. Put the hypothesis and how-to-run in `README.md`.
-
-### Level 2: Paper Experiment
-
-Use as the default for paper-level experiments across AI/ML, hardware, side-channel, and simulation.
-
-```text
-README.md
-requirements.txt        # or pyproject.toml, not both
-Makefile
-core.py
-metrics.py
-plot.py
+README.md               # the hypothesis and how to run it
+pyproject.toml
+Makefile                # setup / smoke / run / eval / report / clean
+<project>/              # shallow root package, snake_case of the repo name
+  __init__.py
+  core.py               # split into data.py / model.py / metrics.py / plot.py as it grows
 scripts/
-  00_smoke.py
-  10_prepare.py
-  20_run.py
-  30_eval.py
-  40_report.py
+  00_smoke.py 10_prepare.py 20_run.py 30_eval.py 40_report.py
 configs/
-  base.yaml
-  baseline.yaml
-  experiment.yaml
-runs/
-  .gitkeep
+  base.yaml baseline.yaml experiment.yaml
+runs/                   # canonical artifact store, never hand-edited
 docs/
-  idea.md
-  protocol.md
-  results.md
-  handoff.md
+  idea.md protocol.md results.md handoff.md
 tests/
   test_core.py
 ```
 
-Reusable logic lives in flat root modules (`core.py`, `metrics.py`, `plot.py`), not a package. Add `data/`, `target/`, `notebooks/`, or a package directory only when the domain needs it.
+**Creation rule: directories always exist; a file appears when it has content.** `docs/` is there from the first commit, `docs/results.md` arrives when there is a result. Never scaffold an empty file to fill the shape.
 
-### Level 3: Grown Project
+`make setup` must run the editable install (`pip install -e .`). It is the one line that keeps the package from turning into a `ModuleNotFoundError` in a fresh environment, so it is not optional.
 
-Use only after Level 2 becomes hard to navigate, with many datasets, models, trainers, or collaborators.
+The package sits at the repository root, never at `src/<package>/`. Root-level modules would be simpler still, but a package prevents a file like `types.py` or `random.py` from shadowing the standard library, and that failure is hard to diagnose. One level of depth buys that; two do not.
 
-```text
-README.md
-pyproject.toml
-Makefile
-project_name/          # shallow root package, not src/project_name/
-  __init__.py
-  data.py
-  model.py
-  train.py
-  eval.py
-  metrics.py
-  plot.py
-scripts/
-configs/
-data/
-runs/
-docs/
-tests/
-```
+### Domain Addition
 
-Do not start at Level 3 unless the complexity already exists.
-
-## The src/ Rule
-
-Do not create `src/<package>/` for an initial research repository. It adds depth and a packaging feel the experiment does not need.
+Add at most one domain directory to the layout above. Nothing else changes.
 
 ```text
-Level 0-1:   flat files at repository root (run.py, experiment.py, eval.py)
-Level 2:     flat root modules (core.py, metrics.py, plot.py)
-Level 3:     one shallow root package, e.g. project_name/
-src/<pkg>/:  only when packaging, distribution, or import isolation is an explicit goal
+Hardware / side-channel:  target/firmware/, target/host/
+AI / ML:                  data/            (only once real external data exists)
+LLM / prompt evaluation:  prompts/, data/cases.jsonl
+Simulation / theory:      nothing
 ```
 
-## Domain Defaults
+For hardware work, `runs/` follows the capture run directory contract in `hardware-capture-integrity/references/capture_run_layout.md`, which is stricter than the general shape below.
 
-Start each domain small and expand only on a trigger.
+## Choose The Center
 
-### AI / ML
+The layout is fixed; what fills the package is not. Name the center from the domain:
 
 ```text
-README.md
-requirements.txt
-Makefile
-train.py
-eval.py
-configs/
-  baseline.yaml
-  experiment.yaml
-runs/
-  .gitkeep
-docs/
-  idea.md
-  handoff.md
+Hardware / side-channel:  capture + analyze, target/, runs/
+AI / ML:                  train + eval, data (when real), runs/
+LLM / prompt evaluation:  run_eval + judge, prompts/, runs/ (save raw outputs)
+RL:                       envs, policy + rollout, train + eval, runs/
+Simulation / theory:      simulate + eval, runs/
 ```
 
-Expand later: `data.py` when loading exceeds roughly 50 lines; `model.py` when the model makes `train.py` hard to read; `metrics.py` when there are two or more metrics or they are shared with the baseline; `plot.py` when figure regeneration matters; `scripts/` when stages separate.
+Do not copy a hardware center into an AI project because it worked for a hardware paper.
 
-Do not create from the start: `callbacks/`, `trainers/`, `registries/`, `factories/`, `abstract_dataset.py`, `model_zoo/`, a Hydra config tree, or a W&B wrapper.
+### Do Not Create These
 
-A fixed seed is not enough for reproducibility. Bind split hash, preprocessing version, model and optimizer config, GPU/host, and package versions to the run.
+Per domain, these are the shapes that show up uninvited and never earn their place at the start:
 
-### LLM / Prompt Evaluation
-
-```text
-README.md
-requirements.txt
-run_eval.py
-judge.py
-prompts/
-  system.md
-  task.md
-data/
-  cases.jsonl
-runs/
-  .gitkeep
-docs/
-  handoff.md
-```
-
-No `src/llmeval/` at the start. The critical part is the run artifact, not code structure, because models and APIs drift:
-
-```text
-runs/<run_id>/
-  config.json
-  raw_outputs.jsonl
-  judge_outputs.jsonl
-  metrics.json
-  report.md
-```
-
-Always save raw completions, plus model name, provider, temperature/top_p/max_tokens, system and task prompt hashes, dataset hash, judge model and prompt, and scoring version. Without raw outputs the run cannot be re-scored after a model changes.
-
-### Hardware Capture / Side-Channel
-
-```text
-README.md
-requirements.txt
-Makefile
-capture.py
-analyze.py
-target/
-  firmware/
-  host/
-configs/
-  capture.yaml
-runs/
-  .gitkeep
-docs/
-  setup.md
-  handoff.md
-```
-
-Do not solve side-channel rigor with folder count. Expand only when the project grows:
-
-```text
-target/   firmware/ host/ disasm/
-sca/      capture.py labels.py segment.py leakage.py classify.py plot.py
-scripts/  00_smoke.py 10_build_target.sh 20_capture.py 30_analyze.py 40_report.py
-configs/  runs/  docs/
-```
-
-Use `sca/`, not `src/sca/`. Keep raw traces under the run that produced them, bound to firmware hash, scope config, and trigger strategy, not loose in `data/`.
-
-### Simulation / Theory
-
-```text
-README.md
-requirements.txt
-simulate.py
-eval.py
-configs/
-  base.yaml
-runs/
-  .gitkeep
-docs/
-  handoff.md
-```
-
-Add `theory.py`, `metrics.py`, or `plot.py` when they are needed. State an evidence tier in results: theory only, synthetic simulation, simulator matched to a reference implementation, measured real data, or independently reproduced. Do not present synthetic success as real-world success.
+- **AI / ML**: `callbacks/`, `trainers/`, `registries/`, `factories/`, `abstract_dataset.py`, `model_zoo/`, a Hydra config tree, or a W&B wrapper. A fixed seed is not enough for reproducibility — bind split hash, preprocessing version, model and optimizer config, GPU/host, and package versions to the run.
+- **LLM / prompt evaluation**: any structure that matters more than the run artifact. Models and APIs drift, so always save raw completions plus model name, provider, temperature/top_p/max_tokens, system and task prompt hashes, dataset hash, judge model and prompt, and scoring version. Without raw outputs the run cannot be re-scored after a model changes.
+- **Simulation / theory**: a solver abstraction before the second solver. State an evidence tier in results — theory only, synthetic simulation, simulator matched to a reference implementation, measured real data, or independently reproduced. Never present synthetic success as real-world success.
 
 ## Scripts
 
-Create `scripts/` only when three or more distinct stages exist: prepare/run/eval/report are separated, the hardware procedure is staged, or baseline and ablation run through the same stage script. With one or two stages, keep flat scripts (`experiment.py`, `eval.py`).
-
-Use one script per stage, not one per hypothesis. Number with gaps (00, 10, 20) so stages can be inserted later.
-
-Good:
+Use one script per stage, not one per hypothesis. Number with gaps (00, 10, 20) so stages can be inserted later. With only one or two stages, a single `scripts/20_run.py` is the whole of `scripts/`.
 
 ```bash
 python scripts/20_run.py --config configs/baseline.yaml
@@ -260,29 +77,29 @@ python scripts/20_run.py --config configs/experiment.yaml
 python scripts/30_eval.py --run runs/20260616_exp_seed0
 ```
 
-Avoid per-hypothesis scripts (`20_train_baseline.py`, `21_train_snr.py`, ...) and avoid a mega CLI that hides run order.
+Avoid per-hypothesis scripts (`20_train_baseline.py`, `21_train_snr.py`, …) and avoid a mega CLI that hides run order.
 
 ## Package Boundary
 
-`scripts/` answers what to run and in what order. Reusable modules answer how the logic works.
+`scripts/` answers what to run and in what order. The package answers how the logic works.
 
 Put in `scripts/`: run order, path-only argparse (`--config`, `--run`, `--out`), run naming, and print-based progress. Experiment parameters belong in the YAML config, not in CLI flags.
 
-Put in modules: data loading and preprocessing; model, schedule, policy, or target logic; train/sample/eval loops; metrics; plotting; capture, segmentation, and analysis; small JSON/CSV/NPZ/checkpoint/seed helpers.
+Put in the package: data loading and preprocessing; model, schedule, policy, or target logic; train/sample/eval loops; metrics; plotting; capture, segmentation, and analysis; small JSON/CSV/NPZ/checkpoint/seed helpers.
 
 Do not put the paper claim, final conclusion, or complete protocol inside one opaque function.
 
 ## Configs
 
-Experiment parameters live in the config, never in CLI flags. From Level 1 on, that config is a YAML file under `configs/`; at Level 0 (no `configs/` yet) keep them as named constants at the top of `run.py`. CLI arguments may only reference paths — `--config <yaml>`, `--run <dir>`, `--out <dir>` — never tunable parameters (learning rate, epochs, seed, batch size, model size, thresholds). One readable config should fully describe the run and be recorded with it.
+Experiment parameters live in `configs/*.yaml`, never in CLI flags. CLI arguments may only reference paths — `--config <yaml>`, `--run <dir>`, `--out <dir>` — never tunable parameters (learning rate, epochs, seed, batch size, model size, thresholds). One readable config should fully describe the run and be recorded with it.
 
-Configs describe experiments; they must not hide them. Prefer explicit, readable YAML. Create `configs/` when there are two or more run conditions or reproducibility matters. Split by role (`data/ model/ train/ exp/`) only after the experiment space grows large. Do not require a config framework at project start.
+Configs describe experiments; they must not hide them. Prefer explicit, readable YAML. Split by role (`data/ model/ train/ exp/`) only after the experiment space grows large. Do not adopt a config framework.
 
 ## Data And Runs
 
-Create `data/` only when real external data exists. Keep `data/raw` (external, unmodified), `data/processed` (derived), and `data/cache` (reproducible temporary state).
+`data/` appears only when real external data exists. Keep `data/raw` (external, unmodified), `data/processed` (derived), and `data/cache` (reproducible temporary state).
 
-Make `runs/` the canonical artifact store and add it early, from Level 1, because binding a result to what produced it is the core job of a research repo. Each run is self-contained:
+`runs/` is the canonical artifact store and exists from the first commit, because binding a result to what produced it is the core job of a research repo. Each run is self-contained:
 
 ```text
 runs/<timestamp>_<short_name>/
@@ -294,56 +111,57 @@ runs/<timestamp>_<short_name>/
   report.md
 ```
 
-`manifest.json` records at least run_id, claim, config path, git_commit, seed, data_hash, started_at, finished_at, and status. Add firmware/disasm hashes, device, and scope config for hardware; checkpoint and split hashes for ML. Put checkpoints under the run that produced them, not in a global `models/`.
+`manifest.json` records at least run_id, claim, config path, git_commit, seed, started_at, finished_at, and status. Hash the run's *inputs* when they can change silently — dataset, firmware, prepared queries — and add device and scope config for hardware, checkpoint and split hashes for ML. Do not hash the artifacts the run just wrote; `git_commit` identifies the code and the copied `config.yaml` identifies the settings. Put checkpoints under the run that produced them, not in a global `models/`.
 
 Start with local files. Add W&B, MLflow, or TensorBoard later as a secondary index; do not remove local `runs/`. Tool-managed directories such as `mlruns/` should usually be Git-ignored while reports and figures stay in `runs/`.
 
 ## Docs
 
-Create only the docs that hold current information in the first commit. Do not create empty documentation files.
+`docs/` exists from the start; each file appears when it holds current information. Never create an empty documentation file.
 
-```text
-Level 0:  notes.md
-Level 1:  docs/handoff.md   (hypothesis and how-to-run go in README.md)
-Level 2:  docs/idea.md, protocol.md, results.md, handoff.md
-Level 3:  add docs/archive/ for superseded plans
-```
+`docs/idea.md` states the hypothesis, primary metric, secondary metrics, baselines, success criterion, and failure modes. `docs/protocol.md` is how the experiment is actually run. `docs/results.md` is the canonical home of a measured value. `docs/handoff.md` holds unresolved limitations and next steps — unfinished work goes here, not in source comments.
 
-`docs/idea.md` should state the hypothesis, primary metric, secondary metrics, baselines, success criterion, and failure modes. `docs/handoff.md` holds unresolved limitations and next steps; put unfinished work here, not in source comments. Archived notes must say they are not current and point to the current `protocol.md` and `handoff.md`.
+Add `docs/archive/` only when a plan is superseded. Archived notes must say they are not current and point to the current `protocol.md` and `handoff.md`.
 
 ## Tests
 
-Tests protect the claim, not coverage. Verify the smallest logic that, if broken, would invalidate a result (labels, splits, metrics, segmentation, statistics).
+Tests protect the claim, not coverage. Verify the smallest logic that, if broken, would invalidate a result: labels, splits, metrics, segmentation, statistics.
 
-```text
-Level 0:  no tests/ (a small self-check in run.py is enough)
-Level 1:  no tests/ by default; add tests/test_smoke.py only if reusable logic exists
-Level 2:  tests/test_core.py, test_metrics.py, test_io.py
-Level 3:  tests/unit/, smoke/, integration/
-```
-
-Separate fast from slow and hardware-dependent checks (`make smoke / test / test-slow / test-hw`). Never put a test that needs hardware in the default `make test`.
+Start with `tests/test_core.py` and split into `test_metrics.py`, `test_io.py` when it grows. Separate fast from slow and hardware-dependent checks (`make smoke / test / test-slow / test-hw`). Never put a test that needs hardware in the default `make test`.
 
 ## Notebooks
 
-Create `notebooks/` only when notebooks are actually used. They are allowed for inspection, visualization, sample review, dataset checks, and metric debugging, never as the source of truth. Keep train loops, dataset splits, final metrics, and final figures in scripts and modules, regenerable without a notebook.
+Create `notebooks/` only when notebooks are actually used. They are allowed for inspection, visualization, sample review, dataset checks, and metric debugging, never as the source of truth. Keep train loops, dataset splits, final metrics, and final figures in scripts and the package, regenerable without a notebook.
 
 ## Dependency And Build Files
 
-Use one dependency file at a time: `requirements.txt` for Level 0-2, `pyproject.toml` for Level 3. Do not create `requirements.txt`, `pyproject.toml`, `setup.cfg`, and `setup.py` together.
+Use `pyproject.toml` alone, with plain `pip` and `venv`. Do not create `requirements.txt`, `setup.cfg`, or `setup.py` alongside it. Its `dependencies` list is the dependency file — that is why there is no second one.
 
-Keep a small `Makefile` as a thin command interface (`smoke`, `run`, `eval`, `report`, `clean`). Experiment logic stays in scripts and configs, not in the Makefile, and the Makefile does not grow one target per hypothesis.
+Keep it minimal. This is the whole file for most research repos:
+
+```toml
+[project]
+name = "myproject"
+version = "0"
+dependencies = ["numpy", "scipy"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+```
+
+Do not introduce `uv`, Poetry, PDM, Pipenv, or Conda as required tooling, and do not generate a lockfile (`uv.lock`, `poetry.lock`, `requirements.lock`, pip-compile output, `--require-hashes`). A lockfile pins a whole dependency graph to defend a deployment against drift between machines and over time; a single-author experiment repo has neither problem, and the file is large, unreadable, and regenerated by a tool the reader may not have installed. When a specific version actually affects a result, pin that one package in `dependencies` (`numpy==2.1.3`) and say why in `README.md`. Record the versions that produced a number in the run manifest, not in a lockfile.
+
+Keep a small `Makefile` as a thin command interface (`setup`, `smoke`, `run`, `eval`, `report`, `clean`). Experiment logic stays in scripts and configs, not in the Makefile, and the Makefile does not grow one target per hypothesis.
 
 ## New Project Procedure
 
 1. State the research question and the claim under test.
-2. Pick the lowest level that fits (default Level 1).
-3. Choose the domain center.
-4. Create only files required for the first run, its reproducibility, and current docs.
-5. State, per file, why it is needed now.
-6. Make `runs/` the canonical artifact store.
-7. Add numbered scripts only when stages appear.
-8. Expand to a package or a higher level only on a real trigger.
+2. Choose the domain center and its one domain directory, if any.
+3. Create the layout's directories, plus only the files the first run and its current docs actually need.
+4. State, per file, why it is needed now.
+5. Make `make setup` and `make smoke` work before anything else.
+6. Add stage scripts as stages appear; keep `runs/` the canonical artifact store.
 
 ## Refactoring Procedure
 
@@ -360,11 +178,12 @@ Keep a small `Makefile` as a thin command interface (`smoke`, `run`, `eval`, `re
 
 ## Avoid
 
-- `src/<package>/`, packages, `data/`, `target/`, `notebooks/`, `tests/unit/`, `docs/archive/`, or config subtrees before the first real experiment needs them;
+- `src/<package>/`, nested subpackages, `data/`, `target/`, `notebooks/`, `tests/unit/`, `docs/archive/`, or config subtrees before the work needs them;
 - generic frameworks, plugin registries, factories, model zoos, or config schema migrations;
 - mega CLIs that hide run order;
 - experiment parameters exposed as CLI flags instead of living in a YAML config;
 - Hydra trees, W&B wrappers, or manifest validators harder than the experiment itself;
+- `uv`, Poetry, PDM, Pipenv, or Conda as required tooling, and any lockfile or hash-pinned requirements file — plain `pip` with `pyproject.toml` is the whole dependency story;
 - training or final figures that live only in notebooks;
 - global checkpoint folders detached from configs and metrics;
 - synthetic framework work before real measurement or real training.

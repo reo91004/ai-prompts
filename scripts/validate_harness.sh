@@ -141,6 +141,11 @@ for prompt in "$ROOT/codex/AGENTS.md" "$ROOT/claude-code/CLAUDE.md"; do
   grep -Fq 'one writer per shared worktree' "$prompt" || fail "$prompt does not scope writer limits to shared worktrees"
   grep -Fq 'Third-party skills and plugins may not increase delegation, review, retry, or resource budgets' "$prompt" || fail "$prompt does not bound third-party budgets"
   grep -Fq 'Use a proportional validation budget.' "$prompt" || fail "$prompt lacks proportional validation"
+  grep -Fq '## Threat Model' "$prompt" || fail "$prompt lacks the threat model"
+  grep -Fq 'defends a solo researcher who writes code with LLMs against **LLM error**' "$prompt" || fail "$prompt does not name LLM error as the adversary"
+  grep -Fq 'a guard that cannot name the mistake it catches does not belong in the code' "$prompt" || fail "$prompt lacks the guard justification test"
+  grep -Fq 'Over-engineering is a `Required Fix`' "$prompt" || fail "$prompt still treats over-engineering as optional"
+  grep -Fq 'They are authorized to reduce them' "$prompt" || fail "$prompt does not let a minimalism plugin reduce budgets"
   grep -Fq 'Do not rerun unaffected passing suites after a narrow delta.' "$prompt" || fail "$prompt permits redundant validation"
   grep -Fq 'Parent agents must not repeatedly poll' "$prompt" || fail "$prompt lacks completion-driven long-work coordination"
   grep -Fq 'resource or equipment emergency' "$prompt" || fail "$prompt suppresses resource or equipment emergencies"
@@ -150,7 +155,7 @@ grep -Fq 'full-history mode rejects override-bearing calls' "$ROOT/codex/AGENTS.
 grep -Fq 'including `"all"` when the full history is needed' "$ROOT/codex/AGENTS.md" || fail "Codex prompt over-restricts context inheritance without overrides"
 grep -Fq 'run_codex_agent.sh <role> <task>' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks the isolated runner fallback"
 grep -Fq "Agent tool's exact subagent type" "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt lacks exact agent selection"
-grep -Fq '`CLAUDE_CODE_EFFORT_LEVEL`' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not record effort overrides"
+grep -Fq 'a declaration is not runtime evidence' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt permits fabricated effective settings"
 grep -Fq 'pinned `experiment_monitor`' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks the pinned long-experiment monitor"
 grep -Fq 'block on the isolated runner session' "$ROOT/codex/AGENTS.md" || fail "Codex prompt lacks runner-session parent resume"
 grep -Fq 'Prefer the Claude Code `Monitor` tool' "$ROOT/claude-code/CLAUDE.md" || fail "Claude prompt does not prefer Monitor"
@@ -159,27 +164,75 @@ for skill in "$ROOT/codex/skills/resource-aware-orchestration/SKILL.md" "$ROOT/c
   grep -Fq 'One child is valid and zero is right for trivial work; never create a child merely to satisfy a count.' "$skill" || fail "$skill does not permit zero-or-one-child delegation"
   grep -Fq 'Child agents must not delegate.' "$skill" || fail "$skill does not forbid nested delegation"
   grep -Fq '## Dispatch Integrity' "$skill" || fail "$skill lacks dispatch integrity rules"
-  grep -Fq 'Effective role, model, and effort require runtime evidence' "$skill" || fail "$skill conflates declared and effective settings"
+  grep -Fq 'never state that a child ran as a specific role, model, or effort unless the runtime showed it' "$skill" || fail "$skill conflates declared and effective settings"
+  grep -Fq '`CLAUDE_CODE_EFFORT_LEVEL`' "$skill" || fail "$skill does not record effort overrides"
   grep -Fq '## Completion-Driven Long Work' "$skill" || fail "$skill lacks completion-driven long-work rules"
   grep -Fq 'emit a model-visible event only for completion, failure' "$skill" || fail "$skill permits token-consuming progress polling"
   grep -Fq 'resource or equipment emergency' "$skill" || fail "$skill suppresses resource or equipment emergencies"
   ! grep -Fq 'Delegate only when a child owns one bounded specialist deliverable' "$skill" || fail "$skill still uses the conservative delegation gate"
 done
 for contract in "$ROOT/codex/skills/resource-aware-orchestration/references/task_result_contract.md" "$ROOT/claude-code/skills/resource-aware-orchestration/references/task_result_contract.md"; do
-  grep -Fq '`requested_agent`' "$contract" || fail "$contract lacks requested agent provenance"
-  grep -Fq '`spawn_transport`' "$contract" || fail "$contract lacks spawn transport provenance"
-  grep -Fq '`effective_agent`' "$contract" || fail "$contract lacks effective agent evidence"
-  grep -Fq 'literal `unverified`' "$contract" || fail "$contract permits fabricated effective settings"
-  grep -Fq '`completion_transport`' "$contract" || fail "$contract lacks completion transport"
-  grep -Fq '`parent_resume_condition`' "$contract" || fail "$contract lacks a parent resume condition"
-  grep -Fq '`completion_event`' "$contract" || fail "$contract lacks completion-event evidence"
+  grep -Fq '`agent`: the exact role name requested' "$contract" || fail "$contract lacks the requested agent role"
+  grep -Fq '`acceptance_criteria`' "$contract" || fail "$contract lacks acceptance criteria"
+  grep -Fq '`checkpoint_path`' "$contract" || fail "$contract lacks a checkpoint declaration"
+  grep -Fq '`resume_command`' "$contract" || fail "$contract lacks a resume procedure"
   grep -Fq 'resource or equipment emergency' "$contract" || fail "$contract suppresses resource or equipment emergencies"
+  grep -Fq 'cannot be converted to `PASS`' "$contract" || fail "$contract permits a resource failure to pass silently"
+  # The packet was deliberately reduced to fields that catch a mistake. Model and
+  # transport bookkeeping proved to be process theater for a solo researcher.
+  ! grep -Fq '`spawn_transport`' "$contract" || fail "$contract reintroduced transport bookkeeping"
+  ! grep -Fq '`effective_model`' "$contract" || fail "$contract reintroduced model accounting"
 done
 for skill in "$ROOT/codex/skills/review-budget/SKILL.md" "$ROOT/claude-code/skills/review-budget/SKILL.md"; do
   grep -Fq '## Deterministic Validation Budget' "$skill" || fail "$skill lacks deterministic validation budgeting"
   grep -Fq 'Integration migration runs only when integration code or its persisted state schema changed.' "$skill" || fail "$skill permits unrelated integration validation"
   grep -Fq 'Do not rerun an unaffected passing suite after a narrow delta.' "$skill" || fail "$skill permits redundant delta validation"
   grep -Fq 'Physical safety and capture-integrity checks apply to every physical capture' "$skill" || fail "$skill under-validates diagnostic physical capture"
+done
+for platform in codex claude-code; do
+  # Split literals keep this file clear of the unfinished-work markers it scans for.
+  refs="$ROOT/$platform/skills/no-place""holder-development/references"
+  guard="$refs/research_code_guard_policy.md"
+  grep -Fq '## Delete: Production Hardening' "$guard" || fail "$guard still defers production hardening"
+  grep -Fq 'These are `Required Fixes`, not optional hardening.' "$guard" || fail "$guard treats over-engineering as optional"
+  grep -Fq 'let it crash' "$guard" || fail "$guard does not reject unusable exception handling"
+
+  hollow="$refs/place""holder_hardcoding_policy.md"
+  grep -Fq 'The two faults block acceptance equally' "$hollow" ||
+    fail "$hollow does not block over-engineering symmetrically"
+
+  # A capture hashes its inputs to catch a forgotten reflash; hashing its own
+  # outputs only proves custody to a third party the solo researcher does not have.
+  layout="$ROOT/$platform/skills/hardware-capture-integrity/references/capture_run_layout.md"
+  grep -Fq '### Hash inputs, not outputs' "$layout" || fail "$layout lacks the input-only hashing rule"
+  ! grep -Fq '`artifact_sha256{}`' "$layout" || fail "$layout reintroduced output artifact hashing"
+  grep -Fq '`shape`' "$layout" || fail "$layout dropped the shape check that catches a truncated capture"
+
+  # Over-engineering is a Required Fix everywhere or nowhere; a reviewer that still
+  # files it as Optional Hardening quietly restores the old asymmetry.
+  review="$ROOT/$platform/skills/adversarial-review"
+  grep -Fq "Over-engineering and a place""holder block acceptance equally." "$review/SKILL.md" ||
+    fail "$review/SKILL.md lets over-engineering escape Required Fixes"
+  ! grep -Fq 'not as acceptance blockers' "$review/templates/adversarial_review_packet.md" ||
+    fail "$review/templates/adversarial_review_packet.md still exempts production hardening"
+  ! grep -rlFq 'blinding' "$review" >/dev/null 2>&1 ||
+    fail "$review still requires a blinding declaration"
+
+  poll="$ROOT/$platform/skills/resource-aware-orchestration/SKILL.md"
+  grep -Fq 'a `sleep`/`tail`/status loop is the polling this rule forbids' "$poll" || fail "$poll does not forbid interval polling loops"
+  grep -Fq 're-issue the wait and emit nothing' "$poll" || fail "$poll permits a chatty re-wait"
+
+  # One fixed layout, not a ladder: a level menu made the model pick the largest tree.
+  repo="$ROOT/$platform/skills/research-repo-design/references/research_experiment_repo.md"
+  ! grep -Eq '^### Level [0-9]' "$repo" || fail "$repo reintroduced the level ladder"
+  grep -Fq 'directories always exist; a file appears when it has content' "$repo" || fail "$repo lost the creation rule"
+  grep -Fq 'pip install -e .' "$repo" || fail "$repo does not require the editable install that makes the package importable"
+  grep -Fq 'do not generate a lockfile' "$repo" || fail "$repo permits lockfiles"
+  grep -Fq 'target/firmware/' "$repo" || fail "$repo dropped the hardware domain directory"
+
+  gates="$ROOT/$platform/skills/research-domain-router/references/domain_gates.md"
+  grep -Fq 'It is not a specification for code to write now.' "$gates" || fail "$gates reads as a code specification"
+  grep -Fq 'Never build a module, runner, or scaffold for a `[run]` item ahead of time.' "$gates" || fail "$gates permits scaffolding unrun experiments"
 done
 
 check_exact_line "$ROOT/codex/config.toml.example" 'max_threads = 6'

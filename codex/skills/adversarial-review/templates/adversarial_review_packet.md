@@ -16,7 +16,7 @@ Review only the provided artifact slice.
 [What would count as sufficient evidence]
 
 ## Evidence Contract
-[Origin, purpose, blinding, measurement scope, and exact claim scope]
+[Origin, purpose, exact claim scope, and measurement scope for measured evidence]
 
 ## Review Budget And Delta
 [Round number, prior required fixes, and changed artifact slice]
@@ -35,4 +35,4 @@ Review only the provided artifact slice.
 ## Required Output
 Return Verdict, Scope Reviewed, Evidence, Findings, Missing Evidence, Required Fixes, Research-Sufficient, Optional Hardening, Do Not Change, and Claim-Control Decision.
 
-Use `Required Fixes` only for issues that can invalidate the logic, evidence, reproducibility, artifact provenance, data integrity, user safety, or claim scope. Put production-only improvements under `Optional Hardening`, not as acceptance blockers.
+Use `Required Fixes` for issues that can invalidate the logic, evidence, reproducibility, artifact provenance, data integrity, user safety, or claim scope — and for production hardening already present in the code, which is fixed by deleting it. `Optional Hardening` describes only what a hypothetical future production version would need; it never excuses hardening that is in the code now.

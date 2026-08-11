@@ -17,7 +17,7 @@ For research code, attack logic, evidence, reproducibility, and claim strength. 
 
 Classify review items:
 
-- `Required Fixes`: logic errors, claim/evidence mismatch, missing provenance, missing seed/config/run binding, synthetic/measured confusion, fake-pass paths, missing artifacts hidden as success, data corruption risk, or destructive/user-data risks.
+- `Required Fixes`: logic errors, claim/evidence mismatch, missing provenance, missing seed/config/run binding, synthetic/measured confusion, fake-pass paths, missing artifacts hidden as success, data corruption risk, or destructive/user-data risks. Production hardening **already present in the code** also belongs here, as a deletion: unusable `try`/`except`, internal argument validation, dtype/shape re-checks, resource caps, TOCTOU defenses, complex exception hierarchies, output-artifact hashing, or framework/schema machinery. Over-engineering and a placeholder block acceptance equally.
 - `Research-Sufficient`: code that is readable, traceable, and adequate for the stated research claim even if it is not production hardened.
-- `Optional Hardening`: internal argument validation, dtype/shape over-defensiveness, resource caps, TOCTOU defenses, duplicate revalidation, complex exception hierarchies, or framework/schema machinery that would mainly serve production use.
+- `Optional Hardening`: work that would only matter if this became production code someday. It is a note about a hypothetical future, never a defense of hardening that is in the code now — that gets deleted under `Required Fixes`.
 - `Do Not Change`: changes that would reduce readability, make scripts less explicit, or add generic infrastructure without strengthening the research claim.
