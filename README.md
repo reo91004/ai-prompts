@@ -52,7 +52,7 @@ LazyCodex는 버전과 무관하게 ultra 외 profile에서 비활성화됩니�
 
 LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치·활성화합니다. 기본(`ponytail`)/`ultra` 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. Node가 없는 환경은 `--integrations none` 또는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`(통합 단계 전체 생략)을 사용합니다. Graphify와 Headroom은 별도 tooling 단계이며 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`로 생략할 수 있습니다.
 
-외부 코드는 설치 시점의 가변 `latest`나 기본 브랜치를 바로 실행하지 않습니다. Graphify는 `graphifyy==0.9.32`, Headroom은 `headroom-ai[all]==0.34.0`, LazyCodex는 검증된 `4.17.0` npm 릴리스, Ponytail은 `4.8.4` 릴리스 커밋 `bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324`로 고정합니다. 이미 PATH에 정확한 버전이 있으면 재설치하지 않고, 없거나 버전이 다르면 키트 전용 환경(`~/.universal-research-agent-kit/tooling/`)에 설치하므로 사용자 Python/uv 환경을 덮어쓰지 않습니다.
+외부 코드는 설치 시점의 가변 `latest`나 기본 브랜치를 바로 실행하지 않습니다. Graphify는 `graphifyy==0.9.39`, Headroom은 `headroom-ai[all]==0.34.0`, LazyCodex는 검증된 `4.19.4` npm 릴리스, Ponytail은 `4.9.0` 릴리스 커밋 `0a4dd63ad4541f4f655c4108a295916f3c1d8fda`로 고정합니다. 이미 PATH에 정확한 버전이 있으면 재설치하지 않고, 없거나 버전이 다르면 키트 전용 환경(`~/.universal-research-agent-kit/tooling/`)에 설치하므로 사용자 Python/uv 환경을 덮어쓰지 않습니다.
 
 설치 스크립트는 기존 설정과 agents/skills 디렉터리를 전용 상태 디렉터리에 백업한 뒤, ownership manifest에 기록된 키트 소유 항목만 교체합니다. LazyCodex, Ponytail, 개인 스킬처럼 다른 이름을 사용하는 제3자 항목은 삭제하지 않습니다. 키트 소유 항목과 이름이 같은 파일이나 디렉터리는 백업 후 키트 버전으로 교체합니다. 사용자가 등록한 MCP 서버는 어떤 프로필에서도 수정·삭제하지 않습니다. MCP에 대한 유일한 예외는 추가뿐입니다: Sequential Thinking MCP가 등록돼 있지 않으면 pin된 버전(`@modelcontextprotocol/server-sequential-thinking@2026.7.4`)을 Codex(`sequential_thinking`)와 Claude(`sequential-thinking`, user 스코프)에 추가하고, 어떤 이름·버전으로든 이미 등록돼 있으면 그대로 둡니다. 사용자 소유의 ponytail marketplace가 이미 있으면 키트는 해당 호스트의 Ponytail 관리를 건너뛰고 보존합니다.
 
@@ -163,7 +163,7 @@ universal_research_agent_prompt_kit_final/
 ~/.bashrc
 ```
 
-`install_all.sh`는 Graphify `0.9.32`와 Headroom `0.34.0`을 고정해 설치하고 다음 두 전역 Graphify 등록을 수행합니다.
+`install_all.sh`는 Graphify `0.9.39`와 Headroom `0.34.0`을 고정해 설치하고 다음 두 전역 Graphify 등록을 수행합니다.
 
 ```bash
 graphify install --platform claude
@@ -179,7 +179,7 @@ claude_raw             # Headroom을 거치지 않고 원래 CLI 실행
 codex_raw              # Headroom을 거치지 않고 원래 CLI 실행
 ```
 
-설치기는 `~/.zshrc`와 `~/.bashrc`에 wrapper source를 중복 없이 추가합니다. 설치 후 이미 열려 있는 셸에는 자동으로 적용되지 않으므로 새 터미널을 열거나 해당 rc 파일을 다시 source해야 합니다. Graphify 0.9.32의 Claude 등록 경로가 `~/.claude/CLAUDE.md`로 고정되어 있어, 이 설치기는 `CLAUDE_CONFIG_DIR`이 설정된 환경을 명시적으로 거부합니다. 해제한 뒤 다시 실행해야 합니다.
+설치기는 `~/.zshrc`와 `~/.bashrc`에 wrapper source를 중복 없이 추가합니다. 설치 후 이미 열려 있는 셸에는 자동으로 적용되지 않으므로 새 터미널을 열거나 해당 rc 파일을 다시 source해야 합니다. Graphify 0.9.39의 Claude 등록 경로가 `~/.claude/CLAUDE.md`로 고정되어 있어, 이 설치기는 `CLAUDE_CONFIG_DIR`이 설정된 환경을 명시적으로 거부합니다. 해제한 뒤 다시 실행해야 합니다.
 
 ## 자동 로드와 온디맨드 로드
 

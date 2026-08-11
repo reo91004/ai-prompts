@@ -7,7 +7,7 @@ command -v node >/dev/null 2>&1 || { echo "node is required for the migration te
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/harness-migration.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 
-PONYTAIL_REVISION="bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324"
+PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 MOCK_BIN="$WORK/bin"
 mkdir -p "$MOCK_BIN"
 
@@ -152,7 +152,7 @@ seed_codex_mock_state() {
       installed: [
         {
           pluginId: "ponytail@ponytail",
-          version: "4.8.4",
+          version: "4.9.0",
           installed: true,
           enabled: true,
           source: { source: "local", path: pluginPath },
@@ -162,7 +162,7 @@ seed_codex_mock_state() {
     if (withLazy === "1") {
       plugins.installed.push({
         pluginId: "omo@sisyphuslabs",
-        version: "4.17.0",
+        version: "4.19.4",
         installed: true,
         enabled: true,
         source: { source: "npm" },
@@ -193,7 +193,7 @@ seed_claude_mock_state() {
     const fs = require("fs");
     const [dir, marketPath] = process.argv.slice(1);
     fs.writeFileSync(dir + "/plugins.json", JSON.stringify([
-      { id: "ponytail@ponytail", scope: "user", version: "4.8.4", enabled: true },
+      { id: "ponytail@ponytail", scope: "user", version: "4.9.0", enabled: true },
     ]));
     fs.writeFileSync(dir + "/marketplaces.json", JSON.stringify([{ name: "ponytail", path: marketPath }]));
   ' "$state_dir" "$market_path"

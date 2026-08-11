@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-EXPECTED_GRAPHIFY_VERSION="0.9.32"
+EXPECTED_GRAPHIFY_VERSION="0.9.39"
 EXPECTED_HEADROOM_VERSION="0.34.0"
 TOOLING_STATE_FILE="$HOME/.universal-research-agent-kit/tooling.state"
 read_tooling_state() {
@@ -442,7 +442,7 @@ fi
 # the intended outcome rather than as a missing kit install.
 STATE_FILE="$HOME/.universal-research-agent-kit/integrations.state"
 KIT_MARKETPLACE_ROOT="$HOME/.universal-research-agent-kit/marketplaces"
-KIT_PONYTAIL_PATH="$KIT_MARKETPLACE_ROOT/ponytail-bc9ee949d5f439e8b9f3bb92c6d6d3d1e6ebd324/ponytail"
+KIT_PONYTAIL_PATH="$KIT_MARKETPLACE_ROOT/ponytail-0a4dd63ad4541f4f655c4108a295916f3c1d8fda/ponytail"
 
 read_state() {
   sed -n "s/^$1=//p" "$STATE_FILE" | sed -n '1p'
@@ -455,7 +455,7 @@ codex_ponytail_kit_enabled() {
   codex plugin list --json | EXPECTED_PONYTAIL_PATH="$KIT_PONYTAIL_PATH" node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
     const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
-    const valid = ponytail && ponytail.version === "4.8.4" &&
+    const valid = ponytail && ponytail.version === "4.9.0" &&
       ponytail.installed === true && ponytail.enabled === true &&
       ponytail.source?.source === "local" &&
       ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
@@ -479,7 +479,7 @@ codex_lazycodex_pinned_enabled() {
   codex plugin list --json | node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
     const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
-    process.exit(lazy && lazy.version === "4.17.0" && lazy.installed === true &&
+    process.exit(lazy && lazy.version === "4.19.4" && lazy.installed === true &&
       lazy.enabled === true ? 0 : 1);
   '
 }
@@ -499,7 +499,7 @@ claude_ponytail_kit_enabled() {
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
     const ponytail = plugins.find((item) =>
       item.id === "ponytail@ponytail" && item.scope === "user");
-    process.exit(ponytail && ponytail.version === "4.8.4" &&
+    process.exit(ponytail && ponytail.version === "4.9.0" &&
       ponytail.enabled === true ? 0 : 1);
   '
 }
@@ -511,7 +511,7 @@ claude_ponytail_pinned_installed() {
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
     const ponytail = plugins.find((item) =>
       item.id === "ponytail@ponytail" && item.scope === "user");
-    process.exit(ponytail && ponytail.version === "4.8.4" ? 0 : 1);
+    process.exit(ponytail && ponytail.version === "4.9.0" ? 0 : 1);
   '
 }
 
@@ -590,7 +590,7 @@ else
       ;;
     removed_legacy|not_requested)
       if claude_usable && claude_ponytail_pinned_installed; then
-        echo "Kit-pinned Claude Ponytail 4.8.4 is installed despite state '$claude_ponytail_state'; run 'sh install.sh' to reconcile."
+        echo "Kit-pinned Claude Ponytail 4.9.0 is installed despite state '$claude_ponytail_state'; run 'sh install.sh' to reconcile."
         missing=1
       elif claude_usable && claude_ponytail_installed; then
         echo "OK Claude integration: non-pinned user-owned Ponytail detected and preserved (state '$claude_ponytail_state')."

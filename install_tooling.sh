@@ -4,12 +4,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/lib/install_common.sh"
 
-GRAPHIFY_VERSION="0.9.32"
+GRAPHIFY_VERSION="0.9.39"
 HEADROOM_VERSION="0.34.0"
 GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
 HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
 
-# Graphify 0.9.32 still writes Claude's global registration to ~/.claude even
+# Graphify 0.9.39 still writes Claude's global registration to ~/.claude even
 # when CLAUDE_CONFIG_DIR points elsewhere. Reject that ambiguous layout before
 # creating the shared state or changing any user files.
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
