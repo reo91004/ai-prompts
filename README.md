@@ -42,13 +42,15 @@ profile별 reconciliation 규칙:
 
 | 대상 | `none` | `ponytail` (기본) | `ultra` |
 |---|---|---|---|
-| LazyCodex (버전 무관) | 비활성화(`disabled_legacy`) | 비활성화 | pin 버전 설치·활성 |
+| LazyCodex (버전 무관) | 제거(`removed_legacy`) | 제거 | pin 버전 설치·활성 |
 | `agents.max_threads > 6` | 6으로 캡 | 6으로 캡 | 유지 |
 | kit-owned Ponytail | plugin·marketplace 제거 | 설치·활성 | 설치·활성 |
 | Sequential Thinking MCP | 없으면 추가 | 없으면 추가 | 없으면 추가 |
 | user-owned Ponytail | **불변** (보존 기록) | **불변** | **불변** |
 
-LazyCodex는 버전과 무관하게 ultra 외 profile에서 비활성화됩니다 — 제거가 아니라 config 키(`enabled = false`)라서 언제든 가역적이며, 이 플러그인의 상시-위임·5-lane 리뷰 워크플로가 하네스의 review budget과 충돌하기 때문입니다. Ponytail의 user-owned 판별은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`disabled_legacy` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 비활성화된 LazyCodex는 `~/.codex/config.toml`의 `[plugins."omo@sisyphuslabs"]` 섹션에서 `enabled = true`로 되돌리면 언제든 복귀합니다(Codex CLI에는 plugin enable/disable 서브커맨드가 없어 config 키로 관리됩니다).
+LazyCodex는 버전과 무관하게 ultra 외 profile에서 `codex plugin remove omo@sisyphuslabs`로 제거됩니다. 이전에는 config 키(`enabled = false`)로 비활성화만 했는데, 그러면 플러그인 스킬이 디스크에 남아 에이전트가 `omo` CLI를 찾고 연구 레포에 `.omo/` 디렉터리를 만들었습니다. 상시-위임·5-lane 리뷰 워크플로가 하네스의 review budget과 충돌하는 것도 그대로입니다. 되돌리려면 `--integrations ultra`로 다시 설치합니다. LazyCodex 전용인 `sisyphuslabs` marketplace 등록도 함께 지우지만, 키트 소유가 아니므로 실패해도 설치를 중단하지 않습니다.
+
+Ponytail의 user-owned 판별은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`not_requested` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 제거는 부재로 수렴하므로 두 번째 실행부터 LazyCodex 상태는 `not_requested`가 됩니다.
 
 LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치·활성화합니다. 기본(`ponytail`)/`ultra` 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. Node가 없는 환경은 `--integrations none` 또는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`(통합 단계 전체 생략)을 사용합니다. Graphify와 Headroom은 별도 tooling 단계이며 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`로 생략할 수 있습니다.
 

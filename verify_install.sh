@@ -485,6 +485,13 @@ codex_lazycodex_pinned_enabled() {
   '
 }
 
+codex_lazycodex_installed() {
+  codex plugin list --json | node -e '
+    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
+    process.exit(plugins.some((item) => item.pluginId === "omo@sisyphuslabs") ? 0 : 1);
+  '
+}
+
 # Outside the ultra profile any enabled LazyCodex version conflicts with the
 # harness review budget, so the check is version-agnostic.
 codex_lazycodex_enabled() {
@@ -619,6 +626,14 @@ else
       else
         echo "Missing Codex integration: LazyCodex"
         missing=1
+      fi
+      ;;
+    removed_legacy)
+      if codex_usable && codex_lazycodex_installed; then
+        echo "LazyCodex is still installed but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
+        missing=1
+      else
+        echo "OK Codex integration: LazyCodex removed"
       fi
       ;;
     disabled_legacy|not_requested|user_owned_warned)

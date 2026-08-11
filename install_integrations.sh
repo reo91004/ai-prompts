@@ -141,42 +141,6 @@ codex_plugin_exact_enabled() {
   ' "$selector" "$version" "$require_local" "$expected_path"
 }
 
-# Codex has no plugin enable/disable subcommand: the enabled flag lives in
-# ~/.codex/config.toml [plugins."<id>"] sections and `codex plugin list`
-# reflects it. Subsections like [plugins."<id>".mcp_servers.*] are untouched.
-codex_set_plugin_enabled() {
-  local plugin="$1"
-  local value="$2"
-  local config="$HOME/.codex/config.toml"
-  local tmp
-
-  kit_require_regular_or_absent "$config"
-  if [ ! -f "$config" ]; then
-    printf '' > "$config"
-  fi
-  tmp="$(mktemp "$config.tmp.XXXXXX")"
-  awk -v value="$value" -v header="[plugins.\"$plugin\"]" '
-    $0 == header { in_section = 1; found = 1; print; next }
-    /^\[/ {
-      if (in_section && !wrote) { print "enabled = " value; wrote = 1 }
-      in_section = 0
-      print
-      next
-    }
-    in_section && /^enabled[[:space:]]*=/ { print "enabled = " value; wrote = 1; next }
-    { print }
-    END {
-      if (in_section && !wrote) print "enabled = " value
-      if (!found) {
-        print ""
-        print header
-        print "enabled = " value
-      }
-    }
-  ' "$config" > "$tmp"
-  mv "$tmp" "$config"
-}
-
 # Prints "<version> enabled|disabled" for an installed plugin, or "absent".
 codex_plugin_status() {
   local selector="$1"
@@ -347,11 +311,13 @@ configure_claude_marketplace() {
   fi
 }
 
-# LazyCodex reconciliation is version-agnostic: outside the ultra profile
-# every installed LazyCodex is disabled (never removed) because its
-# always-delegate/5-lane workflow overrides this harness's review budget.
+# LazyCodex reconciliation is version-agnostic: outside the ultra profile every
+# installed LazyCodex is removed, because its always-delegate/5-lane workflow
+# overrides this harness's review budget. Disabling it left the plugin's skills
+# on disk, where agents still reached for the `omo` CLI and wrote `.omo/`
+# directories into research repositories. `--integrations ultra` reinstalls it.
 reconcile_codex_lazycodex() {
-  local status version enablement
+  local status version
 
   status="$(codex_plugin_status "omo@sisyphuslabs")"
   if [ "$status" = "absent" ]; then
@@ -359,16 +325,15 @@ reconcile_codex_lazycodex() {
     return
   fi
   version="${status%% *}"
-  enablement="${status##* }"
-  if [ "$enablement" = "enabled" ]; then
-    echo "Disabling LazyCodex $version (profile: $PROFILE). Re-enable by setting enabled = true under [plugins.\"omo@sisyphuslabs\"] in ~/.codex/config.toml or reinstalling with --integrations ultra"
-    codex_set_plugin_enabled "omo@sisyphuslabs" false
-    [ "$(codex_plugin_status "omo@sisyphuslabs")" = "$version disabled" ] ||
-      kit_die "Failed to disable LazyCodex."
-  else
-    echo "LazyCodex $version is already disabled."
-  fi
-  CODEX_LAZYCODEX_STATE="disabled_legacy"
+  echo "Removing LazyCodex $version (profile: $PROFILE). Reinstall with --integrations ultra."
+  codex plugin remove omo@sisyphuslabs
+  [ "$(codex_plugin_status "omo@sisyphuslabs")" = "absent" ] ||
+    kit_die "Failed to remove LazyCodex."
+  # The sisyphuslabs marketplace exists only to serve LazyCodex, but it is not
+  # kit-owned, so a failure to drop the registration is not an install failure.
+  codex plugin marketplace remove sisyphuslabs 2>/dev/null ||
+    echo "Left the sisyphuslabs marketplace registration in place."
+  CODEX_LAZYCODEX_STATE="removed_legacy"
 }
 
 # LazyCodex installs raise agents.max_threads to 1000; the harness ceiling

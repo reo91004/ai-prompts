@@ -47,13 +47,22 @@ case "$cmd" in
   "plugin marketplace list --json")
     cat "$STATE/marketplaces.json"
     ;;
-  "plugin remove ponytail@ponytail")
+  "plugin remove ponytail@ponytail" | "plugin remove omo@sisyphuslabs")
     node -e '
       const fs = require("fs");
       const path = process.argv[1] + "/plugins.json";
+      const target = process.argv[2];
       const data = JSON.parse(fs.readFileSync(path, "utf8"));
-      data.installed = (data.installed || []).filter((p) => p.pluginId !== "ponytail@ponytail");
+      data.installed = (data.installed || []).filter((p) => p.pluginId !== target);
       fs.writeFileSync(path, JSON.stringify(data));
+    ' "$STATE" "${cmd##* }"
+    ;;
+  "plugin marketplace remove sisyphuslabs")
+    node -e '
+      const fs = require("fs");
+      const path = process.argv[1] + "/marketplaces.json";
+      const data = JSON.parse(fs.readFileSync(path, "utf8"));
+      fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "sisyphuslabs")));
     ' "$STATE"
     ;;
   "plugin marketplace remove ponytail")
@@ -219,9 +228,8 @@ seed_codex_mock_state "$A_CODEX" "$A_HOME" kit
 seed_claude_mock_state "$A_CLAUDE" "$A_HOME" kit
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 
-disabled_line="$(grep -A1 '^\[plugins."omo@sisyphuslabs"\]$' "$A_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$disabled_line" = "enabled = false" ] || {
-  echo "legacy LazyCodex was not disabled in config.toml" >&2; exit 1; }
+grep -Fqx 'codex plugin remove omo@sisyphuslabs' "$A_CODEX/calls.log" || {
+  echo "legacy LazyCodex was not removed" >&2; exit 1; }
 grep -Fqx 'codex plugin remove ponytail@ponytail' "$A_CODEX/calls.log" || {
   echo "kit-owned Codex Ponytail plugin was not removed" >&2; exit 1; }
 grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {
@@ -229,7 +237,7 @@ grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {
 grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.log" || {
   echo "kit-owned Claude Ponytail plugin was not removed" >&2; exit 1; }
 [ "$(state_value "$A_HOME" requested_profile)" = "none" ]
-[ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
+[ "$(state_value "$A_HOME" codex_lazycodex)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" codex_ponytail)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" claude_ponytail)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" codex_sequential_thinking)" = "registered_kit" ]
@@ -237,7 +245,8 @@ grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.l
 
 echo "Scenario A repeat: converged state stays converged and verifies"
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
-[ "$(state_value "$A_HOME" codex_lazycodex)" = "disabled_legacy" ]
+# Removal converges to absence: the second run finds nothing to remove.
+[ "$(state_value "$A_HOME" codex_lazycodex)" = "not_requested" ]
 [ "$(state_value "$A_HOME" codex_sequential_thinking)" = "preexisting" ]
 [ "$(state_value "$A_HOME" claude_sequential_thinking)" = "preexisting" ]
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
@@ -305,7 +314,7 @@ run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" no
 [ "$(state_value "$C_HOME" codex_sequential_thinking)" = "registered_kit" ]
 [ "$(state_value "$C_HOME" claude_sequential_thinking)" = "registered_kit" ]
 
-echo "Scenario D: any-version LazyCodex is disabled and max_threads is capped"
+echo "Scenario D: any-version LazyCodex is removed and max_threads is capped"
 D_HOME="$WORK/home-d"
 D_CODEX="$WORK/mock-d-codex"
 D_CLAUDE="$WORK/mock-d-claude"
@@ -337,11 +346,15 @@ printf '%s\n' '[]' > "$D_CLAUDE/plugins.json"
 printf '%s\n' '[]' > "$D_CLAUDE/marketplaces.json"
 run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 
-[ "$(state_value "$D_HOME" codex_lazycodex)" = "disabled_legacy" ]
+[ "$(state_value "$D_HOME" codex_lazycodex)" = "removed_legacy" ]
 [ "$(state_value "$D_HOME" codex_ponytail)" = "not_requested" ]
-d_disabled_line="$(grep -A1 '^\[plugins."omo@sisyphuslabs"\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$d_disabled_line" = "enabled = false" ] || {
-  echo "non-pinned LazyCodex was not disabled" >&2; exit 1; }
+grep -Fqx 'codex plugin remove omo@sisyphuslabs' "$D_CODEX/calls.log" || {
+  echo "non-pinned LazyCodex was not removed" >&2; exit 1; }
+node -e '
+  const fs = require("fs");
+  const data = JSON.parse(fs.readFileSync(process.argv[1] + "/plugins.json", "utf8"));
+  process.exit((data.installed || []).some((p) => p.pluginId === "omo@sisyphuslabs") ? 1 : 0);
+' "$D_CODEX" || { echo "LazyCodex is still installed after removal" >&2; exit 1; }
 d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
 [ "$d_threads_line" = "max_threads = 6" ] || {
   echo "agents.max_threads was not capped to 6" >&2; exit 1; }
