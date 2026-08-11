@@ -110,18 +110,25 @@ ensure_tool() {
     kit_die "Cannot install $command_name: neither uv nor python3 is available."
   fi
 
-  command_path="$(command -v "$command_name" 2>/dev/null || true)"
-  if [ -z "$command_path" ] || ! tool_version_matches "$command_name" "$expected_version"; then
-    kit_die "$command_name installation completed but did not provide version $expected_version on PATH."
+  # Verify the copy just installed, by path. A PATH lookup can resolve to an
+  # older same-named binary earlier in PATH and reject a good install.
+  hash -r 2>/dev/null || true
+  command_path="$TOOL_BIN_DIR/$command_name"
+  if [ ! -x "$command_path" ]; then
+    kit_die "$command_name installation completed but produced no executable at $command_path."
+  fi
+  if ! tool_version_matches "$command_path" "$expected_version"; then
+    kit_die "$command_path does not report version $expected_version after installation."
   fi
   printf -v "$install_state_var" '%s' 'installed'
 }
 
-case ":$PATH:" in
-  *":$TOOL_BIN_DIR:"*) ;;
-  *) PATH="$TOOL_BIN_DIR:$PATH" ;;
-esac
+# Always put the managed bin first. A previous run leaves this directory in the
+# shell rc, and ~/.profile can prepend ~/.local/bin ahead of it, so testing for
+# mere presence would let a stale copy there shadow the version installed here.
+PATH="$TOOL_BIN_DIR:$PATH"
 export PATH
+hash -r 2>/dev/null || true
 
 GRAPHIFY_STATE=""
 HEADROOM_STATE=""

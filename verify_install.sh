@@ -14,11 +14,6 @@ if [ -f "$TOOLING_STATE_FILE" ] && [ ! -L "$TOOLING_STATE_FILE" ]; then
   tooling_status_for_prompt="$(read_tooling_state status)"
 fi
 
-case ":$PATH:" in
-  *":$HOME/.universal-research-agent-kit/tooling/bin:"*) ;;
-  *) PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH"; export PATH ;;
-esac
-
 if command -v uv >/dev/null 2>&1; then
   uv_tool_bin="$(uv tool dir --bin 2>/dev/null || true)"
   case "$uv_tool_bin" in
@@ -35,6 +30,12 @@ case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *) PATH="$HOME/.local/bin:$PATH"; export PATH ;;
 esac
+# The managed bin goes on last so it wins. The three directories above can each
+# hold an older same-named tool, and verifying one of those would report the
+# wrong version for a correct install.
+PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH"
+export PATH
+hash -r 2>/dev/null || true
 
 bash "$ROOT/scripts/validate_harness.sh"
 

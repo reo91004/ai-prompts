@@ -156,6 +156,27 @@ grep -Fqx 'graphify=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/
 grep -Fqx 'headroom=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/tooling.state"
 [ "$(grep -Fc 'uv tool install' "$CALLS")" -eq 4 ]
 
+# A repeat install on a machine whose rc already exports the managed bin, with a
+# stale same-named binary ahead of it (Ubuntu's ~/.profile prepends ~/.local/bin).
+# The installer must verify the copy it just wrote, not whatever PATH resolves to.
+SHADOW_HOME="$TMP_ROOT/shadow-home"
+SHADOW_LOCAL_BIN="$SHADOW_HOME/.local/bin"
+SHADOW_TOOL_BIN="$SHADOW_HOME/.universal-research-agent-kit/tooling/bin"
+mkdir -p "$SHADOW_LOCAL_BIN" "$SHADOW_TOOL_BIN"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "graphify 0.9.32"' > "$SHADOW_LOCAL_BIN/graphify"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom 0.33.0"' > "$SHADOW_LOCAL_BIN/headroom"
+chmod +x "$SHADOW_LOCAL_BIN/graphify" "$SHADOW_LOCAL_BIN/headroom"
+HOME="$SHADOW_HOME" PATH="$SHADOW_LOCAL_BIN:$MOCK_BIN:$SHADOW_TOOL_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
+  UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
+  bash "$ROOT/install_tooling.sh" >"$TMP_ROOT/shadow-install.out" 2>&1 || {
+    cat "$TMP_ROOT/shadow-install.out" >&2
+    echo "a stale binary earlier in PATH must not fail the install" >&2
+    exit 1
+  }
+grep -Fqx 'graphify=installed' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'graphify_version=0.9.39' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'headroom=installed' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
+
 FULL_HOME="$TMP_ROOT/full-home"
 mkdir -p "$FULL_HOME"
 HOME="$FULL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
