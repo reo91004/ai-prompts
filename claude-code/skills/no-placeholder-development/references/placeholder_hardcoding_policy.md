@@ -1,5 +1,7 @@
 # Placeholder, Fallback, Hardcoding, and Stale Comment Policy
 
+Hollow code is banned because it is the shortest path from an LLM mistake to a wrong number in a paper. A stub that returns a plausible value, a fallback that hides a failed run, or a comment describing behavior the code never implements all produce output that looks like a result and is not one.
+
 ## Forbidden Unless Explicitly Requested as Planning-Only Stub
 
 - TODO
@@ -37,4 +39,6 @@ Old repair-history comments must be deleted or moved to documentation. Source co
 
 Do not mark a task as complete while placeholder logic, silent fallback, unsupported fake paths, stale comments, or TODO/FIXME/HACK markers remain in accepted artifacts.
 
-For research code, combine this policy with `research_code_guard_policy.md`: fail-fast is required when it prevents fake evidence, but production-only defensive programming is not automatically required.
+Do not mark a task as complete while production hardening from `research_code_guard_policy.md`'s Delete list remains either. The two faults block acceptance equally: a placeholder is code that does too little, over-engineering is code that should not exist. Neither is a matter of taste, and neither may be deferred as optional.
+
+For research code, combine this policy with `research_code_guard_policy.md`: fail-fast is required when it prevents fake evidence, and production-only defensive programming is deleted rather than deferred.

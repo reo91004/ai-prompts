@@ -16,7 +16,7 @@ Keep evidence and metric rigor in full, but do not let it grow into production-s
 State, for the claim under review:
 
 - Claim:
-- Evidence contract: origin, purpose, blinding, measurement scope, and claim scope
+- Evidence contract: origin, purpose, claim scope, and measurement scope for measured evidence
 - Evidence available:
 - Evidence missing:
 - Allowed statement:
