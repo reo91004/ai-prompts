@@ -21,7 +21,7 @@ runs/<YYYYMMDD-HHMMSS>-<slug>/
 ├── capture_summary.json       # backend + rig_quality (see below)
 ├── capture_diagnostic.png     # traces visualization (see below)
 ├── blocked.json               # ONLY on failure, instead of a fake-success manifest
-├── config.yaml                # the exact config used (hashed into manifest)
+├── config.yaml                # the exact config used (copied, not hashed)
 ├── queries/queries.json       # prepared inputs, bound by sha256 in provenance
 ├── logs/
 │   ├── capture.log            # scope settings (before→after), per-attempt events
@@ -46,20 +46,37 @@ reads as success.
 Top level:
 
 - `run_id`, `scheme`, `stage`, `backend` (`hardware` | `simulation`)
-- `seed`, `config_path`, `config_sha256`, `git_commit`
+- `seed`, `config_path`, `git_commit`
 - `started_at_unix`, `finished_at_unix`, `status` (`ok` | `blocked`)
 - `host` (`platform`, `python`), `tool_versions`
 - `claim`, `claim_scope`, `claim_allowed[]`, `claim_not_allowed[]`
 - `artifacts[]` — filenames
 - `artifact_roles[]` — one entry per artifact:
-  `{filename, role, sha256, shape, dtype, size_bytes, claim_scope}`
-- `artifact_sha256{}` — filename → sha256 (mirrors `artifact_roles`)
+  `{filename, role, shape, dtype, claim_scope}`
 - `provenance{}` — everything that binds the measurement to what produced it:
   - `firmware`: `hex` / `elf` / `lss` / `build_manifest`, each `{path, sha256}`
   - `host`: `so` / `build_signature`, each `{path, sha256}`
   - `prepared_queries`: `{schema, path, sha256, query_count, helper{params, required_symbols, sha256}}`
   - `target_board`, `command_route`, `tool_versions`
     (`chipwhisperer`, `picosdk`, `numpy`, `python`, …)
+
+### Hash inputs, not outputs
+
+Hash only what went *into* the capture: firmware, host library, and prepared
+queries. Those catch a real and silent mistake — you edit the firmware, forget to
+flash it, capture 2048 traces, and the run reads as v2 while the board ran v1.
+Nothing in the rig tells you; the hash does.
+
+Do not hash what the run just produced. A `sha256` of `traces.npy` computed
+seconds after writing it proves only that nobody tampered with the file
+afterward, which is a custody claim for a third party, not a mistake this
+researcher can make. `git_commit` covers the code, and `config.yaml` is copied
+into the run directory, so neither needs a separate digest.
+
+`shape` and `dtype` stay in `artifact_roles` because they *do* catch mistakes: a
+capture that died at trace 1997 of 2048 shows up immediately. `role` and
+`claim_scope` stay because they stop a diagnostic array from being read as a
+result.
 
 `claim_not_allowed` always includes the overclaims this run must not support
 (`key_recovery`, `full_key_recovery`, `scheme_break`,
@@ -121,15 +138,15 @@ A small IO module keeps every run consistent (see `p2mlab/io.py`,
 library — but whatever you write should provide these functions so the contract
 above is produced the same way every time, rather than re-derived per script:
 
-- `sha256_file(path) -> "sha256:…"`, `sha256_bytes(bytes)`
+- `sha256_file(path) -> "sha256:…"` — for provenance inputs only (firmware, host
+  library, prepared queries)
 - `write_json(path, data)` — `indent=2, sort_keys=True`, trailing newline
 - `save_np(path, arr)`
 - `start_manifest(config, config_path, out_dir, status=…)` — seeds run_id / scheme
-  / stage / backend / seed / config hash / git commit / host / tool_versions and
-  the default `claim_not_allowed`
+  / stage / backend / seed / git commit / host / tool_versions and the default
+  `claim_not_allowed`
 - `finish_manifest(manifest, out_dir, artifacts, status="ok")` — fills
-  `artifact_roles` (sha256 + shape + dtype + size + scope) and `artifact_sha256`,
-  writes `manifest.json`
+  `artifact_roles` (shape + dtype + role + scope) and writes `manifest.json`
 - `write_blocked(out_dir, config, config_path, reason, provenance=…)` — writes
   `blocked.json` on any failure instead of a fake-success manifest
 - `write_capture_diagnostic(path, traces, labels)` — the PNG above

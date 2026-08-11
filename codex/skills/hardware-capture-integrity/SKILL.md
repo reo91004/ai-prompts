@@ -22,7 +22,7 @@ logging, JSON, and diagnostic image come out consistent every time — this is
 reproduction evidence, never trimmed. Required outputs:
 
 - `traces.npy` (float32 `[N, samples]`) plus the per-trace label/decoded arrays the analysis needs;
-- `manifest.json` — provenance (firmware/host/prepared-query hashes, tool versions, target board), `artifact_roles[]` (filename, role, sha256, shape, dtype, size, claim_scope), `artifact_sha256`, and `claim_scope` / `claim_allowed` / `claim_not_allowed`;
+- `manifest.json` — provenance (firmware/host/prepared-query hashes, tool versions, target board), `artifact_roles[]` (filename, role, shape, dtype, claim_scope), and `claim_scope` / `claim_allowed` / `claim_not_allowed`. Hash the capture's inputs, never its outputs: a firmware hash catches a forgotten reflash, while a digest of the traces you just wrote only proves custody to a third party;
 - `capture_summary.json` — `backend` and `rig_quality` (trigger swing min/mean, power std, overflow count, sampling settings, thresholds);
 - `capture_diagnostic.png` — traces visualization (2×2 with labels: per-sample SNR + POI, mean trace by label, POI feature by label, feature-vs-label; 2×1 fallback without labels), titled as a diagnostic;
 - `logs/` — one log per step (`capture.log` records scope settings before→after and per-attempt swing/overflow/ACK/accept-reject);

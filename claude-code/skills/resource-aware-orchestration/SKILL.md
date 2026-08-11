@@ -13,13 +13,15 @@ Delegate by default for: a bounded implementation or refactoring slice with expl
 
 For native Codex delegation, set the exact `agent_type`; a task label does not select a role. In a spawn call that also sets role, model, or reasoning overrides, use `fork_turns = "none"` or a bounded positive turn count because current Multi-Agent V2 full-history mode rejects override-bearing calls. Without overrides, select the context range independently and allow `"all"` when full history is needed. Pass the agent's declared `model` and `reasoning_effort` when the tool exposes those fields. If this runtime hides the selector or model controls, run `scripts/run_codex_agent.sh <role> <task>` from this skill for an isolated Codex child, or report the limitation. Do not describe a generic child as the configured specialist.
 
-For Claude Code, select the exact subagent type through the Agent tool or an explicit `@agent-name` mention. Record `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_EFFORT_LEVEL` when present because they can change the declared assignment.
+For Claude Code, select the exact subagent type through the Agent tool or an explicit `@agent-name` mention. `CLAUDE_CODE_SUBAGENT_MODEL` and `CLAUDE_CODE_EFFORT_LEVEL` override the declared assignment when set, so mention them if they change what actually ran.
 
-In both runtimes, distinguish requested and declared settings from effective runtime identity. Effective role, model, and effort require runtime evidence; otherwise record `unverified`.
+In both runtimes, never state that a child ran as a specific role, model, or effort unless the runtime showed it. Saying "unverified" is correct; asserting the declaration as fact is not.
 
 ## Completion-Driven Long Work
 
 Parent agents must not repeatedly poll long training, synthesis, hardware capture, PIDs, logs, task lists, or mailboxes. Keep routine progress in durable logs and checkpoints; emit a model-visible event only for completion, failure, a permission request, confirmed sustained no-progress, a resource or equipment emergency, or required operator intervention. After an event, the parent verifies exit status and expected artifacts before continuing dependent work.
+
+Run a long command in the foreground and block on it in one tool call — the whole run then costs a single turn. Background it only when there is declared independent work to do meanwhile, and block with one OS-level wait on the process (`wait "$pid"`, or `tail --pid="$pid" -f /dev/null`); a `sleep`/`tail`/status loop is the polling this rule forbids, whatever interval it uses. When a tool wait returns on timeout it carries no information: re-issue the wait and emit nothing. Repeated waits are free only when they are silent, so a per-minute status line is a defect, not progress reporting.
 
 For a fully specified long-running experiment, training, synthesis, or hardware-capture command in Codex, use the pinned `experiment_monitor` through `scripts/run_codex_agent.sh`. This role is `gpt-5.6-luna` at low effort with `danger-full-access`; it may execute the declared command, block, and collect terminal evidence, but it must not design the experiment, construct a missing command, interpret results, accept claims, or choose an undeclared retry. Do not replace it with an unpinned native child merely to obtain device access. Use a domain specialist before launch when those judgment-bearing tasks remain.
 
@@ -50,8 +52,8 @@ For read-only Linux collector diagnosis, pass `--system-root <directory>` to rep
 
 ## Task Packet
 
-Read `references/task_result_contract.md`. Each child receives objective, allowed scope, forbidden scope, write permission, acceptance criteria, resource budget, review budget, stop condition, and output schema. Long-running commands additionally declare their progress probe, checkpoint, resume, cancel, and cleanup contract. Distinct children must own distinct deliverables.
+Read `references/task_result_contract.md`. Each child receives objective, agent role, allowed scope, forbidden scope, write permission, acceptance criteria, and return mode. Long-running commands additionally declare command, expected artifacts, checkpoint, and resume. Distinct children must own distinct deliverables. Keep the packet to those fields; process bookkeeping that catches no mistake does not belong in it.
 
 ## Result Contract
 
-Each child returns status (`PASS`, `FAIL`, `BLOCKED`, or `RESOURCE_*`), evidence, commands and exit codes, artifact paths, deviations, and remaining risks. A resource failure blocks dependent work but does not erase completed evidence.
+Each child returns status (`PASS`, `FAIL`, `BLOCKED`, or `RESOURCE_*`), evidence with inspectable paths, commands and exit codes, artifact paths, and remaining risks. A resource failure blocks dependent work but does not erase completed evidence.
