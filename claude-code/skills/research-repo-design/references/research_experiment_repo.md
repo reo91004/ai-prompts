@@ -79,6 +79,10 @@ python scripts/30_eval.py --run runs/20260616_exp_seed0
 
 Avoid per-hypothesis scripts (`20_train_baseline.py`, `21_train_snr.py`, …) and avoid a mega CLI that hides run order.
 
+Scripts import from the package and never from each other. Loading a sibling script with `importlib.util.spec_from_file_location` and then calling its private functions (`OTHER._attempt`, `OTHER._features`) means that logic was always a module wearing a stage number — move it into the package and import it normally. The same applies to a `sys.path` insert at the top of a script: `make setup` installs the package, so the path hack and the lint suppression above it both disappear.
+
+One phase per script. When a script carries more than two phases, or passes roughly 400 lines, its phases are already separate stages — split them and let `runs/` carry the state between.
+
 ## Package Boundary
 
 `scripts/` answers what to run and in what order. The package answers how the logic works.

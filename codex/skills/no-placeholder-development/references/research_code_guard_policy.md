@@ -23,6 +23,8 @@ Do not write these, and delete them when found, unless the user asks for product
 - `try`/`except` around code whose traceback is already the clearest failure report — let it crash;
 - exhaustive internal argument validation in private research helpers;
 - repeated dtype, shape, range, or schema checks after the data boundary is already controlled;
+- re-reading output this pipeline just wrote and re-checking every field of it; between your own stages, verify only the identity and binding that a wrong path or a stale file would break;
+- a second copy of a check that another function in the same pipeline already performs;
 - DoS or resource caps for single-user offline scripts;
 - TOCTOU defenses for non-destructive local experiment reads;
 - complex exception hierarchies where a plain error is clearer;

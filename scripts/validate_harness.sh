@@ -197,6 +197,14 @@ for platform in codex claude-code; do
   grep -Fq 'These are `Required Fixes`, not optional hardening.' "$guard" || fail "$guard treats over-engineering as optional"
   grep -Fq 'let it crash' "$guard" || fail "$guard does not reject unusable exception handling"
 
+  # Named growth patterns bite where an abstract "keep it simple" does not.
+  skill="$refs/../SKILL.md"
+  grep -Fq '## Code That Grows' "$skill" || fail "$skill lost the growth-pattern list"
+  grep -Fq 'Re-validating your own output' "$skill" || fail "$skill permits re-checking the pipeline's own output"
+  grep -Fq 'The same check in two places' "$skill" || fail "$skill permits duplicated validation"
+  grep -Fq 'name the check it replaces and delete that one' "$skill" || fail "$skill lets guards accumulate"
+  grep -Fq 'not in the number of `raise` statements' "$skill" || fail "$skill still equates rigor with guard count"
+
   hollow="$refs/place""holder_hardcoding_policy.md"
   grep -Fq 'The two faults block acceptance equally' "$hollow" ||
     fail "$hollow does not block over-engineering symmetrically"
@@ -229,6 +237,8 @@ for platform in codex claude-code; do
   grep -Fq 'pip install -e .' "$repo" || fail "$repo does not require the editable install that makes the package importable"
   grep -Fq 'do not generate a lockfile' "$repo" || fail "$repo permits lockfiles"
   grep -Fq 'target/firmware/' "$repo" || fail "$repo dropped the hardware domain directory"
+  grep -Fq 'Scripts import from the package and never from each other.' "$repo" || fail "$repo permits scripts to import siblings by path"
+  grep -Fq 'One phase per script.' "$repo" || fail "$repo lost the per-script phase limit"
 
   gates="$ROOT/$platform/skills/research-domain-router/references/domain_gates.md"
   grep -Fq 'It is not a specification for code to write now.' "$gates" || fail "$gates reads as a code specification"
