@@ -333,7 +333,7 @@ printf '%s\n' \
   'config_file = "/home/u/.codex/agents/metis.toml"' \
   '' \
   '[agents.my-own-agent]' \
-  'config_file = "/home/u/.codex/agents/my-own-agent.toml"' \
+  "config_file = \"$D_HOME/.codex/agents/my-own-agent.toml\"" \
   '' \
   '[plugins."omo@sisyphuslabs"]' \
   'enabled = true' > "$D_HOME/.codex/config.toml"
@@ -408,6 +408,36 @@ node -e '
 d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
 [ "$d_threads_line" = "max_threads = 6" ] || {
   echo "agents.max_threads was not capped to 6" >&2; exit 1; }
+
+echo "Scenario D2: a host that already deleted the files still loses the stale registrations"
+D2_HOME="$WORK/home-d2"
+D2_CODEX="$WORK/mock-d2-codex"
+D2_CLAUDE="$WORK/mock-d2-claude"
+mkdir -p "$D2_HOME/.codex/agents" "$D2_HOME/.claude/plugins"
+seed_codex_mock_state "$D2_CODEX" "$D2_HOME" empty
+seed_claude_mock_state "$D2_CLAUDE" "$D2_HOME" empty
+# No lazycodex-*.toml on disk and no omo manifest: only the registrations remain.
+printf 'name = "my-own-agent"\n' > "$D2_HOME/.codex/agents/my-own-agent.toml"
+printf '%s\n' \
+  '[agents]' \
+  'max_threads = 6' \
+  '' \
+  '[agents.lazycodex-worker-high]' \
+  "config_file = \"$D2_HOME/.codex/agents/lazycodex-worker-high.toml\"" \
+  '' \
+  '[agents.momus]' \
+  "config_file = \"$D2_HOME/.codex/agents/momus.toml\"" \
+  '' \
+  '[agents.my-own-agent]' \
+  "config_file = \"$D2_HOME/.codex/agents/my-own-agent.toml\"" > "$D2_HOME/.codex/config.toml"
+run_kit "$D2_HOME" "$D2_CODEX" "$D2_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+for stale in '[agents.lazycodex-worker-high]' '[agents.momus]'; do
+  grep -Fqx "$stale" "$D2_HOME/.codex/config.toml" && {
+    echo "a registration pointing at a missing file survived: $stale" >&2; exit 1; }
+done
+grep -Fqx '[agents.my-own-agent]' "$D2_HOME/.codex/config.toml" || {
+  echo "a registration pointing at an existing file was deleted" >&2; exit 1; }
 
 echo "Scenario E: duplicate Headroom MCP sections are repaired before Codex CLI use"
 E_HOME="$WORK/home-e"

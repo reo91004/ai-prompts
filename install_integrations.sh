@@ -326,7 +326,40 @@ LAZYCODEX_AGENT_MANIFEST="$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/a
 
 # Deleting the TOML alone leaves [agents.<name>] pointing at a missing file, and
 # Codex prints "Ignoring malformed agent role definition" for it on every start.
-# Drop the registration for exactly the names whose files were removed.
+#
+# Keying this on "files removed during this run" would never fire on a host that
+# already deleted them, which is exactly where the warnings persist. Key it on
+# the broken state instead: a registration whose config_file does not exist is
+# dead config that Codex already refuses to load, so it is safe to drop whoever
+# wrote it. Prints the names so a surprising removal is visible.
+broken_codex_agent_registrations() {
+  local config="$HOME/.codex/config.toml"
+
+  [ -f "$config" ] || return 0
+  awk -v home="$HOME" '
+    /^\[agents\./ {
+      name = $0
+      sub(/^\[agents\./, "", name)
+      sub(/\]$/, "", name)
+      gsub(/"/, "", name)
+      if (index(name, ".") > 0) { current = ""; next }
+      current = name
+      next
+    }
+    /^\[/ { current = ""; next }
+    current != "" && /^[ \t]*config_file[ \t]*=/ {
+      path = $0
+      sub(/^[ \t]*config_file[ \t]*=[ \t]*/, "", path)
+      gsub(/^"|"$/, "", path)
+      if (substr(path, 1, 2) == "~/") path = home substr(path, 2)
+      print current "\t" path
+    }
+  ' "$config" | while IFS="$(printf '\t')" read -r name path; do
+    [ -n "$name" ] || continue
+    [ -e "$path" ] || printf '%s\n' "$name"
+  done
+}
+
 drop_codex_agent_registrations() {
   local names="$1"
   local config="$HOME/.codex/config.toml"
@@ -372,9 +405,16 @@ remove_lazycodex_planted_agents() {
   local agents_dir="$HOME/.codex/agents"
   local removed=0
   local removed_names=""
+  local broken
   local name entry
 
-  [ -d "$agents_dir" ] || return 0
+  if [ ! -d "$agents_dir" ]; then
+    broken="$(broken_codex_agent_registrations | tr '\n' ' ')"
+    drop_codex_agent_registrations "$broken"
+    [ -z "${broken// /}" ] ||
+      echo "Dropped Codex agent registration(s) pointing at missing files:${broken% }"
+    return 0
+  fi
 
   if [ -f "$LAZYCODEX_AGENT_MANIFEST" ] && command -v node >/dev/null 2>&1; then
     while IFS= read -r entry; do
@@ -406,9 +446,12 @@ EOF
     removed=$((removed + 1))
   done
 
-  drop_codex_agent_registrations "$removed_names"
+  broken="$(broken_codex_agent_registrations | tr '\n' ' ')"
+  drop_codex_agent_registrations "$removed_names $broken"
   [ "$removed" -eq 0 ] ||
-    echo "Removed $removed LazyCodex-planted agent file(s) and their config registrations (backed up)."
+    echo "Removed $removed LazyCodex-planted agent file(s) from ~/.codex/agents (backed up)."
+  [ -z "${broken// /}" ] ||
+    echo "Dropped Codex agent registration(s) pointing at missing files:${broken% }"
 }
 
 reconcile_codex_lazycodex() {
