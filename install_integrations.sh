@@ -316,11 +316,59 @@ configure_claude_marketplace() {
 # overrides this harness's review budget. Disabling it left the plugin's skills
 # on disk, where agents still reached for the `omo` CLI and wrote `.omo/`
 # directories into research repositories. `--integrations ultra` reinstalls it.
+
+# LazyCodex also copies loose agent TOMLs straight into ~/.codex/agents, which
+# Codex reads regardless of plugin registration. Removing only the plugin leaves
+# lazycodex-worker-high and friends dispatchable, which is how agents kept
+# reaching for the `omo` CLI. LazyCodex records what it planted, so remove
+# exactly that list plus any lazycodex-*.toml an older version left behind.
+LAZYCODEX_AGENT_MANIFEST="$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage/.installed-agents.json"
+
+remove_lazycodex_planted_agents() {
+  local agents_dir="$HOME/.codex/agents"
+  local removed=0
+  local name entry
+
+  [ -d "$agents_dir" ] || return 0
+
+  if [ -f "$LAZYCODEX_AGENT_MANIFEST" ] && command -v node >/dev/null 2>&1; then
+    while IFS= read -r entry; do
+      [ -n "$entry" ] || continue
+      name="${entry##*/}"
+      case "$name" in
+        */*|..|.|"") continue ;;
+      esac
+      [ -f "$agents_dir/$name" ] || continue
+      kit_backup_path "$agents_dir/$name" "integrations/lazycodex-agents/$name"
+      kit_remove_owned_entry "$agents_dir" "$name"
+      removed=$((removed + 1))
+    done <<EOF
+$(node -e '
+  const fs = require("fs");
+  const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  for (const p of data.agents || []) console.log(p);
+' "$LAZYCODEX_AGENT_MANIFEST" 2>/dev/null || true)
+EOF
+  fi
+
+  for entry in "$agents_dir"/lazycodex-*.toml; do
+    [ -f "$entry" ] || continue
+    name="${entry##*/}"
+    kit_backup_path "$entry" "integrations/lazycodex-agents/$name"
+    kit_remove_owned_entry "$agents_dir" "$name"
+    removed=$((removed + 1))
+  done
+
+  [ "$removed" -eq 0 ] ||
+    echo "Removed $removed LazyCodex-planted agent file(s) from ~/.codex/agents (backed up)."
+}
+
 reconcile_codex_lazycodex() {
   local status version
 
   status="$(codex_plugin_status "omo@sisyphuslabs")"
   if [ "$status" = "absent" ]; then
+    remove_lazycodex_planted_agents
     CODEX_LAZYCODEX_STATE="not_requested"
     return
   fi
@@ -333,6 +381,7 @@ reconcile_codex_lazycodex() {
   # kit-owned, so a failure to drop the registration is not an install failure.
   codex plugin marketplace remove sisyphuslabs 2>/dev/null ||
     echo "Left the sisyphuslabs marketplace registration in place."
+  remove_lazycodex_planted_agents
   CODEX_LAZYCODEX_STATE="removed_legacy"
 }
 

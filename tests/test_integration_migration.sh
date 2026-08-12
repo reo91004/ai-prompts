@@ -344,7 +344,33 @@ node -e '
 ' "$D_CODEX"
 printf '%s\n' '[]' > "$D_CLAUDE/plugins.json"
 printf '%s\n' '[]' > "$D_CLAUDE/marketplaces.json"
+# LazyCodex copies loose agent TOMLs into ~/.codex/agents and records them in
+# its own manifest. Codex reads that directory whether or not the plugin is
+# registered, so removing the plugin alone leaves the roles dispatchable.
+D_AGENTS="$D_HOME/.codex/agents"
+D_OMO_DATA="$D_HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage"
+mkdir -p "$D_AGENTS" "$D_OMO_DATA"
+for planted in lazycodex-worker-high lazycodex-code-reviewer explorer metis; do
+  printf 'name = "%s"\n' "$planted" > "$D_AGENTS/$planted.toml"
+done
+printf 'name = "lazycodex-executor"\n' > "$D_AGENTS/lazycodex-executor.toml"
+printf 'name = "my-own-agent"\n' > "$D_AGENTS/my-own-agent.toml"
+node -e '
+  const fs = require("fs");
+  const [file, dir] = process.argv.slice(1);
+  fs.writeFileSync(file, JSON.stringify({
+    agents: ["lazycodex-worker-high", "lazycodex-code-reviewer", "explorer", "metis"]
+      .map((n) => dir + "/" + n + ".toml"),
+  }));
+' "$D_OMO_DATA/.installed-agents.json" "$D_AGENTS"
 run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+for gone in lazycodex-worker-high lazycodex-code-reviewer lazycodex-executor explorer metis; do
+  [ ! -e "$D_AGENTS/$gone.toml" ] || {
+    echo "LazyCodex-planted agent survived removal: $gone" >&2; exit 1; }
+done
+[ -f "$D_AGENTS/my-own-agent.toml" ] || {
+  echo "a user-owned Codex agent was deleted" >&2; exit 1; }
 
 [ "$(state_value "$D_HOME" codex_lazycodex)" = "removed_legacy" ]
 [ "$(state_value "$D_HOME" codex_ponytail)" = "not_requested" ]
