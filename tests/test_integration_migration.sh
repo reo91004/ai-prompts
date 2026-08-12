@@ -323,6 +323,18 @@ printf '%s\n' \
   '[agents]' \
   'max_threads = 1000' \
   '' \
+  '[agents.lazycodex-worker-high]' \
+  'config_file = "/home/u/.codex/agents/lazycodex-worker-high.toml"' \
+  '' \
+  '[agents.lazycodex-worker-high.env]' \
+  'FOO = "bar"' \
+  '' \
+  '[agents.metis]' \
+  'config_file = "/home/u/.codex/agents/metis.toml"' \
+  '' \
+  '[agents.my-own-agent]' \
+  'config_file = "/home/u/.codex/agents/my-own-agent.toml"' \
+  '' \
   '[plugins."omo@sisyphuslabs"]' \
   'enabled = true' > "$D_HOME/.codex/config.toml"
 mkdir -p "$D_CODEX" "$D_CLAUDE"
@@ -371,6 +383,18 @@ for gone in lazycodex-worker-high lazycodex-code-reviewer lazycodex-executor exp
 done
 [ -f "$D_AGENTS/my-own-agent.toml" ] || {
   echo "a user-owned Codex agent was deleted" >&2; exit 1; }
+# A registration pointing at a deleted file makes Codex warn on every start.
+for stale in '[agents.lazycodex-worker-high]' '[agents.lazycodex-worker-high.env]' '[agents.metis]'; do
+  grep -Fqx "$stale" "$D_HOME/.codex/config.toml" && {
+    echo "stale Codex agent registration survived: $stale" >&2; exit 1; }
+done
+grep -Fqx '[agents.my-own-agent]' "$D_HOME/.codex/config.toml" || {
+  echo "a user-owned Codex agent registration was deleted" >&2; exit 1; }
+grep -Fqx 'FOO = "bar"' "$D_HOME/.codex/config.toml" && {
+  echo "a dropped agent subsection left its body behind" >&2; exit 1; }
+d_threads_check="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
+[ "$d_threads_check" = "max_threads = 6" ] || {
+  echo "the [agents] table was damaged by the registration cleanup" >&2; exit 1; }
 
 [ "$(state_value "$D_HOME" codex_lazycodex)" = "removed_legacy" ]
 [ "$(state_value "$D_HOME" codex_ponytail)" = "not_requested" ]

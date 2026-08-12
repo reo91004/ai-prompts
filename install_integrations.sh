@@ -324,9 +324,54 @@ configure_claude_marketplace() {
 # exactly that list plus any lazycodex-*.toml an older version left behind.
 LAZYCODEX_AGENT_MANIFEST="$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage/.installed-agents.json"
 
+# Deleting the TOML alone leaves [agents.<name>] pointing at a missing file, and
+# Codex prints "Ignoring malformed agent role definition" for it on every start.
+# Drop the registration for exactly the names whose files were removed.
+drop_codex_agent_registrations() {
+  local names="$1"
+  local config="$HOME/.codex/config.toml"
+  local tmp
+
+  [ -n "$names" ] || return 0
+  [ -f "$config" ] || return 0
+  kit_require_regular_or_absent "$config"
+  kit_backup_path "$config" "integrations/codex-config-agents.toml"
+
+  tmp="$(mktemp "$config.tmp.XXXXXX")"
+  awk -v names="$names" '
+    BEGIN {
+      count = split(names, list, " ")
+      for (i = 1; i <= count; i++) {
+        drop["[agents." list[i] "]"] = 1
+        drop["[agents.\"" list[i] "\"]"] = 1
+        prefix[i] = "[agents." list[i] "."
+        quoted[i] = "[agents.\"" list[i] "\"."
+      }
+      total = count
+    }
+    /^\[/ {
+      skip = ($0 in drop)
+      if (!skip) {
+        for (i = 1; i <= total; i++) {
+          if (index($0, prefix[i]) == 1 || index($0, quoted[i]) == 1) { skip = 1; break }
+        }
+      }
+      if (skip) next
+    }
+    !skip { print }
+  ' "$config" > "$tmp"
+  mv "$tmp" "$config"
+
+  if command -v codex >/dev/null 2>&1; then
+    (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
+      kit_die "Removing LazyCodex agent registrations produced an invalid Codex config: $config"
+  fi
+}
+
 remove_lazycodex_planted_agents() {
   local agents_dir="$HOME/.codex/agents"
   local removed=0
+  local removed_names=""
   local name entry
 
   [ -d "$agents_dir" ] || return 0
@@ -341,6 +386,7 @@ remove_lazycodex_planted_agents() {
       [ -f "$agents_dir/$name" ] || continue
       kit_backup_path "$agents_dir/$name" "integrations/lazycodex-agents/$name"
       kit_remove_owned_entry "$agents_dir" "$name"
+      removed_names="$removed_names ${name%.toml}"
       removed=$((removed + 1))
     done <<EOF
 $(node -e '
@@ -356,11 +402,13 @@ EOF
     name="${entry##*/}"
     kit_backup_path "$entry" "integrations/lazycodex-agents/$name"
     kit_remove_owned_entry "$agents_dir" "$name"
+    removed_names="$removed_names ${name%.toml}"
     removed=$((removed + 1))
   done
 
+  drop_codex_agent_registrations "$removed_names"
   [ "$removed" -eq 0 ] ||
-    echo "Removed $removed LazyCodex-planted agent file(s) from ~/.codex/agents (backed up)."
+    echo "Removed $removed LazyCodex-planted agent file(s) and their config registrations (backed up)."
 }
 
 reconcile_codex_lazycodex() {
