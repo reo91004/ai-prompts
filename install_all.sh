@@ -4,10 +4,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$ROOT/lib/install_common.sh"
 
 usage() {
-  echo "usage: install_all.sh [--integrations none|ponytail|ultra]"
+  echo "usage: install_all.sh [--integrations none|ponytail]"
   echo "  ponytail  core plus pinned Ponytail and Sequential Thinking MCP (default)"
   echo "  none      core plus Graphify/Headroom; reconciles away kit and legacy integrations"
-  echo "  ultra     ponytail plus the pinned LazyCodex workflow"
 }
 
 INTEGRATIONS_PROFILE=ponytail
@@ -16,7 +15,7 @@ while [ "$#" -gt 0 ]; do
     --integrations)
       [ "$#" -ge 2 ] || { usage >&2; exit 2; }
       case "$2" in
-        none|ponytail|ultra) INTEGRATIONS_PROFILE="$2" ;;
+        none|ponytail) INTEGRATIONS_PROFILE="$2" ;;
         *) usage >&2; exit 2 ;;
       esac
       shift 2

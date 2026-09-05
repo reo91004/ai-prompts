@@ -6,9 +6,9 @@ source "$ROOT/lib/install_common.sh"
 
 PROFILE="${1:-}"
 case "$PROFILE" in
-  none|ponytail|ultra) ;;
+  none|ponytail) ;;
   *)
-    echo "usage: install_integrations.sh none|ponytail|ultra" >&2
+    echo "usage: install_integrations.sh none|ponytail" >&2
     echo "The selected profile is the target state: 'none' also reconciles away kit-installed legacy plugins." >&2
     exit 2
     ;;
@@ -17,14 +17,17 @@ esac
 kit_init_state
 kit_enable_rollback
 
-LAZYCODEX_VERSION="4.19.4"
-PONYTAIL_VERSION="4.9.0"
-PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
-SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@2026.7.4"
+SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@latest"
+PONYTAIL_REMOTE="https://github.com/DietrichGebert/ponytail.git"
 PONYTAIL_SOURCE_ROOT="$KIT_STATE_ROOT/sources"
-PONYTAIL_SOURCE="$PONYTAIL_SOURCE_ROOT/ponytail-$PONYTAIL_REVISION"
 PONYTAIL_MARKETPLACE_ROOT="$KIT_STATE_ROOT/marketplaces"
-PONYTAIL_MARKETPLACE="$PONYTAIL_MARKETPLACE_ROOT/ponytail-$PONYTAIL_REVISION"
+# Resolved from the remote's current HEAD by prepare_ponytail_source, so an
+# install always lands on the latest Ponytail. Every path and version check
+# below is keyed on the resolved revision, never on a constant in this file.
+PONYTAIL_REVISION=""
+PONYTAIL_VERSION=""
+PONYTAIL_SOURCE=""
+PONYTAIL_MARKETPLACE=""
 
 CODEX_PONYTAIL_STATE="host_unavailable"
 CLAUDE_PONYTAIL_STATE="host_unavailable"
@@ -74,15 +77,27 @@ repair_duplicate_headroom_mcp() {
   echo "Removed $headroom_sections stale or duplicate Headroom MCP section(s) from ~/.codex/config.toml; Headroom wrap will register one canonical entry."
 }
 
-# Sequential Thinking MCP is add-only: a registration under any existing
-# name or version is never inspected further, replaced, or removed.
+# Sequential Thinking MCP is add-or-repin: a registration under the kit's own
+# name is replaced when it does not carry the kit's @latest package spec, so
+# install alone converges a registration frozen at an older version. A
+# registration under any other name is never inspected, replaced, or removed.
 ensure_codex_sequential_thinking() {
-  if (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1); then
-    echo "Codex sequential_thinking MCP is already registered; leaving it unchanged."
-    CODEX_SEQTHINK_STATE="preexisting"
+  local current
+  if current="$(cd "$HOME" && codex mcp get sequential_thinking 2>/dev/null)"; then
+    if printf '%s\n' "$current" | grep -Fq "$SEQUENTIAL_THINKING_PACKAGE"; then
+      echo "Codex sequential_thinking MCP already tracks the latest package; leaving it unchanged."
+      CODEX_SEQTHINK_STATE="preexisting"
+      return
+    fi
+    echo "Re-registering the Codex sequential_thinking MCP against the latest package."
+    (cd "$HOME" && codex mcp remove sequential_thinking)
+    (cd "$HOME" && codex mcp add sequential_thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE")
+    (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1) ||
+      kit_die "Failed to re-register the Codex sequential_thinking MCP."
+    CODEX_SEQTHINK_STATE="repinned_kit"
     return
   fi
-  echo "Registering the pinned Sequential Thinking MCP for Codex."
+  echo "Registering the Sequential Thinking MCP (latest) for Codex."
   (cd "$HOME" && codex mcp add sequential_thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE")
   (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1) ||
     kit_die "Failed to register the Codex sequential_thinking MCP."
@@ -90,12 +105,22 @@ ensure_codex_sequential_thinking() {
 }
 
 ensure_claude_sequential_thinking() {
-  if claude mcp get sequential-thinking >/dev/null 2>&1; then
-    echo "Claude sequential-thinking MCP is already registered; leaving it unchanged."
-    CLAUDE_SEQTHINK_STATE="preexisting"
+  local current
+  if current="$(claude mcp get sequential-thinking 2>/dev/null)"; then
+    if printf '%s\n' "$current" | grep -Fq "$SEQUENTIAL_THINKING_PACKAGE"; then
+      echo "Claude sequential-thinking MCP already tracks the latest package; leaving it unchanged."
+      CLAUDE_SEQTHINK_STATE="preexisting"
+      return
+    fi
+    echo "Re-registering the Claude sequential-thinking MCP against the latest package."
+    claude mcp remove sequential-thinking -s user
+    claude mcp add -s user sequential-thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE"
+    claude mcp get sequential-thinking >/dev/null 2>&1 ||
+      kit_die "Failed to re-register the Claude sequential-thinking MCP."
+    CLAUDE_SEQTHINK_STATE="repinned_kit"
     return
   fi
-  echo "Registering the pinned Sequential Thinking MCP for Claude Code."
+  echo "Registering the Sequential Thinking MCP (latest) for Claude Code."
   claude mcp add -s user sequential-thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE"
   claude mcp get sequential-thinking >/dev/null 2>&1 ||
     kit_die "Failed to register the Claude sequential-thinking MCP."
@@ -201,10 +226,18 @@ prepare_ponytail_source() {
   local revision
 
   command -v git >/dev/null 2>&1 || {
-    echo "Error: git is required to install the pinned Ponytail release." >&2
+    echo "Error: git is required to install the latest Ponytail release." >&2
     exit 1
   }
   kit_require_real_dir "$PONYTAIL_SOURCE_ROOT"
+
+  PONYTAIL_REVISION="$(git ls-remote "$PONYTAIL_REMOTE" HEAD | awk 'NR == 1 { print $1 }')"
+  case "$PONYTAIL_REVISION" in
+    [0-9a-f][0-9a-f]*) ;;
+    *) kit_die "Failed to resolve the latest Ponytail revision from $PONYTAIL_REMOTE" ;;
+  esac
+  PONYTAIL_SOURCE="$PONYTAIL_SOURCE_ROOT/ponytail-$PONYTAIL_REVISION"
+  PONYTAIL_MARKETPLACE="$PONYTAIL_MARKETPLACE_ROOT/ponytail-$PONYTAIL_REVISION"
 
   if [ -e "$PONYTAIL_SOURCE" ]; then
     kit_require_real_dir "$PONYTAIL_SOURCE"
@@ -212,11 +245,11 @@ prepare_ponytail_source() {
   else
     temp="$(mktemp -d "$PONYTAIL_SOURCE_ROOT/.ponytail.tmp.XXXXXX")"
     if ! git -C "$temp" init -q ||
-       ! git -C "$temp" remote add origin https://github.com/DietrichGebert/ponytail.git ||
+       ! git -C "$temp" remote add origin "$PONYTAIL_REMOTE" ||
        ! git -C "$temp" fetch -q --depth=1 origin "$PONYTAIL_REVISION" ||
        ! git -C "$temp" checkout -q --detach FETCH_HEAD; then
       rm -rf -- "$temp"
-      echo "Error: failed to fetch the pinned Ponytail release." >&2
+      echo "Error: failed to fetch the latest Ponytail release." >&2
       exit 1
     fi
     mv "$temp" "$PONYTAIL_SOURCE"
@@ -224,9 +257,19 @@ prepare_ponytail_source() {
 
   revision="$(git -C "$PONYTAIL_SOURCE" rev-parse HEAD)"
   [ "$revision" = "$PONYTAIL_REVISION" ] ||
-    kit_die "Pinned Ponytail checkout has unexpected revision: $revision"
+    kit_die "Ponytail checkout has unexpected revision: $revision"
   [ -z "$(git -C "$PONYTAIL_SOURCE" status --porcelain --untracked-files=all)" ] ||
-    kit_die "Pinned Ponytail checkout contains local modifications."
+    kit_die "Ponytail checkout contains local modifications."
+
+  # The version to verify after install comes from the checkout, so tracking
+  # HEAD cannot leave a stale expected version behind in this script.
+  PONYTAIL_VERSION="$(node -e '
+    const fs = require("fs");
+    const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(manifest.version || "");
+  ' "$PONYTAIL_SOURCE/.claude-plugin/plugin.json")"
+  [ -n "$PONYTAIL_VERSION" ] ||
+    kit_die "Ponytail checkout $PONYTAIL_REVISION declares no plugin version."
 }
 
 prepare_ponytail_marketplace() {
@@ -277,6 +320,29 @@ JSON
   mv "$temp" "$PONYTAIL_MARKETPLACE"
 }
 
+# Tracking HEAD leaves one directory per installed revision. They are dead once
+# both hosts are present, because whatever either host still uses was pointed at
+# the current revision above. A missing host may still hold a plugin pointing
+# into an older directory, so nothing is pruned unless both hosts were seen.
+prune_old_ponytail_revisions() {
+  local root entry name
+
+  [ -n "$PONYTAIL_REVISION" ] || return 0
+  if [ "$codex_available" -ne 1 ] || [ "$claude_available" -ne 1 ]; then
+    return 0
+  fi
+  for root in "$PONYTAIL_SOURCE_ROOT" "$PONYTAIL_MARKETPLACE_ROOT"; do
+    for entry in "$root"/ponytail-*; do
+      [ -d "$entry" ] || continue
+      name="${entry##*/}"
+      if [ "$name" != "ponytail-$PONYTAIL_REVISION" ]; then
+        kit_remove_owned_entry "$root" "$name"
+        echo "Removed superseded Ponytail revision directory: $entry"
+      fi
+    done
+  done
+}
+
 # Returns 0 when the kit marketplace is registered and usable, 1 when a
 # user-owned ponytail marketplace must be preserved (skip kit management).
 configure_codex_marketplace() {
@@ -311,11 +377,12 @@ configure_claude_marketplace() {
   fi
 }
 
-# LazyCodex reconciliation is version-agnostic: outside the ultra profile every
-# installed LazyCodex is removed, because its always-delegate/5-lane workflow
-# overrides this harness's review budget. Disabling it left the plugin's skills
-# on disk, where agents still reached for the `omo` CLI and wrote `.omo/`
-# directories into research repositories. `--integrations ultra` reinstalls it.
+# LazyCodex reconciliation is version-agnostic and unconditional: the kit never
+# installs LazyCodex and removes every installed copy, because its
+# always-delegate/5-lane workflow overrides this harness's review budget.
+# Disabling it left the plugin's skills on disk, where agents still reached for
+# the `omo` CLI and wrote `.omo/` directories into research repositories. The
+# removal path stays because hosts that installed it earlier still carry it.
 
 # LazyCodex also copies loose agent TOMLs straight into ~/.codex/agents, which
 # Codex reads regardless of plugin registration. Removing only the plugin leaves
@@ -464,7 +531,7 @@ reconcile_codex_lazycodex() {
     return
   fi
   version="${status%% *}"
-  echo "Removing LazyCodex $version (profile: $PROFILE). Reinstall with --integrations ultra."
+  echo "Removing LazyCodex $version; this kit does not install it in any profile."
   codex plugin remove omo@sisyphuslabs
   [ "$(codex_plugin_status "omo@sisyphuslabs")" = "absent" ] ||
     kit_die "Failed to remove LazyCodex."
@@ -604,20 +671,8 @@ if [ "$PROFILE" != "none" ] && { [ "$codex_available" -eq 1 ] || [ "$claude_avai
 fi
 
 if [ "$codex_available" -eq 1 ]; then
-  if [ "$PROFILE" = "ultra" ]; then
-    if ! codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION"; then
-      command -v npx >/dev/null 2>&1 || kit_die "npx is required to install LazyCodex."
-      npx --yes "lazycodex-ai@$LAZYCODEX_VERSION" install --no-tui --no-codex-autonomous
-    else
-      echo "LazyCodex is already installed; keeping the existing installation."
-    fi
-    codex_plugin_exact_enabled "omo@sisyphuslabs" "$LAZYCODEX_VERSION" ||
-      kit_die "LazyCodex $LAZYCODEX_VERSION is not installed and enabled."
-    CODEX_LAZYCODEX_STATE="installed_kit_owned"
-  else
-    reconcile_codex_lazycodex
-    codex_cap_agent_threads
-  fi
+  reconcile_codex_lazycodex
+  codex_cap_agent_threads
 
   if [ "$PROFILE" = "none" ]; then
     reconcile_codex_ponytail_none
@@ -673,6 +728,8 @@ fi
 if [ "$claude_available" -eq 1 ]; then
   ensure_claude_sequential_thinking
 fi
+
+prune_old_ponytail_revisions
 
 kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
 echo "Recorded integrations state (profile: $PROFILE)."

@@ -443,7 +443,30 @@ fi
 # the intended outcome rather than as a missing kit install.
 STATE_FILE="$HOME/.universal-research-agent-kit/integrations.state"
 KIT_MARKETPLACE_ROOT="$HOME/.universal-research-agent-kit/marketplaces"
-KIT_PONYTAIL_PATH="$KIT_MARKETPLACE_ROOT/ponytail-0a4dd63ad4541f4f655c4108a295916f3c1d8fda/ponytail"
+
+# Ponytail tracks the remote's HEAD, so the expected path and version come from
+# the marketplace directory the installer materialized. An empty value means no
+# kit marketplace is on disk, and the kit-install checks below then fail loudly
+# instead of comparing against a constant that install no longer guarantees.
+KIT_PONYTAIL_MANIFEST=""
+KIT_PONYTAIL_PATH=""
+KIT_PONYTAIL_VERSION=""
+for ponytail_manifest in "$KIT_MARKETPLACE_ROOT"/ponytail-*/ponytail/.claude-plugin/plugin.json; do
+  [ -f "$ponytail_manifest" ] || continue
+  if [ -z "$KIT_PONYTAIL_MANIFEST" ] || [ "$ponytail_manifest" -nt "$KIT_PONYTAIL_MANIFEST" ]; then
+    KIT_PONYTAIL_MANIFEST="$ponytail_manifest"
+  fi
+done
+if [ -n "$KIT_PONYTAIL_MANIFEST" ]; then
+  KIT_PONYTAIL_PATH="${KIT_PONYTAIL_MANIFEST%/.claude-plugin/plugin.json}"
+  if command -v node >/dev/null 2>&1; then
+    KIT_PONYTAIL_VERSION="$(node -e '
+      const fs = require("fs");
+      const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      process.stdout.write(manifest.version || "");
+    ' "$KIT_PONYTAIL_MANIFEST" 2>/dev/null || true)"
+  fi
+fi
 
 read_state() {
   sed -n "s/^$1=//p" "$STATE_FILE" | sed -n '1p'
@@ -453,10 +476,12 @@ codex_usable() { command -v codex >/dev/null 2>&1 && command -v node >/dev/null 
 claude_usable() { command -v claude >/dev/null 2>&1 && command -v node >/dev/null 2>&1; }
 
 codex_ponytail_kit_enabled() {
-  codex plugin list --json | EXPECTED_PONYTAIL_PATH="$KIT_PONYTAIL_PATH" node -e '
+  codex plugin list --json | EXPECTED_PONYTAIL_PATH="$KIT_PONYTAIL_PATH" \
+    EXPECTED_PONYTAIL_VERSION="$KIT_PONYTAIL_VERSION" node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
     const ponytail = plugins.find((item) => item.pluginId === "ponytail@ponytail");
-    const valid = ponytail && ponytail.version === "4.9.0" &&
+    const expected = process.env.EXPECTED_PONYTAIL_VERSION;
+    const valid = expected && ponytail && ponytail.version === expected &&
       ponytail.installed === true && ponytail.enabled === true &&
       ponytail.source?.source === "local" &&
       ponytail.source.path === process.env.EXPECTED_PONYTAIL_PATH;
@@ -476,15 +501,6 @@ codex_ponytail_kit_owned_present() {
   '
 }
 
-codex_lazycodex_pinned_enabled() {
-  codex plugin list --json | node -e '
-    const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
-    const lazy = plugins.find((item) => item.pluginId === "omo@sisyphuslabs");
-    process.exit(lazy && lazy.version === "4.19.4" && lazy.installed === true &&
-      lazy.enabled === true ? 0 : 1);
-  '
-}
-
 codex_lazycodex_installed() {
   codex plugin list --json | node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
@@ -492,8 +508,8 @@ codex_lazycodex_installed() {
   '
 }
 
-# Outside the ultra profile any enabled LazyCodex version conflicts with the
-# harness review budget, so the check is version-agnostic.
+# Any enabled LazyCodex version conflicts with the harness review budget, so the
+# check is version-agnostic.
 codex_lazycodex_enabled() {
   codex plugin list --json | node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8")).installed || [];
@@ -503,23 +519,26 @@ codex_lazycodex_enabled() {
 }
 
 claude_ponytail_kit_enabled() {
-  claude plugin list --json | node -e '
+  claude plugin list --json | EXPECTED_PONYTAIL_VERSION="$KIT_PONYTAIL_VERSION" node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
     const ponytail = plugins.find((item) =>
       item.id === "ponytail@ponytail" && item.scope === "user");
-    process.exit(ponytail && ponytail.version === "4.9.0" &&
+    const expected = process.env.EXPECTED_PONYTAIL_VERSION;
+    process.exit(expected && ponytail && ponytail.version === expected &&
       ponytail.enabled === true ? 0 : 1);
   '
 }
 
 # Claude plugin listings expose no source path, so ownership uses the same
-# heuristic as LazyCodex: only the kit-pinned version counts as a kit remnant.
+# heuristic as LazyCodex: only the version the kit materialized counts as a kit
+# remnant.
 claude_ponytail_pinned_installed() {
-  claude plugin list --json | node -e '
+  claude plugin list --json | EXPECTED_PONYTAIL_VERSION="$KIT_PONYTAIL_VERSION" node -e '
     const plugins = JSON.parse(require("fs").readFileSync(0, "utf8"));
     const ponytail = plugins.find((item) =>
       item.id === "ponytail@ponytail" && item.scope === "user");
-    process.exit(ponytail && ponytail.version === "4.9.0" ? 0 : 1);
+    const expected = process.env.EXPECTED_PONYTAIL_VERSION;
+    process.exit(expected && ponytail && ponytail.version === expected ? 0 : 1);
   '
 }
 
@@ -598,7 +617,7 @@ else
       ;;
     removed_legacy|not_requested)
       if claude_usable && claude_ponytail_pinned_installed; then
-        echo "Kit-pinned Claude Ponytail 4.9.0 is installed despite state '$claude_ponytail_state'; run 'sh install.sh' to reconcile."
+        echo "Kit-installed Claude Ponytail $KIT_PONYTAIL_VERSION is present despite state '$claude_ponytail_state'; run 'sh install.sh' to reconcile."
         missing=1
       elif claude_usable && claude_ponytail_installed; then
         echo "OK Claude integration: non-pinned user-owned Ponytail detected and preserved (state '$claude_ponytail_state')."
@@ -621,12 +640,8 @@ else
   codex_lazycodex_state="$(read_state codex_lazycodex)"
   case "$codex_lazycodex_state" in
     installed_kit_owned)
-      if codex_usable && codex_lazycodex_pinned_enabled; then
-        echo "OK Codex integration: LazyCodex (ultra profile)"
-      else
-        echo "Missing Codex integration: LazyCodex"
-        missing=1
-      fi
+      echo "State records a kit-installed LazyCodex, which this kit no longer installs; run 'sh install.sh' to remove it."
+      missing=1
       ;;
     removed_legacy)
       if codex_usable && codex_lazycodex_installed; then
@@ -658,7 +673,7 @@ else
 
   codex_seqthink_state="$(read_state codex_sequential_thinking)"
   case "$codex_seqthink_state" in
-    registered_kit|preexisting)
+    registered_kit|repinned_kit|preexisting)
       if command -v codex >/dev/null 2>&1 && ! (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1); then
         echo "Missing Codex MCP: sequential_thinking (state '$codex_seqthink_state')"
         missing=1
@@ -677,7 +692,7 @@ else
 
   claude_seqthink_state="$(read_state claude_sequential_thinking)"
   case "$claude_seqthink_state" in
-    registered_kit|preexisting)
+    registered_kit|repinned_kit|preexisting)
       if command -v claude >/dev/null 2>&1 && ! claude mcp get sequential-thinking >/dev/null 2>&1; then
         echo "Missing Claude MCP: sequential-thinking (state '$claude_seqthink_state')"
         missing=1
@@ -695,8 +710,8 @@ else
   esac
 
   # LazyCodex installs raise agents.max_threads far above the harness
-  # ceiling; outside ultra the installer caps it at 6.
-  if [ "$requested_profile" != "ultra" ] && command -v codex >/dev/null 2>&1 &&
+  # ceiling; the installer caps it at 6.
+  if command -v codex >/dev/null 2>&1 &&
      [ -f "$HOME/.codex/config.toml" ] && [ ! -L "$HOME/.codex/config.toml" ]; then
     agents_max_threads="$(awk '$0 == "[agents]" { s = 1; next } /^\[/ { s = 0 } s && /^max_threads[ \t]*=/ { sub(/^max_threads[ \t]*=[ \t]*/, ""); print; exit }' "$HOME/.codex/config.toml")"
     case "$agents_max_threads" in

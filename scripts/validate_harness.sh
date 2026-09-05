@@ -270,6 +270,7 @@ find "$ROOT" -type f \
   -not -path "$ROOT/.git/*" \
   -not -path "$ROOT/.serena/*" \
   -not -path "$ROOT/.claude/settings.local.json" \
+  -not -path "$ROOT/.claude/.headroom_wrap_marker.json" \
   -not -path "$ROOT/.plans/*" \
   -not -name '.DS_Store' \
   -not -name 'handover*.md' \

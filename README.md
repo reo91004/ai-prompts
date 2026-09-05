@@ -33,30 +33,29 @@ sh install.sh
 ```bash
 sh install.sh                          # core + Ponytail + Sequential Thinking (기본)
 sh install.sh --integrations none      # core + Graphify/Headroom, kit/레거시 통합 정리
-sh install.sh --integrations ultra     # 기본 구성 + LazyCodex 워크플로
 ```
 
 기본 설치는 Graphify와 Headroom도 함께 준비합니다. Graphify는 현재 CLI의 전역 설치 옵션으로 Claude Code와 Codex 스킬을 등록하고, Headroom은 `uv tool`을 우선 사용해 설치한 뒤 두 셸에서 `claude`와 `codex`를 자동으로 `headroom wrap`으로 라우팅합니다. 외부 패키지 설치를 의도적으로 생략해야 하는 오프라인 테스트 환경에서는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`을 사용합니다.
 
 profile별 reconciliation 규칙:
 
-| 대상 | `none` | `ponytail` (기본) | `ultra` |
-|---|---|---|---|
-| LazyCodex (버전 무관) | 제거(`removed_legacy`) | 제거 | pin 버전 설치·활성 |
-| `agents.max_threads > 6` | 6으로 캡 | 6으로 캡 | 유지 |
-| kit-owned Ponytail | plugin·marketplace 제거 | 설치·활성 | 설치·활성 |
-| Sequential Thinking MCP | 없으면 추가 | 없으면 추가 | 없으면 추가 |
-| user-owned Ponytail | **불변** (보존 기록) | **불변** | **불변** |
+| 대상 | `none` | `ponytail` (기본) |
+|---|---|---|
+| LazyCodex (버전 무관) | 제거(`removed_legacy`) | 제거 |
+| `agents.max_threads > 6` | 6으로 캡 | 6으로 캡 |
+| kit-owned Ponytail | plugin·marketplace 제거 | 최신 릴리스 설치·활성 |
+| Sequential Thinking MCP | 없거나 구버전 고정이면 최신으로 등록 | 동일 |
+| user-owned Ponytail | **불변** (보존 기록) | **불변** |
 
-LazyCodex는 버전과 무관하게 ultra 외 profile에서 `codex plugin remove omo@sisyphuslabs`로 제거됩니다. 이전에는 config 키(`enabled = false`)로 비활성화만 했는데, 그러면 플러그인 스킬이 디스크에 남아 에이전트가 `omo` CLI를 찾고 연구 레포에 `.omo/` 디렉터리를 만들었습니다. 상시-위임·5-lane 리뷰 워크플로가 하네스의 review budget과 충돌하는 것도 그대로입니다. 되돌리려면 `--integrations ultra`로 다시 설치합니다. LazyCodex 전용인 `sisyphuslabs` marketplace 등록도 함께 지우지만, 키트 소유가 아니므로 실패해도 설치를 중단하지 않습니다.
+LazyCodex는 이 키트가 어떤 profile에서도 설치하지 않으며, 설치돼 있으면 버전과 무관하게 `codex plugin remove omo@sisyphuslabs`로 제거됩니다. 이전에는 config 키(`enabled = false`)로 비활성화만 했는데, 그러면 플러그인 스킬이 디스크에 남아 에이전트가 `omo` CLI를 찾고 연구 레포에 `.omo/` 디렉터리를 만들었습니다. 상시-위임·5-lane 리뷰 워크플로가 하네스의 review budget과 충돌하는 것도 그대로입니다. LazyCodex 전용인 `sisyphuslabs` marketplace 등록과 `~/.codex/agents`에 심어둔 agent TOML도 함께 지웁니다(marketplace 등록은 키트 소유가 아니므로 실패해도 설치를 중단하지 않습니다).
 
 Ponytail의 user-owned 판별은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`not_requested` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 제거는 부재로 수렴하므로 두 번째 실행부터 LazyCodex 상태는 `not_requested`가 됩니다.
 
-LazyCodex의 고강도 다중 리뷰 워크플로는 이 키트의 review-budget 정책과 충돌하므로 명시적인 `ultra` 프로필에서만 설치·활성화합니다. 기본(`ponytail`)/`ultra` 설치에는 Node.js와 `git`, 네트워크 연결이 필요하고 LazyCodex에는 `npx`가 추가로 필요합니다. Node가 없는 환경은 `--integrations none` 또는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`(통합 단계 전체 생략)을 사용합니다. Graphify와 Headroom은 별도 tooling 단계이며 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`로 생략할 수 있습니다.
+기본(`ponytail`) 설치에는 Node.js와 `git`, 네트워크 연결이 필요합니다. Node가 없는 환경은 `--integrations none` 또는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`(통합 단계 전체 생략)을 사용합니다. Graphify와 Headroom은 별도 tooling 단계이며 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`로 생략할 수 있습니다.
 
-외부 코드는 설치 시점의 가변 `latest`나 기본 브랜치를 바로 실행하지 않습니다. Graphify는 `graphifyy==0.9.39`, Headroom은 `headroom-ai[all]==0.34.0`, LazyCodex는 검증된 `4.19.4` npm 릴리스, Ponytail은 `4.9.0` 릴리스 커밋 `0a4dd63ad4541f4f655c4108a295916f3c1d8fda`로 고정합니다. 이미 PATH에 정확한 버전이 있으면 재설치하지 않고, 없거나 버전이 다르면 키트 전용 환경(`~/.universal-research-agent-kit/tooling/`)에 설치하므로 사용자 Python/uv 환경을 덮어쓰지 않습니다.
+Graphify(`graphifyy==0.9.39`)와 Headroom(`headroom-ai[all]==0.34.0`)은 검증된 버전으로 고정합니다. Ponytail과 Sequential Thinking MCP는 설치 시점의 최신을 사용합니다: Ponytail은 `git ls-remote`로 원격 HEAD를 확인해 그 커밋을 받아오고 검증에 쓰는 버전 문자열도 그 체크아웃의 `plugin.json`에서 읽으며, MCP는 `@latest` 스펙으로 등록합니다. 이미 PATH에 정확한 버전이 있으면 재설치하지 않고, 없거나 버전이 다르면 키트 전용 환경(`~/.universal-research-agent-kit/tooling/`)에 설치하므로 사용자 Python/uv 환경을 덮어쓰지 않습니다.
 
-설치 스크립트는 기존 설정과 agents/skills 디렉터리를 전용 상태 디렉터리에 백업한 뒤, ownership manifest에 기록된 키트 소유 항목만 교체합니다. LazyCodex, Ponytail, 개인 스킬처럼 다른 이름을 사용하는 제3자 항목은 삭제하지 않습니다. 키트 소유 항목과 이름이 같은 파일이나 디렉터리는 백업 후 키트 버전으로 교체합니다. 사용자가 등록한 MCP 서버는 어떤 프로필에서도 수정·삭제하지 않습니다. MCP에 대한 유일한 예외는 추가뿐입니다: Sequential Thinking MCP가 등록돼 있지 않으면 pin된 버전(`@modelcontextprotocol/server-sequential-thinking@2026.7.4`)을 Codex(`sequential_thinking`)와 Claude(`sequential-thinking`, user 스코프)에 추가하고, 어떤 이름·버전으로든 이미 등록돼 있으면 그대로 둡니다. 사용자 소유의 ponytail marketplace가 이미 있으면 키트는 해당 호스트의 Ponytail 관리를 건너뛰고 보존합니다.
+설치 스크립트는 기존 설정과 agents/skills 디렉터리를 전용 상태 디렉터리에 백업한 뒤, ownership manifest에 기록된 키트 소유 항목만 교체합니다. LazyCodex, Ponytail, 개인 스킬처럼 다른 이름을 사용하는 제3자 항목은 삭제하지 않습니다. 키트 소유 항목과 이름이 같은 파일이나 디렉터리는 백업 후 키트 버전으로 교체합니다. 사용자가 등록한 MCP 서버는 어떤 프로필에서도 수정·삭제하지 않습니다. MCP에 대한 유일한 예외는 키트 이름을 쓰는 Sequential Thinking 등록입니다: Codex(`sequential_thinking`)·Claude(`sequential-thinking`, user 스코프)에 없으면 `@modelcontextprotocol/server-sequential-thinking@latest`로 추가하고, 이미 있으나 구버전에 고정돼 있으면 제거 후 같은 스펙으로 다시 등록합니다(`repinned_kit`). 다른 이름으로 등록된 MCP는 들여다보지도 않습니다. 사용자 소유의 ponytail marketplace가 이미 있으면 키트는 해당 호스트의 Ponytail 관리를 건너뛰고 보존합니다.
 
 설치는 journal 기반 트랜잭션입니다. `umask 077`로 상태 디렉터리를 보호하고, 동시 설치를 lock으로 차단하며, journal 기록은 백업 완료가 확인된 뒤에만 남습니다. 실패 시 **journal에 등록된 kit 관리 경로**는 자동으로 원상 복구됩니다. 외부 installer(npx 등)가 만드는 cache와 user-owned 통합 상태는 journal 범위 밖이므로 재작성하지 않습니다. gitignore managed block은 BEGIN/END marker 쌍을 검증한 뒤에만 교체합니다.
 
@@ -286,7 +285,7 @@ LazyCodex 없이도 plan·research·evidence 절차를 제공합니다. 다세�
 
 ## Sequential Thinking MCP
 
-설치기는 Sequential Thinking MCP가 없으면 pin된 버전으로 자동 등록하고, 이미 있으면 건드리지 않습니다(모든 profile 공통, `SKIP_INTEGRATIONS`에서는 생략). genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용하며 MCP 부재를 성공으로 가장하지 않습니다. LazyCodex와 Ponytail은 opt-in 통합 대상이고 그 밖의 MCP 서버는 별도로 관리합니다. 키트는 기존 사용자 MCP 등록(`arxiv`, `semantic-scholar`, Zotero 등)을 수정하거나 제거하지 않습니다.
+설치기는 Sequential Thinking MCP가 없으면 `@latest`로 자동 등록하고, 키트 이름으로 이미 있으나 구버전에 고정돼 있으면 최신으로 다시 등록합니다(모든 profile 공통, `SKIP_INTEGRATIONS`에서는 생략). genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용하며 MCP 부재를 성공으로 가장하지 않습니다. Ponytail은 opt-in 통합 대상이고 그 밖의 MCP 서버는 별도로 관리합니다. 키트는 기존 사용자 MCP 등록(`arxiv`, `semantic-scholar`, Zotero 등)을 수정하거나 제거하지 않습니다.
 
 ## Review와 evidence 계약
 

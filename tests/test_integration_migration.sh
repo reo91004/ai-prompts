@@ -75,9 +75,13 @@ case "$cmd" in
     ;;
   "mcp get sequential_thinking")
     [ -f "$STATE/mcp_sequential" ]
+    cat "$STATE/mcp_sequential"
     ;;
-  "mcp add sequential_thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2026.7.4")
-    : > "$STATE/mcp_sequential"
+  "mcp remove sequential_thinking")
+    rm -f "$STATE/mcp_sequential"
+    ;;
+  "mcp add sequential_thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@latest")
+    printf 'args: -y %s\n' "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
     ;;
   "mcp list")
     config="$HOME/.codex/config.toml"
@@ -120,9 +124,13 @@ case "$cmd" in
     ;;
   "mcp get sequential-thinking")
     [ -f "$STATE/mcp_sequential" ]
+    cat "$STATE/mcp_sequential"
     ;;
-  "mcp add -s user sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@2026.7.4")
-    : > "$STATE/mcp_sequential"
+  "mcp remove sequential-thinking -s user")
+    rm -f "$STATE/mcp_sequential"
+    ;;
+  "mcp add -s user sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@latest")
+    printf 'args: -y %s\n' "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
     ;;
   *)
     echo "claude mock: unhandled command: $cmd" >&2
@@ -255,7 +263,10 @@ echo "Scenario B: default profile is ponytail and user-owned Ponytail is preserv
 B_HOME="$WORK/home-b"
 B_CODEX="$WORK/mock-b-codex"
 B_CLAUDE="$WORK/mock-b-claude"
-mkdir -p "$B_HOME/.codex/plugins" "$B_HOME/.claude/plugins" "$B_HOME/.universal-research-agent-kit/sources/ponytail-$PONYTAIL_REVISION/.git"
+B_PONYTAIL_SOURCE="$B_HOME/.universal-research-agent-kit/sources/ponytail-$PONYTAIL_REVISION"
+mkdir -p "$B_HOME/.codex/plugins" "$B_HOME/.claude/plugins" "$B_PONYTAIL_SOURCE/.git" "$B_PONYTAIL_SOURCE/.claude-plugin"
+# prepare_ponytail_source reads the version to verify from the checkout itself.
+printf '%s\n' '{"name":"ponytail","version":"4.9.0"}' > "$B_PONYTAIL_SOURCE/.claude-plugin/plugin.json"
 seed_codex_mock_state "$B_CODEX" "$B_HOME" user
 seed_claude_mock_state "$B_CLAUDE" "$B_HOME" user
 cat > "$MOCK_BIN/git" <<MOCK
@@ -263,6 +274,7 @@ cat > "$MOCK_BIN/git" <<MOCK
 set -euo pipefail
 cmd="\$*"
 case "\$cmd" in
+  "ls-remote "*"HEAD") printf '%s\tHEAD\n' "$PONYTAIL_REVISION" ;;
   *"rev-parse HEAD") echo "$PONYTAIL_REVISION" ;;
   *"status --porcelain"*) : ;;
   *"archive HEAD") tar -cf - -T /dev/null ;;
@@ -492,5 +504,31 @@ run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install_all.sh" --integrati
 
 [ "$(grep -Fxc '[mcp_servers.headroom]' "$F_HOME/.codex/config.toml" || true)" -eq 0 ]
 grep -Fqx 'model = "gpt-6-astra"' "$F_HOME/.codex/config.toml"
+
+echo "Scenario G: an MCP registration frozen at an old version is re-registered at latest"
+G_HOME="$WORK/home-g"
+G_CODEX="$WORK/mock-g-codex"
+G_CLAUDE="$WORK/mock-g-claude"
+mkdir -p "$G_HOME/.codex/plugins" "$G_HOME/.claude/plugins"
+seed_codex_mock_state "$G_CODEX" "$G_HOME" empty
+seed_claude_mock_state "$G_CLAUDE" "$G_HOME" empty
+printf 'args: -y %s\n' '@modelcontextprotocol/server-sequential-thinking@2026.7.4' > "$G_CODEX/mcp_sequential"
+printf 'args: -y %s\n' '@modelcontextprotocol/server-sequential-thinking@2026.7.4' > "$G_CLAUDE/mcp_sequential"
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+
+[ "$(state_value "$G_HOME" codex_sequential_thinking)" = "repinned_kit" ]
+[ "$(state_value "$G_HOME" claude_sequential_thinking)" = "repinned_kit" ]
+grep -Fqx 'codex mcp remove sequential_thinking' "$G_CODEX/calls.log" || {
+  echo "the frozen Codex MCP registration was not removed" >&2; exit 1; }
+grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$G_CODEX/mcp_sequential" || {
+  echo "the Codex MCP was not re-registered at latest" >&2; exit 1; }
+grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$G_CLAUDE/mcp_sequential" || {
+  echo "the Claude MCP was not re-registered at latest" >&2; exit 1; }
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+
+# A second run has nothing left to converge.
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+[ "$(state_value "$G_HOME" codex_sequential_thinking)" = "preexisting" ]
+[ "$(state_value "$G_HOME" claude_sequential_thinking)" = "preexisting" ]
 
 echo "Integration migration tests passed."
