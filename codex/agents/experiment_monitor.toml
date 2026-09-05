@@ -1,6 +1,6 @@
 name = "experiment_monitor"
 description = "Use only to execute a fully specified long-running experiment, training, synthesis, or hardware-capture command; block until a terminal event; and return exit and artifact evidence. Not for experiment design, command construction, autonomous retries, result interpretation, or claim acceptance."
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
 model_reasoning_effort = "low"
 sandbox_mode = "danger-full-access"
 developer_instructions = """

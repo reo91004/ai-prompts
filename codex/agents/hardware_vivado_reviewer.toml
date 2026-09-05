@@ -1,6 +1,6 @@
 name = "hardware_vivado_reviewer"
 description = "Use when reviewing Vivado, FPGA, RTL synthesis, timing, utilization, simulation, or hardware evidence. Returns findings tied to the reports. Not for software-only or non-hardware work."
-model = "gpt-5.6-terra"
+model = "gpt-6-astra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """

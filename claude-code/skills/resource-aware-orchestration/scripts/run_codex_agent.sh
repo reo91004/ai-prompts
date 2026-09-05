@@ -78,8 +78,8 @@ case "$sandbox_mode" in
 esac
 
 if [ "$agent_name" = "experiment_monitor" ]; then
-  if [ "$model" != "gpt-5.6-luna" ] || [ "$reasoning_effort" != "low" ] || [ "$sandbox_mode" != "danger-full-access" ]; then
-    echo "experiment_monitor must use gpt-5.6-luna, low effort, and danger-full-access" >&2
+  if [ "$model" != "gpt-6-astra" ] || [ "$reasoning_effort" != "low" ] || [ "$sandbox_mode" != "danger-full-access" ]; then
+    echo "experiment_monitor must use gpt-6-astra, low effort, and danger-full-access" >&2
     exit 1
   fi
 elif [ "$sandbox_mode" = "danger-full-access" ]; then

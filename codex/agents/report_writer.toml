@@ -1,6 +1,6 @@
 name = "report_writer"
 description = "Use to write Korean research reports, experiment logs, review reports, or carry-over records from established evidence. Returns the document. Not for producing or judging the evidence itself."
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
 model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 developer_instructions = """

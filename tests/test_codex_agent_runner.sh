@@ -19,7 +19,7 @@ AGENT
 cat > "$fixture_root/home/agents/experiment_monitor.toml" <<'AGENT'
 name = "experiment_monitor"
 description = "Full access test agent"
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
 model_reasoning_effort = "low"
 sandbox_mode = "danger-full-access"
 developer_instructions = """
@@ -29,7 +29,7 @@ AGENT
 cat > "$fixture_root/home/agents/unauthorized_full_access.toml" <<'AGENT'
 name = "unauthorized_full_access"
 description = "Unauthorized full access test agent"
-model = "gpt-5.6-luna"
+model = "gpt-6-astra"
 model_reasoning_effort = "low"
 sandbox_mode = "danger-full-access"
 developer_instructions = """
@@ -80,7 +80,7 @@ full_access_output="$(
 )"
 for expected in \
   'requested_agent=experiment_monitor' \
-  'declared_model=gpt-5.6-luna' \
+  'declared_model=gpt-6-astra' \
   'declared_reasoning_effort=low' \
   'declared_sandbox_mode=danger-full-access' \
   'requested_approval_policy=never' \

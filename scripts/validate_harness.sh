@@ -36,22 +36,22 @@ while IFS='|' read -r file name model effort sandbox; do
   [ "$(grep -c '^sandbox_mode = ' "$path")" -eq 1 ] || fail "$file has multiple sandbox fields"
   grep -Fq 'Do not delegate or spawn child agents.' "$path" || fail "$file permits nested delegation"
 done <<'CODEX_AGENTS'
-adversarial_reviewer.toml|adversarial_reviewer|gpt-5.6-sol|high|read-only
-code_comment_hygiene_reviewer.toml|code_comment_hygiene_reviewer|gpt-5.6-luna|low|read-only
-context_explorer.toml|context_explorer|gpt-5.6-terra|medium|read-only
-data_ml_experiment_reviewer.toml|data_ml_experiment_reviewer|gpt-5.6-terra|high|read-only
-experiment_monitor.toml|experiment_monitor|gpt-5.6-luna|low|danger-full-access
-hardware_vivado_reviewer.toml|hardware_vivado_reviewer|gpt-5.6-terra|high|read-only
-implementation_engineer.toml|implementation_engineer|gpt-5.6-terra|medium|workspace-write
-literature_method_reviewer.toml|literature_method_reviewer|gpt-5.6-terra|high|read-only
-quality_gate_runner.toml|quality_gate_runner|gpt-5.6-luna|low|workspace-write
-report_writer.toml|report_writer|gpt-5.6-luna|low|workspace-write
-research_repo_architect.toml|research_repo_architect|gpt-5.6-sol|high|read-only
-sequential_reasoning_coordinator.toml|sequential_reasoning_coordinator|gpt-5.6-sol|high|read-only
-side_channel_security_reviewer.toml|side_channel_security_reviewer|gpt-5.6-sol|high|read-only
-software_architect.toml|software_architect|gpt-5.6-sol|high|read-only
-statistics_reviewer.toml|statistics_reviewer|gpt-5.6-sol|high|read-only
-test_debug_engineer.toml|test_debug_engineer|gpt-5.6-terra|high|workspace-write
+adversarial_reviewer.toml|adversarial_reviewer|gpt-6-astra|high|read-only
+code_comment_hygiene_reviewer.toml|code_comment_hygiene_reviewer|gpt-6-astra|low|read-only
+context_explorer.toml|context_explorer|gpt-6-astra|medium|read-only
+data_ml_experiment_reviewer.toml|data_ml_experiment_reviewer|gpt-6-astra|high|read-only
+experiment_monitor.toml|experiment_monitor|gpt-6-astra|low|danger-full-access
+hardware_vivado_reviewer.toml|hardware_vivado_reviewer|gpt-6-astra|high|read-only
+implementation_engineer.toml|implementation_engineer|gpt-6-astra|medium|workspace-write
+literature_method_reviewer.toml|literature_method_reviewer|gpt-6-astra|high|read-only
+quality_gate_runner.toml|quality_gate_runner|gpt-6-astra|low|workspace-write
+report_writer.toml|report_writer|gpt-6-astra|low|workspace-write
+research_repo_architect.toml|research_repo_architect|gpt-6-astra|high|read-only
+sequential_reasoning_coordinator.toml|sequential_reasoning_coordinator|gpt-6-astra|high|read-only
+side_channel_security_reviewer.toml|side_channel_security_reviewer|gpt-6-astra|high|read-only
+software_architect.toml|software_architect|gpt-6-astra|high|read-only
+statistics_reviewer.toml|statistics_reviewer|gpt-6-astra|high|read-only
+test_debug_engineer.toml|test_debug_engineer|gpt-6-astra|high|workspace-write
 CODEX_AGENTS
 
 while IFS='|' read -r file name model effort tools denied permission turns; do

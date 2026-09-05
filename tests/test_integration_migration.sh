@@ -447,7 +447,7 @@ mkdir -p "$E_HOME/.codex/plugins" "$E_HOME/.claude/plugins"
 seed_codex_mock_state "$E_CODEX" "$E_HOME" empty
 seed_claude_mock_state "$E_CLAUDE" "$E_HOME" empty
 printf '%s\n' \
-  'model = "gpt-5.6-sol"' \
+  'model = "gpt-6-astra"' \
   '' \
   '# --- Headroom MCP server ---' \
   '[mcp_servers.headroom]' \
@@ -469,7 +469,7 @@ printf '%s\n' \
 run_kit "$E_HOME" "$E_CODEX" "$E_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 
 [ "$(grep -Fxc '[mcp_servers.headroom]' "$E_HOME/.codex/config.toml" || true)" -eq 0 ]
-grep -Fqx 'model = "gpt-5.6-sol"' "$E_HOME/.codex/config.toml"
+grep -Fqx 'model = "gpt-6-astra"' "$E_HOME/.codex/config.toml"
 grep -Fqx '[mcp_servers.zotero]' "$E_HOME/.codex/config.toml"
 grep -Fqx 'command = "zotero-mcp"' "$E_HOME/.codex/config.toml"
 
@@ -481,7 +481,7 @@ mkdir -p "$F_HOME/.codex/plugins" "$F_HOME/.claude/plugins"
 seed_codex_mock_state "$F_CODEX" "$F_HOME" empty
 seed_claude_mock_state "$F_CLAUDE" "$F_HOME" empty
 printf '%s\n' \
-  'model = "gpt-5.6-sol"' \
+  'model = "gpt-6-astra"' \
   '' \
   '# --- Headroom MCP server ---' \
   '[mcp_servers.headroom]' \
@@ -491,6 +491,6 @@ printf '%s\n' \
 run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
 
 [ "$(grep -Fxc '[mcp_servers.headroom]' "$F_HOME/.codex/config.toml" || true)" -eq 0 ]
-grep -Fqx 'model = "gpt-5.6-sol"' "$F_HOME/.codex/config.toml"
+grep -Fqx 'model = "gpt-6-astra"' "$F_HOME/.codex/config.toml"
 
 echo "Integration migration tests passed."
