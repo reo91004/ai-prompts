@@ -1,23 +1,19 @@
 ---
 name: adversarial-review
-description: Use when reviewing code, papers, experiments, results, claims, diffs, logs, figures, or tables adversarially.
+description: Use for critical review of a material claim or artifact, or to investigate an unexpectedly negative result or pessimistic assessment.
 ---
 
-## Use
-Attack the artifact, not the author. Use concrete evidence.
+# Critical Review And Result Analysis
 
-Use `templates/adversarial_review_packet.md` when asking Codex MCP or another reviewer to review. Use `templates/adversarial_review_report.md` when recording results.
+Use `review-budget` to decide whether an acceptance review is needed. Establish what the evidence supports before testing the weakest inference. Keep criticism specific to the claim and recognize a contribution that is research-sufficient within its scope.
 
-Apply `review-budget` first. Run deterministic evidence before semantic review, use one semantic reviewer, and review only the changed delta after required fixes. A failed deterministic gate cannot be converted to approval by reviewer judgment.
+For unexpectedly negative results or pessimistic Codex assessments, use `references/result_analysis.md`. This is causal investigation and remedy design; repeated acceptance review alone is not analysis.
 
-A valid review must include verdict, scope, evidence, findings, missing evidence, required fixes, research-sufficient notes, optional hardening, do-not-change notes, and claim-control decision.
+Use the optional templates only when a structured written review helps. Existing artifacts and evidence pointers are sufficient input. Report `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, and `Do Not Change` as relevant. Do not require every heading or invent a fault to fill one.
 
-## Calibration
-For research code, attack logic, evidence, reproducibility, and claim strength. Do not turn readable paper-idea validation code into production infrastructure unless the claim, data integrity, user safety, or destructive behavior requires it.
+- A concrete wrong result, unsupported inference, failed relevant test, placeholder, or needless implementation complexity is a required fix.
+- Missing production polish or experiments beyond the current claim are optional.
+- When a claim is too broad, identify the narrower supported finding as well as the evidence needed to extend it.
+- One semantic reviewer and at most one targeted delta re-review are the default. New evidence or a new causal hypothesis can justify further investigation under the user's task scope.
 
-Classify review items:
-
-- `Required Fixes`: logic errors, claim/evidence mismatch, missing provenance, missing seed/config/run binding, synthetic/measured confusion, fake-pass paths, missing artifacts hidden as success, data corruption risk, or destructive/user-data risks. Production hardening **already present in the code** also belongs here, as a deletion: unusable `try`/`except`, internal argument validation, dtype/shape re-checks, resource caps, TOCTOU defenses, complex exception hierarchies, output-artifact hashing, or framework/schema machinery. The growth patterns in `no-placeholder-development` count too — re-validating the pipeline's own output, the same check in two places, a guard that only serves a type annotation, and one `raise` covering eight conditions. Over-engineering and a placeholder block acceptance equally.
-- `Research-Sufficient`: code that is readable, traceable, and adequate for the stated research claim even if it is not production hardened.
-- `Optional Hardening`: work that would only matter if this became production code someday. It is a note about a hypothetical future, never a defense of hardening that is in the code now — that gets deleted under `Required Fixes`.
-- `Do Not Change`: changes that would reduce readability, make scripts less explicit, or add generic infrastructure without strengthening the research claim.
+Over-engineering and a placeholder block acceptance equally.

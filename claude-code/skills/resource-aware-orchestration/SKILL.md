@@ -1,6 +1,6 @@
 ---
 name: resource-aware-orchestration
-description: Use before delegation to select safe concurrency on macOS, Linux, or WSL and enforce task/result contracts.
+description: Use when independent agent work is warranted, to select safe concurrency and define a bounded task and result.
 ---
 
 ## Delegation Gate
@@ -8,6 +8,10 @@ description: Use before delegation to select safe concurrency on macOS, Linux, o
 Actively delegate non-trivial work when a delegation trigger applies; assign each separable specialist deliverable to a subagent, and keep work in the main agent only for genuinely trivial or tightly coupled tasks. One child is valid and zero is right for trivial work; never create a child merely to satisfy a count. Child agents must not delegate.
 
 Delegate by default for: a bounded implementation or refactoring slice with explicit ownership; exploration of an unfamiliar subsystem before acting; high-volume searches, tests, logs, traces, or document retrieval whose raw output would pollute parent context; domain-sensitive design, implementation change, evidence interpretation, or claim review; final acceptance of a material claim; and independent workstreams that can proceed concurrently. For high-volume work, keep raw output in an artifact and return only a concise synthesis with evidence pointers. Detected slots are a ceiling, not a target.
+
+## Claude–Codex Cooperation
+
+Claude collaborates with Codex across substantive phases, using an available connector or the installed `scripts/run_codex_agent.sh` with a matching role. Batch related small steps, reuse useful reviews, and produce concrete answers, artifacts, diagnoses, or decisions. A child never launches another agent; orchestration remains with the parent. If Codex is unavailable, report that once and continue authorized local work without claiming collaboration occurred.
 
 ## Dispatch Integrity
 

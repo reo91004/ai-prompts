@@ -8,5 +8,7 @@ Use this skill only when the task is genuinely hard or ambiguous: consequential 
 
 Call the MCP only when its tool is available. If it is unavailable when warranted, record that limitation and continue with explicit reasoning; never state or imply that the MCP ran.
 
+Ambiguous negative results may warrant deep causal analysis and several discriminating checks. The minimal-code principle does not restrict this reasoning; use new evidence and testable explanations to guide further work.
+
 ## Output
 Return problem decomposition, assumptions, candidate approaches, risks, verification steps, and acceptance blockers.

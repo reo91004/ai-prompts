@@ -27,7 +27,7 @@ Use for cryptographic protocols, attacks, threat models, implementation security
 Use for FPGA, RTL, synthesis, implementation, timing, utilization, simulation, constraints, and bitstream-related claims. Require tool version, target part, and constraints `[code]`; logs, simulation evidence, synthesis/implementation reports, and timing/utilization reports when claiming timing or area `[run]`.
 
 ## Research Experiment Repo Gate
-Use for creating, reviewing, or refactoring repositories whose purpose is to validate a paper idea through experiments, model training, measurements, simulations, hardware runs, side-channel traces, or FPGA/embedded targets. Require a clear research question, chosen domain center, explicit script/package boundary, config policy, current docs source of truth, run artifact policy, hardware-free tests for reusable logic, and no premature generic framework. `[code]`
+Use for creating, reviewing, or refactoring repositories whose purpose is to validate a paper idea through experiments, model training, measurements, simulations, hardware runs, side-channel traces, or FPGA/embedded targets. Require a clear research question and reproducible run artifacts. Start with a script; add package structure or external config only when needed, and use hardware-free checks for reusable logic whose failure would invalidate a result. Do not require a fixed layout or generic framework. `[code]`
 
 For research code, require guards that protect claim integrity: provenance, seed/config/run binding, artifact existence, synthetic/measured separation, and claim scope. Delete production-only defensive programming rather than deferring it; see `no-placeholder-development/references/research_code_guard_policy.md`.
 

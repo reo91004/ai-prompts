@@ -1,6 +1,6 @@
 # MANIFEST.md
 
-**최종 갱신**: 2026-08-03
+**최종 갱신**: 2026-09-06
 
 This is the final universal research/development prompt kit.
 
@@ -29,6 +29,7 @@ This is the final universal research/development prompt kit.
 - `claude-code/agents/test-debug-engineer.md`
 - `claude-code/install.sh`
 - `claude-code/skills/adversarial-review/SKILL.md`
+- `claude-code/skills/adversarial-review/references/result_analysis.md`
 - `claude-code/skills/adversarial-review/templates/adversarial_review_packet.md`
 - `claude-code/skills/adversarial-review/templates/adversarial_review_report.md`
 - `claude-code/skills/ai-ml-experiment/SKILL.md`
@@ -83,6 +84,7 @@ This is the final universal research/development prompt kit.
 - `codex/agents/test_debug_engineer.toml`
 - `codex/install.sh`
 - `codex/skills/adversarial-review/SKILL.md`
+- `codex/skills/adversarial-review/references/result_analysis.md`
 - `codex/skills/adversarial-review/templates/adversarial_review_packet.md`
 - `codex/skills/adversarial-review/templates/adversarial_review_report.md`
 - `codex/skills/ai-ml-experiment/SKILL.md`

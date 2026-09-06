@@ -1,7 +1,7 @@
 # Universal Research Agent Prompt Kit
 
 **작성일**: 2026-05-28  
-**최종 갱신**: 2026-08-03
+**최종 갱신**: 2026-09-06
 
 Claude Code와 Codex를 연구자/개발자 작업 전반에 맞게 전역 설정하는 프롬프트·서브에이전트·스킬 패키지입니다.
 
@@ -17,6 +17,14 @@ Claude Code와 Codex를 연구자/개발자 작업 전반에 맞게 전역 설�
 - 연구용 코드에서는 연구 무결성 가드와 프로덕션 방어 가드를 분리합니다.
 - **기존 주석이 현재 코드와 맞지 않으면 수정하거나 삭제**하도록 강제합니다.
 - 새 연구 실험 레포를 만들거나 리팩토링할 때 **AI/ML, 하드웨어, 부채널, 시뮬레이션 논문 아이디어 검증용 구조**를 선택하도록 `research-repo-design` skill과 전용 repository architect agent를 제공합니다.
+
+## 연구 방식
+
+**Simple is best**는 코드 구현과 검증에 집중합니다. 작은 스크립트와 함수로 시작하고, 현재 실험이 요구할 때만 패키지·설정 계층·의존성을 추가합니다. 불필요한 `try/except`, 내부 방어 검사, 중복 검증은 제거하되 seed·config·환경·원시 결과와 잘못된 수치를 잡는 검사는 유지합니다.
+
+결과 분석은 충분히 깊게 합니다. 부정적 결과나 비관적인 Codex 판단은 구현·데이터·지표·기준선·불확실성·실험 조건·방법의 가정을 살펴 원인과 해결책을 찾습니다. 확인된 성과와 유효 범위를 먼저 설명하고, 가설과 검증된 원인을 구분합니다. 재심 횟수 제한은 같은 근거로 판정을 반복하는 데 적용하며, 새 가설이나 증거에 따른 원인 탐색을 막지 않습니다. 원하는 결과를 얻기 위한 seed·지표·부분집합 선별은 허용하지 않습니다.
+
+Claude는 문제 정의부터 구현·검증·분석·보고까지 Codex와 협력합니다. 작은 관련 단계는 묶어서 논의하고, 기존 Codex 검토를 활용해 승인 절차를 중복하지 않습니다. Codex가 없으면 그 사실을 밝히고 허용된 작업을 계속합니다.
 
 ## 빠른 설치
 
@@ -34,6 +42,15 @@ sh install.sh
 sh install.sh                          # core + Ponytail + Sequential Thinking (기본)
 sh install.sh --integrations none      # core + Graphify/Headroom, kit/레거시 통합 정리
 ```
+
+`./install.sh` 또는 `sh install.sh`는 `~/.codex/config.toml`에 아래 설정을 자동 병합합니다. 기존 `false`는 `true`로 바꾸고 다른 설정은 보존합니다.
+
+```toml
+[features.context_management]
+experimental_mode = true
+```
+
+설정 병합은 일반적인 bare TOML 테이블과 boolean 키를 지원합니다. quoted/dotted/inline 형태의 해당 feature 설정, escape가 포함된 테이블 이름이나 관련 키, 여러 줄 문자열, 해당 feature 테이블의 여러 줄 배열은 원본 교체 전에 오류로 중단합니다. 기존 설정은 설치기의 백업·롤백 대상입니다.
 
 기본 설치는 Graphify와 Headroom도 함께 준비합니다. Graphify는 현재 CLI의 전역 설치 옵션으로 Claude Code와 Codex 스킬을 등록하고, Headroom은 `uv tool`을 우선 사용해 설치한 뒤 두 셸에서 `claude`와 `codex`를 자동으로 `headroom wrap`으로 라우팅합니다. 외부 패키지 설치를 의도적으로 생략해야 하는 오프라인 테스트 환경에서는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`을 사용합니다.
 
@@ -231,7 +248,7 @@ Claude Code에서는 [`Monitor`](https://code.claude.com/docs/en/tools-reference
 
 Codex의 direct background terminal은 완료 push가 아니라 이후 session wait나 `write_stdin`이 있어야 결과가 드러납니다. 명령이 한 번의 blocking wait보다 길면 child 하나가 실행·monitor·evidence를 소유하고, 부모는 의존 없는 작업을 마친 뒤 agent completion/mailbox event를 기다립니다. timeout 때 상태를 재해석하거나 로그를 다시 읽지 않고 허용된 가장 긴 wait를 다시 겁니다. scheduled task는 cadence polling이므로 사용자가 받아들이거나 원 세션 유지가 불가능한 경우에만 사용합니다.
 
-[`codex/config.toml.example`](codex/config.toml.example)은 참고용입니다. 설치기는 기존 `~/.codex/config.toml`에 이 설정을 자동 병합하지 않습니다. 컴퓨터별 실제 CPU·메모리·cgroup 제한이 다르므로 detector를 각 spawn wave 전에 다시 실행해야 합니다.
+[`codex/config.toml.example`](codex/config.toml.example)의 agent 수 설정은 참고용이며 기본 설치기가 자동 병합하지 않습니다. `features.context_management.experimental_mode = true`는 자동 반영합니다. 컴퓨터별 실제 CPU·메모리·cgroup 제한이 다르므로 detector를 각 spawn wave 전에 다시 실행해야 합니다.
 
 Claude에서는 Fable을 main orchestrator 권장 모델로만 문서화하며 강제하지 않습니다. `CLAUDE_CODE_SUBAGENT_MODEL`이 설정되면 agent별 모델 선택을 덮어쓰므로 검증 기록에 해당 환경 변수를 남겨야 합니다.
 
@@ -261,43 +278,25 @@ Claude에서는 Fable을 main orchestrator 권장 모델로만 문서화하며 �
 
 ## planned-work 작업 대장
 
-LazyCodex 없이도 plan·research·evidence 절차를 제공합니다. 다세션 작업, 연구 claim이 걸린 작업, handover 문서 기반 작업, 명시적 계획 요청에서 `planned-work` skill이 프로젝트의 `.plans/`에 사용자가 직접 열람·관리할 수 있는 작업 대장을 유지합니다.
+다세션·handover 작업과 기존 실행 기록만으로 복구하기 어려운 연구 작업은 `.plans/ledger.json`에 현재 작업·상태·사용자 제약을 기록합니다. 짧은 `plan.md`에 다음 행동과 완료 근거를 남기고, 필요할 때만 `evidence.md`나 원문 handover를 추가합니다. 로그와 결과는 기존 산출물을 참조하며 같은 내용을 여러 문서에 복제하지 않습니다. 작업 수행에 대한 사용자 승인이 있으면 계획 갱신을 위해 다시 승인받지 않습니다.
 
-```text
-<프로젝트>/.plans/
-├── ledger.json               # 기계 판독 인덱스: active 포인터 + 작업별 status·constraints
-└── <YYYY-MM-DD>-<L>-<slug>/  # L = 그날 생성 순서 (A, B, C…)
-    ├── handover.md           # 사용자 지시 원문 보존
-    ├── exploration.md        # 탐색 기록: 읽은 파일, 발견, 가정
-    ├── plan.md               # 승인된 확정 계획 = TODO 체크리스트 (draft 금지)
-    ├── evidence.md           # 증거 대장(작은 표): task→명령·exit·evidence 경로
-    ├── carry-over.md         # 미해결 항목과 다음 필요 증거
-    └── evidence/             # 원본 산출물: plan TODO 번호로 색인 (t01-*, t03-*)
-```
-
-`ledger.json`이 단일 소스입니다: `active_work_id`(현재 작업), 작업별 `status`(active/paused/completed/blocked), 사용자가 명시한 `constraints`를 담아 세션이 바뀌어도 무엇을 하던 중이고 제약이 뭐였는지 산문 재독 없이 이어받습니다. 진행 상태는 `plan.md`의 번호 매긴 TODO 체크리스트(`[ ]`/`[x]`/`[~]`/`[!]`)로 추적하고, 완료 체크는 evidence.md의 deterministic check 확인 후에만 합니다. 이 구조는 LazyCodex의 `boulder.json`에서 세션 간 상태 복원 개념만 취하고 런타임 sqlite·git 추적·강제 위임 constraints는 의도적으로 제외한 것입니다.
-
-원본 증거는 `evidence/`에 이를 뒷받침하는 **plan TODO 번호를 접두어**(`t<NN>-<subject>.<ext>`)로 저장하고, plan의 번호가 곧 인덱스이므로 별도 `INDEX.md`·naming validator·`plan.md` SHA 매니페스트를 만들지 않습니다. `STATUS.md` 같은 손유지 상태 문서도 만들지 않습니다 — 현재 상태는 `ledger.json`의 active + `plan.md`의 첫 미체크 TODO + `evidence.md` 마지막 항목에서 파생됩니다. LazyCodex `.omo`의 깨끗함은 런타임이 인덱스를 자동 기록해서 얻어지는 것이라, 런타임 없는 이 키트는 그 조직 원칙(계획별 증거 분리·번호 색인)만 취하고 JSONL 이벤트 로그는 손으로 append하지 않습니다.
-
-작업 중에는 `.plans/`만 갱신하고, 논문용 SoT인 `docs/`(`results.md`·`protocol.md` 등)는 게이트·마일스톤 시점에 배치로 갱신해 매 스텝 미러링에 따른 토큰 낭비를 피합니다. 측정 값은 canonical 아티팩트에 한 번 존재하고 `evidence.md`는 경로만 가리킵니다.
-
-작은 로컬 수정에는 대장을 만들지 않고, 필요한 파일만 생성합니다. 강제 위임·다중 리뷰 lane 없이 전역 규약(child 1개 유효, deterministic check 직접 실행, semantic reviewer 1명)이 그대로 적용됩니다. `.plans/`는 전역 gitignore로 기본 로컬 전용이며, 추적하려는 레포는 자체 `.gitignore`에 `!.plans/`를 추가합니다.
+작은 로컬 수정에는 대장을 만들지 않습니다. 기존 ledger 스키마와 전역 위임·리뷰·취소 규칙을 유지하며, `.plans/`는 기본적으로 로컬 기록입니다.
 
 ## Sequential Thinking MCP
 
-설치기는 Sequential Thinking MCP가 없으면 `@latest`로 자동 등록하고, 키트 이름으로 이미 있으나 구버전에 고정돼 있으면 최신으로 다시 등록합니다(모든 profile 공통, `SKIP_INTEGRATIONS`에서는 생략). genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용하며 MCP 부재를 성공으로 가장하지 않습니다. Ponytail은 opt-in 통합 대상이고 그 밖의 MCP 서버는 별도로 관리합니다. 키트는 기존 사용자 MCP 등록(`arxiv`, `semantic-scholar`, Zotero 등)을 수정하거나 제거하지 않습니다.
+설치기는 Sequential Thinking MCP가 없으면 `@latest`로 자동 등록하고, 키트 이름으로 이미 있으나 구버전에 고정돼 있으면 최신으로 다시 등록합니다(모든 profile 공통, `SKIP_INTEGRATIONS`에서는 생략). genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용하며 MCP 부재를 성공으로 가장하지 않습니다. Ponytail은 기본 profile의 통합 대상이고 그 밖의 MCP 서버는 별도로 관리합니다. 키트는 기존 사용자 MCP 등록(`arxiv`, `semantic-scholar`, Zotero 등)을 수정하거나 제거하지 않습니다.
 
 ## Review와 evidence 계약
 
 deterministic verifier가 먼저 통과한 뒤 필요한 경우에만 semantic reviewer를 한 명 사용합니다. 기본 review는 최초 1회와 변경 delta에 대한 targeted re-review 1회까지입니다. 세 번째 review는 새 blocker, scope/criterion 변경, 사용자 요청이 있을 때만 허용합니다. `Optional Hardening`만 남으면 종료합니다.
 
-Evidence에는 origin, purpose, blinding, measurement scope, claim scope를 기록합니다. Diagnostic 결과는 claim-bearing 결과와 분리하며 evidence scope를 넘는 claim은 승인하지 않습니다. 물리 장비 capture가 포함된 경우에만 `hardware-capture-integrity` skill을 함께 사용하고 장비별 수치·attempt 한도는 project config/overlay에 둡니다. 이 skill은 canonical run 레이아웃과 필수 산출물 규약(`references/capture_run_layout.md`: manifest/capture_summary JSON·provenance·artifact_roles·진단 PNG·logs·실패 시 blocked.json)과 외부 스코프+MCU GPIO 트리거 rig의 첫-arm 안전 순서(`references/first_trigger_recovery.md`: audit-only warm-up→reset→eligible, trigger-swing gate, retry≤1)를 함께 담아 로깅·JSON·이미지 산출을 표준화하고 첫-트리거 누락을 예방합니다.
+Evidence에는 origin, purpose, claim scope와 측정 대상인 경우 measurement scope를 기록합니다. 디버깅·교정용 diagnostic 결과는 claim-bearing 결과와 구분합니다. 탐색 결과는 탐색적 관찰로 보고할 수 있지만, 튜닝에 사용한 결과를 독립 확인으로 제시하지 않습니다. 기존 실행 기록에 필요한 분류가 있으면 별도 선언 문서를 만들지 않습니다. 물리 장비 capture가 포함된 경우에만 `hardware-capture-integrity` skill을 함께 사용하고 장비별 수치·attempt 한도는 project config/overlay에 둡니다. 이 skill은 canonical run 레이아웃과 필수 산출물 규약(`references/capture_run_layout.md`: manifest/capture_summary JSON·provenance·artifact_roles·진단 PNG·logs·실패 시 blocked.json)과 외부 스코프+MCU GPIO 트리거 rig의 첫-arm 안전 순서(`references/first_trigger_recovery.md`: audit-only warm-up→reset→eligible, trigger-swing gate, retry≤1)를 함께 담아 로깅·JSON·이미지 산출을 표준화하고 첫-트리거 누락을 예방합니다.
 
 RESOURCE 오류나 검증 실패는 해당 단계와 종속 단계, 최종 acceptance를 차단하지만 무관한 분석과 이미 생성된 evidence 보존은 계속할 수 있습니다. scoped retry 후에도 전체 목표가 불가능할 때만 task 전체를 `BLOCKED`로 판정합니다.
 
 ## 연구용 코드 가드 철학
 
-적대적 리뷰는 논리 오류, 증거 부족, 재현성 붕괴, overclaim, fake-pass를 잡는 데 사용합니다. 다만 연구용 실험 코드를 프로덕션 서비스처럼 만들기 위한 방어 코드는 기본 acceptance blocker로 보지 않습니다.
+적대적 리뷰는 논리 오류, 증거 부족, 재현성 붕괴, overclaim, fake-pass를 잡는 데 사용합니다. 현재 연구에 필요 없는 프로덕션 방어 코드와 추상화도 제거해야 할 수정 사항입니다.
 
 유지해야 하는 것은 연구 무결성 가드입니다.
 
@@ -307,7 +306,7 @@ RESOURCE 오류나 검증 실패는 해당 단계와 종속 단계, 최종 accep
 - `claim_scope` 기록과 논문 주장 범위 제한
 - 사용자 설정이나 데이터를 삭제·덮어쓰는 작업의 whitelist, backup, dry-run, fail-fast
 
-반대로 내부 연구 helper의 과도한 dtype/shape 검증, 중복 검증, DoS/resource cap, TOCTOU 방어, 복잡한 exception hierarchy, generic schema/registry/framework machinery는 사용자가 production scope를 요구하지 않는 한 선택적 하드닝으로 둡니다.
+반대로 내부 연구 helper의 과도한 dtype/shape 검증, 중복 검증, DoS/resource cap, TOCTOU 방어, 복잡한 exception hierarchy, generic schema/registry/framework machinery는 현재 작업에 구체적인 필요가 없으면 제거합니다. 추가 실험은 현재 결론을 뒷받침하는 데 필수인지, 더 넓은 주장에 필요한 선택적 확장인지 구분합니다.
 
 이 레포의 설치·검증·정리 스크립트에 있는 `set -euo pipefail`, ownership manifest, 전용 백업 경계, symlink 거부, `exit 1`은 유지합니다. 이 스크립트들은 홈 설정과 백업을 다루므로 사용자 데이터 보호 장치가 필요합니다.
 
@@ -360,4 +359,4 @@ CI workflow는 macOS와 Ubuntu의 live detector 및 공통 회귀 검사를 실�
 - LLM 리뷰가 템플릿만 반복한 경우
 - daemon restart로 문제가 사라진 것처럼 보이는 경우
 
-승인은 오직 claim, artifact, deterministic evidence, adversarial review, current comments/documentation, documentation trail이 일치할 때만 가능합니다.
+완료 판단은 실제 산출물·관련 검증·현재 설명·주장 범위가 일치할 때 내립니다. semantic review는 Review Necessity Gate가 요구할 때만 수행합니다.

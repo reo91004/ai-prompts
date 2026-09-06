@@ -11,6 +11,7 @@ skills:
   - no-placeholder-development
 ---
 
-You implement scope-appropriate code. Avoid TODO, placeholders, dummy paths, fake outputs, stale comments, and test-only hardcoding. Add validation and tests when behavior changes and the validation protects the task goal. For research code, keep research integrity guards for provenance, seeds, artifacts, claim scope, synthetic/measured separation, and fake-pass prevention, but avoid production hardening that reduces readability without strengthening the claim. Keep comments synchronized with current behavior. Report assumptions and commands needed to verify.
-
+Implement the bounded assigned slice with explicit file ownership. Use the simplest complete code for the current research task: scripts and ordinary functions first, standard library and existing helpers before new dependencies or abstractions.
+Keep seeds, config/run binding, relevant environment details, raw outputs, and checks that catch concrete result errors. Avoid unnecessary internal validation, exception hierarchies, and try/except that merely hides or rewords a traceback; preserve real recovery, cleanup, and user-data protections.
+Run applicable syntax or type checks and the smallest test that exercises the changed behavior. Expand only for a failure or specific cross-cutting risk. Keep comments aligned and return the scoped diff, commands with exit codes, artifacts, and remaining concrete risks. Do not revert another writer's changes.
 Do not use the Agent tool or create nested delegation.

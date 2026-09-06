@@ -1,6 +1,6 @@
 # CLAUDE.md — Portable Research & Development Harness
 
-**Last Updated**: 2026-07-13
+**Last Updated**: 2026-09-06
 **Scope**: User-global Claude Code instructions
 **Platforms**: macOS, Linux, WSL
 
@@ -37,9 +37,19 @@ Cut — these only prove something to a third party or harden for production:
 
 Simple is best. When a guard protects a claim, keep it in full. When it only makes the code look professional, delete it.
 
+## Research Style And Interpretation
+
+- Apply **Simple is best** chiefly to implementation and validation: write the smallest complete research program and run the checks that can catch a concrete error in its result.
+- Start with a script and ordinary functions. Add a package, configuration layer, dependency, abstraction, or directory only when the current experiment needs it. A second real caller is the usual reason to extract shared code.
+- Let errors surface with their traceback. Use exception handling only for a concrete recovery or required cleanup; never turn a failed step into a plausible result. Keep seeds, run configuration, relevant package versions, raw outputs, and the checks that prevent wrong numbers.
+- Simple implementation does not mean shallow analysis. When a result is negative or an assessment pessimistic, investigate plausible causes across implementation, data, metrics, baselines, uncertainty, operating conditions, and method assumptions as relevant. Prioritize the causes that could change the conclusion and use discriminating checks to choose the next remedy.
+- Report what the evidence establishes first, then the scope and limitations that matter. A result can be research-sufficient within a stated scope even when broader validation would be useful. Missing optional experiments are not failures.
+- Reconsider pessimistic judgments, including Codex's, against the actual evidence. Distinguish an implementation failure, insufficient information, and a supported negative result. Preserve supported negative findings; look for a useful operating regime, narrower contribution, or next experiment without promising success.
+- New evidence or a new testable explanation can justify further analysis. Repeating the same criticism or seeking agreement cannot. Preserve the original result and label exploratory follow-up; do not select seeds, metrics, subsets, or reruns merely to obtain a favorable conclusion.
+
 ## Global Core
 
-- Use evidence before confidence and reply in Korean unless the user asks otherwise.
+- Use evidence before confidence and reply in Korean unless the user asks otherwise. Honor the current user request within higher-priority instructions; skill defaults must not add approval questions for already authorized work.
 - Use the smallest complete solution. Reject placeholders, silent fallbacks, fake outputs, test-only hardcoding, stale comments, and speculative framework machinery.
 - Research code and process surfaces default to the simplest form that supports the claim. Remove over-engineering, code bloat, and duplicated documents — but never cut the logging, seeds, provenance, or verification metrics that exact reproduction and the claim require. Simplify complexity, not evidence.
 - Over-engineering is a `Required Fix`, symmetric with a placeholder. Do not accept work that carries a guard the Threat Model lists under Cut; delete it first. Both faults are code that should not exist.
@@ -50,6 +60,14 @@ Simple is best. When a guard protects a claim, keep it in full. When it only mak
 - Preserve research integrity: provenance, seeds, config/run binding, artifacts, evidence scope, and synthetic/simulated/measured separation.
 - Start at the lowest model and reasoning effort that fits the task; escalate only on failure or revealed ambiguity.
 - Use Sequential Thinking MCP only for genuinely hard or ambiguous planning, unclear debugging, expensive experiment design, or claim acceptance. If unavailable when warranted, record the limitation.
+
+## Claude–Codex Collaboration
+
+- Collaborate with Codex across all parts of the work: problem framing, design, implementation, debugging, verification, result interpretation, and reporting. Use its input when that phase has a concrete decision or artifact; small related steps may share one exchange.
+- Prefer an available Codex connector or the installed `resource-aware-orchestration/scripts/run_codex_agent.sh` with the matching role. Send the relevant question, artifact, and evidence. Use read-only input by default; an implementation assignment needs explicit file ownership and isolation.
+- Incorporate Codex's reasoning into the work and challenge unsupported pessimism with evidence and alternative explanations. Ask for causes, discriminating checks, and practical remedies, not a more favorable verdict. Claude remains responsible for the final judgment.
+- Reuse useful collaboration as the applicable review; it does not create a second approval chain. The review budget limits repeated verdicts on the same artifact, not investigation of a new cause or evidence.
+- If Codex is unavailable, state that once and continue authorized work with local checks, subject to the evidence required for the claim. Do not claim collaboration happened. Codex children must not launch further agents; orchestration stays with the parent.
 
 ## Delegation Contract
 

@@ -10,6 +10,65 @@ kit_require_real_dir "$HOME/.agents"
 kit_require_real_dir "$HOME/.codex/agents"
 kit_require_real_dir "$HOME/.agents/skills"
 
+# Keep the user config intact except for this feature; unsupported TOML forms
+# fail before replacement instead of risking a duplicate or misplaced key.
+config="$HOME/.codex/config.toml"
+kit_require_regular_or_absent "$config"
+config_input="$config"
+[ -f "$config_input" ] || config_input=/dev/null
+config_next="$KIT_BACKUP_DIR/codex-config.next"
+if ! awk '
+  function finish_section() {
+    if (target && !key_seen) print "experimental_mode = true"
+  }
+  {
+    line = $0
+    # Multiline strings can contain text that looks like table headers.
+    if (index(line, "\"\"\"") || index(line, sprintf("%c%c%c", 39, 39, 39))) exit 1
+    sub(/#.*/, "", line)
+    gsub(/[[:space:]]/, "", line)
+    normalized = line
+    gsub(/[\"\047]/, "", normalized)
+    if (target && line ~ /=\[/ && line !~ /]$/) exit 1
+    if (line ~ /^\[/) {
+      if (index(line, "\\")) exit 1
+      finish_section()
+      target = (line == "[features.context_management]")
+      if ((normalized ~ /^\[features(\.|])/ && normalized != line) ||
+          normalized ~ /^\[\[features(\.|])/ ||
+          normalized ~ /^\[features\.context_management\.experimental_mode(\.|])/) exit 1
+      if (target) {
+        if (section_seen++) exit 1
+        key_seen = 0
+      }
+      section = line
+    } else if ((section == "" || section == "[features]" || target) &&
+               line ~ /^[^=]*\\/) {
+      exit 1
+    } else if (target && line ~ /^experimental_mode=/) {
+      if (key_seen++ || line !~ /^experimental_mode=(true|false)$/) exit 1
+      sub(/=[[:space:]]*(true|false)/, "= true")
+    } else if ((section == "" && normalized ~ /^features[.=]/) ||
+               (section == "[features]" && normalized ~ /^context_management[.=]/) ||
+               (target && (normalized ~ /^experimental_mode\./ ||
+                           (normalized ~ /^experimental_mode=/ && normalized != line)))) {
+      exit 1
+    }
+    print
+  }
+  END {
+    finish_section()
+    if (!section_seen) {
+      if (NR) print ""
+      print "[features.context_management]\nexperimental_mode = true"
+    }
+  }
+' "$config_input" > "$config_next"; then
+  kit_die "Cannot safely update $config. Use [features.context_management] with a boolean experimental_mode; quoted/dotted/inline feature settings and multiline values in this table are unsupported; multiline strings and escaped table headers or related keys are unsupported."
+fi
+kit_backup_path "$config" "codex/config.toml"
+kit_replace_file "$config_next" "$config"
+
 kit_backup_path "$HOME/.codex/AGENTS.md" "codex/AGENTS.md"
 kit_backup_path "$HOME/.codex/agents" "codex/agents"
 kit_backup_path "$HOME/.agents/skills" "shared/skills"

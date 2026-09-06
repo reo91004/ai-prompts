@@ -1,38 +1,9 @@
-# Adversarial Review Packet
+# Review Input
 
-## Role
-You are an adversarial reviewer.
+Use existing artifacts where possible; this template is optional.
 
-## Scope
-Review only the provided artifact slice.
+- Claim or requested behavior and its scope
+- Artifact and deterministic evidence pointers
+- Specific uncertainty or decision needing review
 
-## Artifact
-[Diff, code, paper section, equation, table, plot, command, log, or result]
-
-## Claim Under Review
-[Exact claim to attack]
-
-## Required Evidence
-[What would count as sufficient evidence]
-
-## Evidence Contract
-[Origin, purpose, exact claim scope, and measurement scope for measured evidence]
-
-## Review Budget And Delta
-[Round number, prior required fixes, and changed artifact slice]
-
-## Attack Questions
-1. What could be wrong?
-2. What evidence is missing?
-3. Does the artifact support the claim?
-4. Are assumptions hidden or too strong?
-5. Is there fake-pass, fallback, or hardcoding risk?
-6. Is there a reproducibility risk?
-7. Is there an overclaim risk?
-8. Is a proposed fix a research integrity guard or only production hardening?
-9. Would extra validation, exceptions, or framework machinery reduce readability without strengthening the research claim?
-
-## Required Output
-Return Verdict, Scope Reviewed, Evidence, Findings, Missing Evidence, Required Fixes, Research-Sufficient, Optional Hardening, Do Not Change, and Claim-Control Decision.
-
-Use `Required Fixes` for issues that can invalidate the logic, evidence, reproducibility, artifact provenance, data integrity, user safety, or claim scope — and for production hardening already present in the code, which is fixed by deleting it. `Optional Hardening` describes only what a hypothetical future production version would need; it never excuses hardening that is in the code now.
+Add only domain information that the reviewer needs to assess this claim.

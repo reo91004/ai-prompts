@@ -1,17 +1,11 @@
-# Evidence and Acceptance Gate
+# Acceptance Gate
 
-Accept only if all relevant items hold:
-1. The research question or development goal is explicit.
-2. The artifact scope is known.
-3. Required deterministic checks were run or explicitly marked unavailable.
-4. Logs, data, code, derivations, citations, or reports support the claim.
-5. Adversarial review was performed for important changes.
-6. No placeholder, fake-pass, TODO, dummy, stub, or test-only hardcoding remains.
-7. Reproducibility path exists when required.
-8. Limitations are documented.
-9. The evidence contract is complete when a research or benchmark claim is present.
-10. Claims do not exceed evidence origin, purpose, measurement scope, or claim scope.
+1. The requested behavior or stated claim has inspectable artifacts and passes its applicable deterministic checks.
+2. There are no placeholders, fake passes, or silent substitutions, and implementation stays as simple as the task permits.
+3. Research results retain the configuration, seed, code/environment context, and raw outputs needed for reproduction. Domain-specific evidence matches the claim.
+4. Comments, documentation, figures, and conclusions agree with the evidence.
+5. Apply semantic review only when the Review Necessity Gate requires it. Fix concrete errors and unsupported claims; distinguish optional extensions from required fixes.
+6. State the supported outcome first. Accept a scoped contribution or a supported negative finding when the evidence is sufficient for that conclusion.
+7. If the finding is unexpectedly negative or a review pessimistic, investigate plausible causes and practical remedies before generalizing the failure. A hypothesis remains a hypothesis until tested.
 
-For research code, block only on issues that weaken claim validity, reproducibility, provenance, artifact integrity, user data safety, or fake-pass prevention. Production-only hardening is optional unless production use is part of the claim.
-
-Block if logs are missing, results are partial but described as complete, review is generic, daemon restart is used as evidence, tests pass only because behavior was bypassed, data or plots cannot be regenerated, or the claim relies on hidden assumptions.
+The gate decides the current claim, not whether every possible experiment has been run. New evidence may reopen analysis; repeating a verdict without new evidence does not add confidence.

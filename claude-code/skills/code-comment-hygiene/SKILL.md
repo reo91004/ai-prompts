@@ -1,27 +1,10 @@
 ---
 name: code-comment-hygiene
-description: Use whenever reading, editing, refactoring, reviewing, cleaning, or accepting code that contains comments, docstrings, TODOs, FIXME notes, legacy explanations, or implementation history.
+description: Use when changing commented code or explicitly reviewing comments, docstrings, TODOs, or mismatches between explanations and behavior.
 ---
 
-## Purpose
-Keep code comments and docstrings truthful, current, minimal, and useful.
+# Code Comment Hygiene
 
-Read `references/comment_hygiene_policy.md` before accepting any code change that touches comments or legacy code.
+Check comments and docstrings on the changed path against the current behavior. For an explicit comment audit, use the requested scope. Merely reading code with comments does not trigger a repository-wide audit or a separate reviewer.
 
-## Required Checks
-- Compare comments against executable behavior.
-- Remove or rewrite stale, misleading, speculative, or historical comments.
-- Reject TODO/FIXME/HACK/temporary comments in accepted code unless the user explicitly requested a planning stub.
-- Move unfinished work into carry-over docs or issue tracker instead of leaving TODOs in source.
-- Treat comments as explanation only, never as implementation evidence.
-- Prefer no comment over a stale or obvious one; comment only why, assumptions, invariants, units, or provenance.
-- Keep docstrings only on public or research-risky functions; do not docstring every function or restate type hints.
-- Keep resource and review policy change history in documentation, not source comments. Comments may state only the current invariant or threshold provenance.
-- When scanning for unfinished markers, distinguish policy examples and quoted forbidden terms from executable-source markers; report both categories separately rather than treating documentation examples as unfinished implementation.
-
-## Output
-When reviewing, report:
-- stale comments found;
-- comments updated or removed;
-- TODO/FIXME/HACK items moved to carry-over;
-- any remaining comment risk.
+Use `references/comment_hygiene_policy.md`. Remove stale history, duplicated explanations, and unused TODOs; retain the rationale needed to understand a scientific choice or non-obvious implementation constraint. Comments explain code and never prove a result.

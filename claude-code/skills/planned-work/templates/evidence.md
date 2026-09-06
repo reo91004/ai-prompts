@@ -1,25 +1,6 @@
-# Evidence Ledger: [work item title]
+# Evidence: [work item]
 
-Deterministic checks record command and exit code. Claim-bearing entries add
-the evidence contract fields (origin, purpose, claim scope, and measurement
-scope when measured) from `evidence-gate/references/evidence_contract.md`. Raw output
-lives under `evidence/t<NN>-*`; this table only points to it — do not paste
-result prose or a SHA manifest here.
-
-## Deterministic Checks
-
-| Task | Command | Exit | Artifact (evidence/…) | Result summary |
+| Task | Command or check | Exit | Artifact pointer | Finding |
 |---|---|---|---|---|
-| t01 | `[command]` | 0 | `evidence/t01-baseline.log` | [무엇이 확인됐는가] |
 
-## Claim-Bearing Evidence
-
-### [claim 요약]
-
-- evidence_origin: [synthetic | simulated | measured]
-- evidence_purpose: [diagnostic | claim_bearing]
-- measurement_scope: [measured 증거일 때만]
-- claim_scope: [namespace:value]
-- Artifact: [evidence/t<NN>-* 또는 canonical run 경로 — 값 복제 말고 참조]
-- Allowed statement: [증거가 지지하는 최대 서술]
-- Blocked statement: [이 증거로는 주장할 수 없는 것]
+For research results, link to the existing run record carrying origin, purpose, scope, config, seed, environment, and raw outputs. Label exploratory follow-up. Do not duplicate those records here or treat an unrun check as passed.

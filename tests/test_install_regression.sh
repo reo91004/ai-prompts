@@ -6,8 +6,9 @@ REAL_HOME="$HOME"
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
 ROLLBACK_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-rollback.XXXXXX")"
+CONFIG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-config.XXXXXX")"
 VALIDATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/harness-validation.XXXXXX")"
-trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME" "$VALIDATION_ROOT"' EXIT HUP INT TERM
+trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME" "$VALIDATION_ROOT" "$CONFIG_HOME"' EXIT HUP INT TERM
 
 home_prompt_signature() {
   for path in "$REAL_HOME/.codex/AGENTS.md" "$REAL_HOME/.claude/CLAUDE.md"; do
@@ -40,8 +41,78 @@ printf '%s\n' 'third-party-claude-skill' > "$TMP_HOME/.claude/skills/third-party
 
 echo "Install regression run 1 (POSIX sh bootstrap)"
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 sh "$ROOT/install.sh"
+cat > "$TMP_HOME/expected-config.toml" <<'EOF'
+[features.context_management]
+experimental_mode = true
+EOF
+cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
 echo "Install regression run 2 (repeat install)"
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh"
+
+cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
+
+echo "Codex context management config merge regression"
+mkdir -p "$CONFIG_HOME/.codex"
+for mode in false true missing; do
+  {
+    printf '%s\n' 'model = "custom-model"' '[features]' 'shell_tool = false' '' '[features.context_management]'
+    [ "$mode" = missing ] || printf 'experimental_mode = %s # keep this comment\n' "$mode"
+    printf '%s\n' '[mcp_servers.local]' 'command = "custom-command"'
+  } > "$CONFIG_HOME/.codex/config.toml"
+  if [ "$mode" = missing ]; then
+    sed '/^\[mcp_servers.local\]/i\
+experimental_mode = true
+' "$CONFIG_HOME/.codex/config.toml" > "$CONFIG_HOME/expected.toml"
+  else
+    sed 's/experimental_mode = false/experimental_mode = true/' "$CONFIG_HOME/.codex/config.toml" > "$CONFIG_HOME/expected.toml"
+  fi
+  HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh"
+  cmp "$CONFIG_HOME/expected.toml" "$CONFIG_HOME/.codex/config.toml"
+done
+
+printf '%s\n' '[agents]' 'max_threads = 9' > "$CONFIG_HOME/.codex/config.toml"
+cat > "$CONFIG_HOME/expected.toml" <<'EOF'
+[agents]
+max_threads = 9
+
+[features.context_management]
+experimental_mode = true
+EOF
+HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh"
+cmp "$CONFIG_HOME/expected.toml" "$CONFIG_HOME/.codex/config.toml"
+
+for unsupported in \
+  'features.context_management.experimental_mode = false' \
+  'features = { context_management = { experimental_mode = false } }' \
+  '[features]
+context_management = { experimental_mode = false }' \
+  '[features.context_management]
+experimental_mode = "false"' \
+  '[features."context_management"]
+experimental_mode = false' \
+  '["fea\u0074ures".context_management]
+experimental_mode = false' \
+  '[features.context_management]
+"experimental_\u006dode" = false' \
+  '"fea\u0074ures".context_management.experimental_mode = false' \
+  '[features.context_management]
+values = [
+[1, 2]
+]
+experimental_mode = false' \
+  'instructions = """
+[features.context_management]
+experimental_mode = false
+"""'; do
+  printf '%s\n' "$unsupported" > "$CONFIG_HOME/.codex/config.toml"
+  cp "$CONFIG_HOME/.codex/config.toml" "$CONFIG_HOME/expected.toml"
+  if HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh" > "$CONFIG_HOME/unsupported.log" 2>&1; then
+    echo "Unsupported config unexpectedly accepted: $unsupported" >&2
+    exit 1
+  fi
+  grep -Fq 'Cannot safely update' "$CONFIG_HOME/unsupported.log"
+  cmp "$CONFIG_HOME/expected.toml" "$CONFIG_HOME/.codex/config.toml"
+done
 
 grep -Fqx 'third-party-codex-agent' "$TMP_HOME/.codex/agents/third_party.toml"
 grep -Fqx 'third-party-codex-skill' "$TMP_HOME/.agents/skills/third-party/SKILL.md"

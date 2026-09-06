@@ -1,25 +1,16 @@
 # Evidence Contract
 
-Every research or benchmark claim must carry a complete evidence classification. Development claims should use the same fields when the distinction is material.
+For a claim-bearing experiment, retain:
 
-## Required Fields
+- The question, claim scope, data provenance, and whether evidence is synthetic, simulated, or measured.
+- Seed, configuration, relevant package versions, raw outputs, and the code state needed to reproduce the run.
+- The baseline, metric definition, and uncertainty or repetition needed for this conclusion.
+- The association between the run and the reported numbers or figures.
 
-- `evidence_origin`: `synthetic` | `simulated` | `measured`
-- `evidence_purpose`: `diagnostic` | `claim_bearing`
-- `claim_scope`: a non-empty `namespace:value` identifier defined by the task packet
-- `measurement_scope`: `isolated_primitive` | `instrumented_subpath` | `full_algorithm_path` | `full_kem_path` — required for measured evidence only
+Keep the existing field names `evidence_origin` (`synthetic` / `simulated` / `measured`), `evidence_purpose` (`diagnostic` / `claim_bearing`), and `claim_scope`. For measured evidence, `measurement_scope` states what was actually measured. Reuse project identifiers and record a narrowed claim explicitly; do not force cryptographic path categories onto other domains. An isolated component measurement cannot establish whole-system behavior.
 
-These three-to-four fields are the whole contract; they exist to stop a claim from outrunning what was actually run. Do not add ceremony fields that only describe process. The result must return the task packet's exact `claim_scope`; changing it requires a new task packet and review budget.
+The project selects domain checks that protect its actual claim. Hardware checks apply to physical runs; leakage, key-recovery, attack-budget, and trace-alignment evidence apply only to claims that require them.
 
-## Optional Field
+Use `diagnostic` for debugging or calibration that does not support the reported claim, and `claim_bearing` for evidence used by that claim. Exploratory results may support explicitly scoped observations; selecting a hypothesis on those results does not make them independent confirmation. Preserve original results and distinguish follow-up analysis.
 
-- `blinding`: `unblinded` | `blinded` — record only when a human or model judgment selected, tuned, or scored the result. Omit it entirely for a deterministic measurement, where there is nothing to blind.
-
-## Acceptance Rules
-
-- Diagnostic evidence may guide debugging or experiment design but cannot directly support a claim-bearing conclusion.
-- Synthetic or simulated evidence cannot support a measured-real-system claim.
-- Evidence from an isolated primitive or instrumented subpath cannot support a full-algorithm or full-KEM claim.
-- Unblinded selection or tuning must be disclosed and cannot be presented as blinded confirmation.
-- Missing, malformed, or internally inconsistent fields block the affected claim.
-- Before writing a result down, state in one line that the claim does not exceed the evidence origin, purpose, measurement scope, and claim scope. This is a self-check the author or agent performs; it does not require a separate reviewer.
+Use existing logs and `.plans/ledger.json` when work needs cross-session recovery. Do not create duplicate packets, hash manifests, or approval records just to restate the evidence.

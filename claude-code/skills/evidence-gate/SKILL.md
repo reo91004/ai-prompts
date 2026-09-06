@@ -1,24 +1,15 @@
 ---
 name: evidence-gate
-description: Use before accepting any claim, experiment, implementation, report, benchmark, or review outcome.
+description: Use when accepting research results or material implementation, benchmark, or report claims; scale evidence checks to the stated claim.
 ---
 
-## Use
-Apply this before saying work is complete, validated, reproduced, secure, faster, better, accepted, or done.
+# Evidence Gate
 
-Read `references/evidence_contract.md` to classify evidence and `references/acceptance_gate.md` when deciding acceptance.
+Bind the conclusion to inspectable evidence and an explicit scope. Small edits use their relevant deterministic check; they do not need an experiment packet, work ledger, or semantic reviewer solely to say the edit is complete.
 
-A review without artifact-specific evidence is incomplete.
+For research claims, use `references/evidence_contract.md` and the applicable domain checks. For semantic review, first apply `review-budget` and then `references/acceptance_gate.md`.
 
-Keep evidence and metric rigor in full, but do not let it grow into production-style defensive code, duplicated validation, or framework machinery — see `no-placeholder-development/references/research_code_guard_policy.md` for the Keep-vs-Simplify boundary.
-
-## Output
-State, for the claim under review:
-
-- Claim:
-- Evidence contract: origin, purpose, claim scope, and measurement scope for measured evidence
-- Evidence available:
-- Evidence missing:
-- Allowed statement:
-- Blocked statement:
-- Next smallest experiment:
+- A failed deterministic gate blocks the behavior or claim it tests. Preserve independent valid findings and continue unrelated work.
+- Distinguish code failure, insufficient evidence, and a supported negative result. A completed experiment may establish that a method did not work under the tested conditions.
+- Recognize research-sufficient results within their supported scope. Optional broader experiments are not required fixes.
+- For an unexpectedly weak result, check plausible errors, alternative explanations, and remedies using the result-analysis guidance in `adversarial-review`; do not relabel failure as success.
