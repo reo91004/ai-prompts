@@ -1,53 +1,14 @@
-# Claude Code Global Research Kit
+# Claude Code
 
-설치:
-
-```bash
-bash claude-code/install.sh
-```
-
-플랫폼 지침과 스킬을 설치하는 명령입니다. 루트의 `./install.sh`는 기본으로 Ponytail·Sequential Thinking·Graphify·Headroom을 함께 구성합니다. `--integrations none`은 kit-owned Ponytail과 레거시 통합을 정리합니다. user-owned plugin/marketplace는 보존하며 결과는 `integrations.state`에 기록합니다.
-
-설치 위치:
-
-```text
-~/.claude/CLAUDE.md
-~/.claude/agents/*.md
-~/.claude/skills/*/SKILL.md
-```
-
-`CLAUDE.md`는 항상 로드됩니다. `agents`는 subagent 정의입니다. `skills`는 관련 작업일 때만 본문이 로드되어 세부 템플릿과 도메인 규칙을 필요할 때 적용합니다.
-
-역할별 모델과 effort를 고정하려면 Agent 도구의 정확한 subagent type 또는 `@agent-name`을 사용합니다. `description` 기반 자동 선택은 휴리스틱이므로 고정 역할의 근거로 쓰지 않습니다. `CLAUDE_CODE_SUBAGENT_MODEL`과 `CLAUDE_CODE_EFFORT_LEVEL`이 설정되어 있으면 agent 정의를 바꿀 수 있으므로 task packet과 검증 evidence에 함께 기록합니다.
-
-Claude는 계획·구현·검증·분석·보고 전반에서 Codex와 협력합니다. 사용 가능한 Codex connector 또는 설치된 `resource-aware-orchestration/scripts/run_codex_agent.sh`를 사용합니다. 작은 단계는 묶어 다루고 기존 검토를 재사용하며, 연결할 수 없으면 이를 밝히고 허용된 작업을 계속합니다. Codex MCP 자체는 필수가 아닙니다.
-
-## Portable harness
-
-macOS, Linux, WSL을 지원하며 Native Windows와 Git Bash는 제외합니다. non-trivial 작업은 위임 트리거(구현 슬라이스·낯선 코드 탐색·큰 출력 격리·도메인 리뷰·material claim 수용·독립 병렬)를 먼저 찾아 적극 위임하고, 트리거가 없으면 main-only로 처리합니다. child 1개도 0개도 유효하며 강제 최소 인원은 없습니다. 기본 thread 상한 6은 목표가 아니라 ceiling이고 depth는 1입니다. writer는 shared worktree당 하나, heavy command는 한 번에 하나만 실행합니다. 모든 child에서 `Agent` 도구를 금지합니다. 큰 출력은 artifact에 두고 요약만 회수하며, 장기 실행 작업은 progress/checkpoint 계약으로 관리하고 경과 시간만으로 중단하지 않습니다.
-
-긴 학습·캡처는 Claude Code [`Monitor`](https://code.claude.com/docs/en/tools-reference#monitor-tool)를 우선 사용합니다. watcher는 routine progress를 로그에만 쓰고 완료·실패·권한 요청·확정된 무진행·자원/장비 비상·operator intervention만 모델에 전달합니다. 실행 중인 버전이 background subagent의 reliable completion semantics를 보장하지 않으면 `Monitor` 또는 foreground blocking을 사용하며 `/tasks`나 output file을 반복 polling하지 않습니다.
-
-Fable은 main orchestrator 권장 모델일 뿐 강제되지 않습니다. 이 설치기는 Claude main model이나 사용자별 설정을 자동 변경하지 않습니다.
-
-`resource-aware-orchestration`은 컴퓨터별 CPU·메모리·swap·PSI·cgroup 상태를 매 spawn wave 전에 측정합니다. `review-budget`은 변경 범위별 최소 deterministic validation을 먼저 정하고, 필요한 경우에만 semantic reviewer 한 명과 기본 1회의 targeted delta review를 허용합니다. installer regression과 integration migration은 해당 경로가 바뀐 경우에만 실행하며, 물리 capture가 있을 때만 `hardware-capture-integrity`를 사용합니다.
-
-저장소 검증:
+설치·갱신·검증·백업 정리는 저장소 루트의 [install.sh](../install.sh)를 사용합니다. 기본 설치는 MCP·Ponytail·Graphify·Headroom을 유지하며 자세한 옵션과 사용자 파일 보호 범위는 [공통 안내](../README.md)에 있습니다.
 
 ```bash
-bash scripts/validate_harness.sh
-bash tests/test_resource_detector.sh
-bash tests/test_codex_agent_runner.sh
+sh install.sh
+sh install.sh --verify
 ```
 
-CI workflow는 macOS·Ubuntu의 live detector를 실행하도록 구성했지만 remote run은 아직 확인되지 않았습니다. 현재 로컬 실측은 macOS이고 WSL은 fixture 근거만 있으므로 실제 WSL 호스트와 물리 장비 capture는 별도 실측이 필요합니다.
+[CLAUDE.md](CLAUDE.md)는 상시 판단 기준입니다. [agents/](agents/)의 15개 정의는 역할별 모델·effort·도구·권한을 유지하며, 공통 [skills/](../skills/)는 `~/.claude/skills/`로 복사됩니다. 스킬 원본 공유가 agent 설정을 합치지는 않습니다.
 
-## 포함된 정책
+역할별 Opus/Sonnet과 도구 제한을 적용하고 실제 환경 override가 있으면 구분합니다. 모델이나 실행 방법의 상세는 [플랫폼 실행 안내](../skills/resource-aware-orchestration/references/platform_dispatch.md)를 필요한 때 읽습니다.
 
-Includes `code-comment-hygiene` skill and reviewer agent. Use it for stale comments, TODO/FIXME/HACK cleanup, and comment-code mismatch review.
-
-Includes `research-repo-design` skill and `research-repo-architect` agent. Use them before creating, reviewing, or refactoring AI/ML, hardware-backed, side-channel, simulation, or handoff-driven research experiment repositories.
-
-Includes calibrated research-code guard policy. Adversarial review should require fixes for claim integrity, provenance, seed/config/run binding, synthetic/measured separation, fake-pass prevention, and user-data safety; unneeded production-only code is removed, while optional broader experiments do not block a scoped research result.
-
-Includes `planned-work` skill. Use it for multi-session, claim-bearing, or handover-driven work: it keeps a user-inspectable plan and evidence ledger under the project's `.plans/` — a machine-readable `ledger.json` (active work, status, constraints) plus a `plan.md` TODO checklist — without LazyCodex-style forced delegation or multi-lane review.
+Codex와의 협력은 구체적인 질문·독립 산출물·유용한 검토가 있는 단계에서 사용하고, 같은 검토를 중복 승인으로 만들지 않습니다. 장기 실행은 [완료 기반 실행 안내](../skills/resource-aware-orchestration/references/long_runs.md)에 따라 로그·체크포인트·종료 evidence를 관리합니다. 주 모델 설정은 사용자가 선택합니다.

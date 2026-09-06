@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tooling-install.XXXXXX")"
@@ -73,7 +74,7 @@ chmod +x "$MOCK_BIN/uv" "$MOCK_BIN/claude" "$MOCK_BIN/codex"
 run_tooling() {
   HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
     UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
-    bash "$ROOT/install_tooling.sh"
+    bash "$ROOT/install.sh"
 }
 
 UV_TOOL_BIN_DIR="$TMP_ROOT/tool-bin"
@@ -96,7 +97,7 @@ grep -Fqx '# BEGIN UNIVERSAL RESEARCH AGENT KIT GRAPHIFY' "$TMP_HOME/.codex/AGEN
 grep -Fqx '# END UNIVERSAL RESEARCH AGENT KIT GRAPHIFY' "$TMP_HOME/.codex/AGENTS.md"
 grep -Fqx '# user-owned zshrc content' "$TMP_HOME/.zshrc"
 grep -Fqx '# user-owned bashrc content' "$TMP_HOME/.bashrc"
-grep -Fqx 'user-owned Claude prompt content' "$TMP_HOME/.claude/CLAUDE.md"
+grep -Fqx 'user-owned Claude prompt content' "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/claude/CLAUDE.md
 
 for shell_file in "$TMP_HOME/.zshrc" "$TMP_HOME/.bashrc"; do
   [ "$(grep -Fxc '# BEGIN UNIVERSAL RESEARCH AGENT KIT HEADROOM' "$shell_file")" -eq 1 ]
@@ -151,7 +152,7 @@ printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom, version 10.34.0-d
 chmod +x "$BAD_VERSION_BIN/graphify" "$BAD_VERSION_BIN/headroom"
 HOME="$BAD_VERSION_HOME" PATH="$BAD_VERSION_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
-  bash "$ROOT/install_tooling.sh" >/dev/null
+  bash "$ROOT/install.sh" >/dev/null
 grep -Fqx 'graphify=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/tooling.state"
 [ "$(grep -Fc 'uv tool install' "$CALLS")" -eq 4 ]
@@ -168,7 +169,7 @@ printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom 0.33.0"' > "$SHADO
 chmod +x "$SHADOW_LOCAL_BIN/graphify" "$SHADOW_LOCAL_BIN/headroom"
 HOME="$SHADOW_HOME" PATH="$SHADOW_LOCAL_BIN:$MOCK_BIN:$SHADOW_TOOL_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
-  bash "$ROOT/install_tooling.sh" >"$TMP_ROOT/shadow-install.out" 2>&1 || {
+  bash "$ROOT/install.sh" >"$TMP_ROOT/shadow-install.out" 2>&1 || {
     cat "$TMP_ROOT/shadow-install.out" >&2
     echo "a stale binary earlier in PATH must not fail the install" >&2
     exit 1
@@ -182,7 +183,7 @@ mkdir -p "$FULL_HOME"
 HOME="$FULL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
   UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 \
-  bash "$ROOT/install_all.sh" >"$TMP_ROOT/full-install.out" 2>&1 || {
+  bash "$ROOT/install.sh" >"$TMP_ROOT/full-install.out" 2>&1 || {
     cat "$TMP_ROOT/full-install.out" >&2
     exit 1
   }
@@ -204,7 +205,7 @@ printf '%s\n' 'old-antigravity-version' > "$GRAPHIFY_FAIL_HOME/.gemini/config/sk
 set +e
 HOME="$GRAPHIFY_FAIL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
-  TOOLING_TEST_GRAPHIFY_FAIL=codex bash "$ROOT/install_tooling.sh" >"$TMP_ROOT/graphify-failure.out" 2>&1
+  TOOLING_TEST_GRAPHIFY_FAIL=codex bash "$ROOT/install.sh" >"$TMP_ROOT/graphify-failure.out" 2>&1
 graphify_failure_rc=$?
 set -e
 [ "$graphify_failure_rc" -ne 0 ]
@@ -233,7 +234,7 @@ FAIL_HOME="$TMP_ROOT/fail-home"
 mkdir -p "$FAIL_HOME"
 set +e
 HOME="$FAIL_HOME" PATH="$MOCK_BIN:/usr/bin:/bin" UV_TOOL_BIN_DIR="$TMP_ROOT/fail-bin" \
-  TOOLING_TEST_CALLS="$CALLS" TOOLING_TEST_UV_FAIL=1 bash "$ROOT/install_tooling.sh" >"$TMP_ROOT/failure.out" 2>&1
+  TOOLING_TEST_CALLS="$CALLS" TOOLING_TEST_UV_FAIL=1 bash "$ROOT/install.sh" >"$TMP_ROOT/failure.out" 2>&1
 failure_rc=$?
 set -e
 [ "$failure_rc" -ne 0 ]
@@ -245,7 +246,7 @@ mkdir -p "$CONFIG_DIR_HOME"
 set +e
 HOME="$CONFIG_DIR_HOME" CLAUDE_CONFIG_DIR="$CONFIG_DIR_HOME/custom-claude" \
   PATH="$MOCK_BIN:/usr/bin:/bin" UV_TOOL_BIN_DIR="$TMP_ROOT/config-dir-bin" \
-  TOOLING_TEST_CALLS="$CALLS" bash "$ROOT/install_tooling.sh" >"$TMP_ROOT/config-dir-failure.out" 2>&1
+  TOOLING_TEST_CALLS="$CALLS" bash "$ROOT/install.sh" >"$TMP_ROOT/config-dir-failure.out" 2>&1
 config_dir_rc=$?
 set -e
 [ "$config_dir_rc" -ne 0 ]

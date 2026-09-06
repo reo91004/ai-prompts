@@ -227,6 +227,8 @@ run_kit() {
     "$@"
 }
 
+[ "${KIT_TEST_FIXTURES_ONLY:-0}" != 1 ] || return 0
+
 echo "Scenario A: legacy kit integrations reconcile to profile none"
 A_HOME="$WORK/home-a"
 A_CODEX="$WORK/mock-a-codex"
@@ -234,7 +236,7 @@ A_CLAUDE="$WORK/mock-a-claude"
 mkdir -p "$A_HOME/.codex/plugins" "$A_HOME/.claude/plugins"
 seed_codex_mock_state "$A_CODEX" "$A_HOME" kit
 seed_claude_mock_state "$A_CLAUDE" "$A_HOME" kit
-run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
 grep -Fqx 'codex plugin remove omo@sisyphuslabs' "$A_CODEX/calls.log" || {
   echo "legacy LazyCodex was not removed" >&2; exit 1; }
@@ -252,12 +254,12 @@ grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.l
 [ "$(state_value "$A_HOME" claude_sequential_thinking)" = "registered_kit" ]
 
 echo "Scenario A repeat: converged state stays converged and verifies"
-run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 # Removal converges to absence: the second run finds nothing to remove.
 [ "$(state_value "$A_HOME" codex_lazycodex)" = "not_requested" ]
 [ "$(state_value "$A_HOME" codex_sequential_thinking)" = "preexisting" ]
 [ "$(state_value "$A_HOME" claude_sequential_thinking)" = "preexisting" ]
-run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null
 
 echo "Scenario B: default profile is ponytail and user-owned Ponytail is preserved"
 B_HOME="$WORK/home-b"
@@ -282,7 +284,7 @@ case "\$cmd" in
 esac
 MOCK
 chmod +x "$MOCK_BIN/git"
-run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install_all.sh" >/dev/null
+run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install.sh" >/dev/null
 rm -f "$MOCK_BIN/git"
 
 if grep -Eq 'remove|uninstall|disable' "$B_CODEX/calls.log" "$B_CLAUDE/calls.log"; then
@@ -293,7 +295,7 @@ fi
 [ "$(state_value "$B_HOME" codex_ponytail)" = "preserved_user_owned" ]
 [ "$(state_value "$B_HOME" claude_ponytail)" = "preserved_user_owned" ]
 [ "$(state_value "$B_HOME" codex_lazycodex)" = "not_requested" ]
-run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null
 
 echo "Scenario A follow-up: a user-installed non-pinned Ponytail after removal still verifies"
 node -e '
@@ -306,19 +308,19 @@ node -e '
     { name: "ponytail", path: "/opt/user-marketplace/ponytail" },
   ]));
 ' "$A_CLAUDE"
-run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null || {
+run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null || {
   echo "verify failed after the user installed their own non-pinned Ponytail" >&2
   exit 1
 }
 
-echo "Scenario C: standalone install_integrations.sh records state"
+echo "Scenario C: unified installer records integration state"
 C_HOME="$WORK/home-c"
 C_CODEX="$WORK/mock-c-codex"
 C_CLAUDE="$WORK/mock-c-claude"
 mkdir -p "$C_HOME/.codex/plugins" "$C_HOME/.claude/plugins"
 seed_codex_mock_state "$C_CODEX" "$C_HOME" empty
 seed_claude_mock_state "$C_CLAUDE" "$C_HOME" empty
-run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" none >/dev/null
+run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 [ "$(state_value "$C_HOME" requested_profile)" = "none" ]
 [ "$(state_value "$C_HOME" codex_ponytail)" = "not_requested" ]
 [ "$(state_value "$C_HOME" codex_lazycodex)" = "not_requested" ]
@@ -326,7 +328,7 @@ run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install_integrations.sh" no
 [ "$(state_value "$C_HOME" codex_sequential_thinking)" = "registered_kit" ]
 [ "$(state_value "$C_HOME" claude_sequential_thinking)" = "registered_kit" ]
 
-echo "Scenario D: any-version LazyCodex is removed and max_threads is capped"
+echo "Scenario D: any-version LazyCodex is removed and user max_threads is preserved"
 D_HOME="$WORK/home-d"
 D_CODEX="$WORK/mock-d-codex"
 D_CLAUDE="$WORK/mock-d-claude"
@@ -387,7 +389,7 @@ node -e '
       .map((n) => dir + "/" + n + ".toml"),
   }));
 ' "$D_OMO_DATA/.installed-agents.json" "$D_AGENTS"
-run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
 for gone in lazycodex-worker-high lazycodex-code-reviewer lazycodex-executor explorer metis; do
   [ ! -e "$D_AGENTS/$gone.toml" ] || {
@@ -405,7 +407,7 @@ grep -Fqx '[agents.my-own-agent]' "$D_HOME/.codex/config.toml" || {
 grep -Fqx 'FOO = "bar"' "$D_HOME/.codex/config.toml" && {
   echo "a dropped agent subsection left its body behind" >&2; exit 1; }
 d_threads_check="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$d_threads_check" = "max_threads = 6" ] || {
+[ "$d_threads_check" = "max_threads = 1000" ] || {
   echo "the [agents] table was damaged by the registration cleanup" >&2; exit 1; }
 
 [ "$(state_value "$D_HOME" codex_lazycodex)" = "removed_legacy" ]
@@ -418,8 +420,8 @@ node -e '
   process.exit((data.installed || []).some((p) => p.pluginId === "omo@sisyphuslabs") ? 1 : 0);
 ' "$D_CODEX" || { echo "LazyCodex is still installed after removal" >&2; exit 1; }
 d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$d_threads_line" = "max_threads = 6" ] || {
-  echo "agents.max_threads was not capped to 6" >&2; exit 1; }
+[ "$d_threads_line" = "max_threads = 1000" ] || {
+  echo "user agents.max_threads was changed" >&2; exit 1; }
 
 echo "Scenario D2: a host that already deleted the files still loses the stale registrations"
 D2_HOME="$WORK/home-d2"
@@ -442,14 +444,16 @@ printf '%s\n' \
   '' \
   '[agents.my-own-agent]' \
   "config_file = \"$D2_HOME/.codex/agents/my-own-agent.toml\"" > "$D2_HOME/.codex/config.toml"
-run_kit "$D2_HOME" "$D2_CODEX" "$D2_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$D2_HOME" "$D2_CODEX" "$D2_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
-for stale in '[agents.lazycodex-worker-high]' '[agents.momus]'; do
+for stale in '[agents.lazycodex-worker-high]'; do
   grep -Fqx "$stale" "$D2_HOME/.codex/config.toml" && {
     echo "a registration pointing at a missing file survived: $stale" >&2; exit 1; }
 done
 grep -Fqx '[agents.my-own-agent]' "$D2_HOME/.codex/config.toml" || {
   echo "a registration pointing at an existing file was deleted" >&2; exit 1; }
+
+grep -Fqx '[agents.momus]' "$D2_HOME/.codex/config.toml" || { echo "unrelated missing agent registration was deleted" >&2; exit 1; }
 
 echo "Scenario E: duplicate Headroom MCP sections are repaired before Codex CLI use"
 E_HOME="$WORK/home-e"
@@ -478,7 +482,7 @@ printf '%s\n' \
   '[mcp_servers.headroom.env]' \
   'HEADROOM_PROXY_URL = "http://127.0.0.1:8787"' \
   '# --- end Headroom MCP server ---' > "$E_HOME/.codex/config.toml"
-run_kit "$E_HOME" "$E_CODEX" "$E_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$E_HOME" "$E_CODEX" "$E_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
 [ "$(grep -Fxc '[mcp_servers.headroom]' "$E_HOME/.codex/config.toml" || true)" -eq 0 ]
 grep -Fqx 'model = "gpt-6-astra"' "$E_HOME/.codex/config.toml"
@@ -500,7 +504,7 @@ printf '%s\n' \
   'command = "/home/reo/.local/bin/headroom"' \
   'args = ["mcp", "serve"]' \
   '# --- end Headroom MCP server ---' > "$F_HOME/.codex/config.toml"
-run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
 [ "$(grep -Fxc '[mcp_servers.headroom]' "$F_HOME/.codex/config.toml" || true)" -eq 0 ]
 grep -Fqx 'model = "gpt-6-astra"' "$F_HOME/.codex/config.toml"
@@ -514,7 +518,7 @@ seed_codex_mock_state "$G_CODEX" "$G_HOME" empty
 seed_claude_mock_state "$G_CLAUDE" "$G_HOME" empty
 printf 'args: -y %s\n' '@modelcontextprotocol/server-sequential-thinking@2026.7.4' > "$G_CODEX/mcp_sequential"
 printf 'args: -y %s\n' '@modelcontextprotocol/server-sequential-thinking@2026.7.4' > "$G_CLAUDE/mcp_sequential"
-run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
 [ "$(state_value "$G_HOME" codex_sequential_thinking)" = "repinned_kit" ]
 [ "$(state_value "$G_HOME" claude_sequential_thinking)" = "repinned_kit" ]
@@ -524,10 +528,10 @@ grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$G_CODEX/mcp
   echo "the Codex MCP was not re-registered at latest" >&2; exit 1; }
 grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$G_CLAUDE/mcp_sequential" || {
   echo "the Claude MCP was not re-registered at latest" >&2; exit 1; }
-run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/verify_install.sh" >/dev/null
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null
 
 # A second run has nothing left to converge.
-run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install_all.sh" --integrations none >/dev/null
+run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 [ "$(state_value "$G_HOME" codex_sequential_thinking)" = "preexisting" ]
 [ "$(state_value "$G_HOME" claude_sequential_thinking)" = "preexisting" ]
 

@@ -1,362 +1,125 @@
-# Universal Research Agent Prompt Kit
+# Research Agent Kit
 
-**작성일**: 2026-05-28  
-**최종 갱신**: 2026-09-06
+Codex와 Claude Code에서 같은 연구 원칙과 스킬을 사용하는 개인 하네스입니다. **Simple is best**: 현재 요청에 필요 없는 구현 곁가지를 처음부터 만들지 않고, 필요한 근거와 검증은 온전히 남깁니다.
 
-Claude Code와 Codex를 연구자/개발자 작업 전반에 맞게 전역 설정하는 프롬프트·서브에이전트·스킬 패키지입니다.
+## 작업 원칙
 
-## 핵심 목표
+- 작은 스크립트와 함수, 기존 코드와 표준 라이브러리부터 사용합니다. 현재 실험이나 실제 호출자가 필요로 할 때만 의존성·추상화·패키지·설정 계층을 추가합니다.
+- 주석과 docstring은 현재 동작·의도·가정을 설명합니다. 코드 변경과 함께 최신화하고 수리 이력, 오래된 설명, 주석 처리한 미사용 코드는 남기지 않습니다. 이력은 Git에, 실제 미완료 작업은 작업 기록에 둡니다.
+- 잘못된 수치, 가짜 성공, 조용한 대체 결과를 허용하지 않습니다. seed·설정·환경·코드 상태·원시 결과와 보고 수치의 연결, 합성/시뮬레이션/실측 구분을 유지합니다.
+- 검증은 비판적이고 균형 있게 합니다. 확인된 성과와 유효 범위를 먼저 설명하고, 구현 실패·정보 부족·근거 있는 부정적 결과를 구분합니다. 선택적 추가 실험은 현재 범위의 성과를 무효로 만들지 않습니다.
+- 부정적 결과는 구현·데이터·지표·기준선·불확실성·운영 조건·방법 가정에서 원인을 찾습니다. 결론을 바꿀 수 있는 검사를 우선하고, 원래 결과와 탐색적 후속 분석을 보존합니다. 좋은 결론을 얻기 위한 seed·지표·부분집합 선별은 금지합니다.
+- 승인된 작업은 관련 실행·결과 확인·실패 수정까지 진행합니다. 읽기 전용 요청과 실제 승인 경계를 지키며, 이미 승인된 일상 단계마다 다시 묻지 않습니다.
 
-- 연구와 개발 모두에서 **근거 기반 작업**을 강제합니다.
-- Claude Code는 `CLAUDE.md`, subagent, skill을 통해 작업을 라우팅합니다.
-- Codex는 `AGENTS.md`, custom agent TOML, skill을 통해 작업을 라우팅합니다.
-- 세부 템플릿과 도메인 규칙은 항상 로드하지 않고, 관련 작업이 들어왔을 때만 skill이 불러오도록 구성합니다.
-- 어려운 계획·불명확한 디버깅·비싼 실험 설계·claim acceptance에서만 Sequential Thinking MCP를 사용합니다.
-- 자원 상태에 맞춰 child 동시성을 조절하고 deterministic 검증과 semantic review를 분리합니다.
-- placeholder, TODO, FIXME, dummy, fallback, test-only hardcoding, fake-pass를 금지합니다.
-- 연구용 코드에서는 연구 무결성 가드와 프로덕션 방어 가드를 분리합니다.
-- **기존 주석이 현재 코드와 맞지 않으면 수정하거나 삭제**하도록 강제합니다.
-- 새 연구 실험 레포를 만들거나 리팩토링할 때 **AI/ML, 하드웨어, 부채널, 시뮬레이션 논문 아이디어 검증용 구조**를 선택하도록 `research-repo-design` skill과 전용 repository architect agent를 제공합니다.
+항상 읽는 지침은 [Codex AGENTS.md](codex/AGENTS.md)와 [Claude CLAUDE.md](claude-code/CLAUDE.md)입니다. 상세 절차는 해당 작업에서 필요한 스킬·참고 문서만 읽습니다.
 
-## 연구 방식
+## 설치·갱신·확인
 
-**Simple is best**는 코드 구현과 검증에 집중합니다. 작은 스크립트와 함수로 시작하고, 현재 실험이 요구할 때만 패키지·설정 계층·의존성을 추가합니다. 불필요한 `try/except`, 내부 방어 검사, 중복 검증은 제거하되 seed·config·환경·원시 결과와 잘못된 수치를 잡는 검사는 유지합니다.
-
-결과 분석은 충분히 깊게 합니다. 부정적 결과나 비관적인 Codex 판단은 구현·데이터·지표·기준선·불확실성·실험 조건·방법의 가정을 살펴 원인과 해결책을 찾습니다. 확인된 성과와 유효 범위를 먼저 설명하고, 가설과 검증된 원인을 구분합니다. 재심 횟수 제한은 같은 근거로 판정을 반복하는 데 적용하며, 새 가설이나 증거에 따른 원인 탐색을 막지 않습니다. 원하는 결과를 얻기 위한 seed·지표·부분집합 선별은 허용하지 않습니다.
-
-Claude는 문제 정의부터 구현·검증·분석·보고까지 Codex와 협력합니다. 작은 관련 단계는 묶어서 논의하고, 기존 Codex 검토를 활용해 승인 절차를 중복하지 않습니다. Codex가 없으면 그 사실을 밝히고 허용된 작업을 계속합니다.
-
-## 빠른 설치
+설치 진입점은 **`install.sh` 하나**입니다. macOS 기본 Bash 3.2, Linux, WSL에서 사용하며 `sh`로 실행하면 Bash로 전환합니다. Native Windows와 Git Bash는 지원 범위가 아닙니다.
 
 ```bash
-unzip universal_research_agent_prompt_kit_final.zip
-cd universal_research_agent_prompt_kit_final
-sh install.sh
+sh install.sh                       # 기본 설치 또는 갱신
+sh install.sh --verify              # 설치 상태 확인만 수행
+sh install.sh --cleanup-backups     # 키트 설치 백업만 명시적으로 정리
+sh install.sh --help
 ```
 
-`install.sh`는 POSIX sh bootstrap이라 `/bin/sh`가 dash인 Ubuntu에서도 그대로 실행됩니다. 내부 구현은 macOS 기본 Bash 3.2, Linux, WSL 호환 Bash입니다. Native Windows와 Git Bash는 지원 범위가 아닙니다.
+기본 설치는 두 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
 
-선택한 profile이 곧 **최종 수렴 상태**입니다. 어느 컴퓨터에서든 같은 명령을 다시 실행하면 같은 상태로 수렴합니다.
+- Graphify는 `graphifyy==0.9.39`, Headroom은 `headroom-ai[all]==0.34.0`을 사용합니다. 필요한 버전이 없으면 키트 전용 환경에 설치합니다.
+- Ponytail은 설치 시 확인한 원격 HEAD의 소스를 사용하고 실제 plugin 버전과 등록 상태를 확인합니다. 사용자 소유 marketplace는 보존하면서 Ponytail의 설치·활성 상태를 별도로 확인합니다. 누락된 plugin은 설치하고, Claude의 비활성 plugin은 활성화합니다. Codex의 비활성 plugin은 설정에서 활성화해야 한다는 오류로 중단합니다.
+- Sequential Thinking은 키트 이름인 Codex `sequential_thinking`, Claude `sequential-thinking`으로 `@modelcontextprotocol/server-sequential-thinking@latest`를 등록합니다. 다른 이름의 사용자 MCP는 변경하지 않습니다.
+- Codex의 `features.context_management.experimental_mode = true` 설정을 병합합니다. 이외의 모델·추론 설정은 유지합니다. 지원하지 않는 TOML 형태는 원본 교체 전에 오류로 중단합니다.
+- Headroom은 `.zshrc`와 `.bashrc`의 키트 블록으로 연결합니다. 새 셸에서 `claude`와 `codex`는 `headroom wrap`을 사용하고, `claude_raw`와 `codex_raw`는 원래 CLI를 호출합니다.
+- Graphify의 전역 안내는 유용한 기존 그래프나 명시적인 Graphify 요청에 적용합니다. 단순 코드 질문을 위해 그래프 구축을 요구하지 않습니다.
+
+통합을 생략하지 않으면 Codex·Claude CLI와 Node.js·npx를 파일 변경 전에 확인합니다. 기본 통합에는 Git, 네트워크와 각 도구의 설치 조건도 필요합니다. Graphify 등록 경로의 제약 때문에 `CLAUDE_CONFIG_DIR`이 지정된 환경은 지원하지 않습니다. 기존 설정의 별도 위치를 추측해서 덮어쓰지 않습니다.
+
+### 기존 환경 정리
 
 ```bash
-sh install.sh                          # core + Ponytail + Sequential Thinking (기본)
-sh install.sh --integrations none      # core + Graphify/Headroom, kit/레거시 통합 정리
+sh install.sh --integrations none
 ```
 
-`./install.sh` 또는 `sh install.sh`는 `~/.codex/config.toml`에 아래 설정을 자동 병합합니다. 기존 `false`는 `true`로 바꾸고 다른 설정은 보존합니다.
+`none`은 **통합 단계 생략이 아닙니다.** 키트 소유 Ponytail과 식별 가능한 LazyCodex 레거시 항목을 정리하고 Sequential Thinking·Graphify·Headroom은 유지합니다. 기본 `ponytail` 프로필도 레거시 항목을 정리합니다. 사용자 소유 스킬·agent·MCP와 무관한 설정은 보존하며, 사용자 `max_threads`를 일괄 변경하지 않습니다.
 
-```toml
-[features.context_management]
-experimental_mode = true
-```
+등록 경로와 소유권 기록으로 관리 대상을 구분합니다. 같은 키트 항목은 백업 후 갱신하고, 선택에서 제외된 키트 항목만 정리합니다. 통합 결과는 `~/.universal-research-agent-kit/integrations.state`, 도구 결과는 `tooling.state`에 기록하며 검증은 이 상태와 실제 설치를 함께 확인합니다.
 
-설정 병합은 일반적인 bare TOML 테이블과 boolean 키를 지원합니다. quoted/dotted/inline 형태의 해당 feature 설정, escape가 포함된 테이블 이름이나 관련 키, 여러 줄 문자열, 해당 feature 테이블의 여러 줄 배열은 원본 교체 전에 오류로 중단합니다. 기존 설정은 설치기의 백업·롤백 대상입니다.
-
-기본 설치는 Graphify와 Headroom도 함께 준비합니다. Graphify는 현재 CLI의 전역 설치 옵션으로 Claude Code와 Codex 스킬을 등록하고, Headroom은 `uv tool`을 우선 사용해 설치한 뒤 두 셸에서 `claude`와 `codex`를 자동으로 `headroom wrap`으로 라우팅합니다. 외부 패키지 설치를 의도적으로 생략해야 하는 오프라인 테스트 환경에서는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`을 사용합니다.
-
-profile별 reconciliation 규칙:
-
-| 대상 | `none` | `ponytail` (기본) |
-|---|---|---|
-| LazyCodex (버전 무관) | 제거(`removed_legacy`) | 제거 |
-| `agents.max_threads > 6` | 6으로 캡 | 6으로 캡 |
-| kit-owned Ponytail | plugin·marketplace 제거 | 최신 릴리스 설치·활성 |
-| Sequential Thinking MCP | 없거나 구버전 고정이면 최신으로 등록 | 동일 |
-| user-owned Ponytail | **불변** (보존 기록) | **불변** |
-
-LazyCodex는 이 키트가 어떤 profile에서도 설치하지 않으며, 설치돼 있으면 버전과 무관하게 `codex plugin remove omo@sisyphuslabs`로 제거됩니다. 이전에는 config 키(`enabled = false`)로 비활성화만 했는데, 그러면 플러그인 스킬이 디스크에 남아 에이전트가 `omo` CLI를 찾고 연구 레포에 `.omo/` 디렉터리를 만들었습니다. 상시-위임·5-lane 리뷰 워크플로가 하네스의 review budget과 충돌하는 것도 그대로입니다. LazyCodex 전용인 `sisyphuslabs` marketplace 등록과 `~/.codex/agents`에 심어둔 agent TOML도 함께 지웁니다(marketplace 등록은 키트 소유가 아니므로 실패해도 설치를 중단하지 않습니다).
-
-Ponytail의 user-owned 판별은 marketplace/plugin 경로가 키트 상태 디렉터리를 가리키는지 여부입니다. 결과는 `~/.universal-research-agent-kit/integrations.state`에 호스트별로 기록되고 검증기는 이 상태(`installed_kit_owned`/`preserved_user_owned`/`removed_legacy`/`not_requested` 등)를 기준으로 판정하므로, user-owned 보존이 검증 실패로 이어지지 않습니다. 제거는 부재로 수렴하므로 두 번째 실행부터 LazyCodex 상태는 `not_requested`가 됩니다.
-
-기본(`ponytail`) 설치에는 Node.js와 `git`, 네트워크 연결이 필요합니다. Node가 없는 환경은 `--integrations none` 또는 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1`(통합 단계 전체 생략)을 사용합니다. Graphify와 Headroom은 별도 tooling 단계이며 `UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1`로 생략할 수 있습니다.
-
-Graphify(`graphifyy==0.9.39`)와 Headroom(`headroom-ai[all]==0.34.0`)은 검증된 버전으로 고정합니다. Ponytail과 Sequential Thinking MCP는 설치 시점의 최신을 사용합니다: Ponytail은 `git ls-remote`로 원격 HEAD를 확인해 그 커밋을 받아오고 검증에 쓰는 버전 문자열도 그 체크아웃의 `plugin.json`에서 읽으며, MCP는 `@latest` 스펙으로 등록합니다. 이미 PATH에 정확한 버전이 있으면 재설치하지 않고, 없거나 버전이 다르면 키트 전용 환경(`~/.universal-research-agent-kit/tooling/`)에 설치하므로 사용자 Python/uv 환경을 덮어쓰지 않습니다.
-
-설치 스크립트는 기존 설정과 agents/skills 디렉터리를 전용 상태 디렉터리에 백업한 뒤, ownership manifest에 기록된 키트 소유 항목만 교체합니다. LazyCodex, Ponytail, 개인 스킬처럼 다른 이름을 사용하는 제3자 항목은 삭제하지 않습니다. 키트 소유 항목과 이름이 같은 파일이나 디렉터리는 백업 후 키트 버전으로 교체합니다. 사용자가 등록한 MCP 서버는 어떤 프로필에서도 수정·삭제하지 않습니다. MCP에 대한 유일한 예외는 키트 이름을 쓰는 Sequential Thinking 등록입니다: Codex(`sequential_thinking`)·Claude(`sequential-thinking`, user 스코프)에 없으면 `@modelcontextprotocol/server-sequential-thinking@latest`로 추가하고, 이미 있으나 구버전에 고정돼 있으면 제거 후 같은 스펙으로 다시 등록합니다(`repinned_kit`). 다른 이름으로 등록된 MCP는 들여다보지도 않습니다. 사용자 소유의 ponytail marketplace가 이미 있으면 키트는 해당 호스트의 Ponytail 관리를 건너뛰고 보존합니다.
-
-설치는 journal 기반 트랜잭션입니다. `umask 077`로 상태 디렉터리를 보호하고, 동시 설치를 lock으로 차단하며, journal 기록은 백업 완료가 확인된 뒤에만 남습니다. 실패 시 **journal에 등록된 kit 관리 경로**는 자동으로 원상 복구됩니다. 외부 installer(npx 등)가 만드는 cache와 user-owned 통합 상태는 journal 범위 밖이므로 재작성하지 않습니다. gitignore managed block은 BEGIN/END marker 쌍을 검증한 뒤에만 교체합니다.
-
-보존:
-
-```text
-~/.claude/
-~/.codex/
-~/.agents/
-```
-
-백업 후 키트 항목 갱신:
-
-```text
-~/.claude/agents
-~/.claude/skills
-~/.codex/agents
-~/.agents/skills
-```
-
-설치 스냅샷과 소유권 기록:
-
-```text
-~/.universal-research-agent-kit/backups/run.<timestamp>.<unique>/
-~/.universal-research-agent-kit/manifests/
-~/.universal-research-agent-kit/sources/ponytail-<revision>/
-~/.universal-research-agent-kit/marketplaces/ponytail-<revision>/
-```
-
-`~/.agents/skills`, `~/.codex/agents`, `~/.claude/skills`, `~/.claude/agents`는 다른 플러그인과 공유할 수 있습니다. 설치 검증은 키트의 필수 항목만 확인하며, 그 밖의 항목은 공존 대상으로 허용합니다.
-
-## 백업 정리
-
-키트 전용 상태 디렉터리에 있는 설치 스냅샷만 삭제합니다. 다른 프로그램이나 사용자가 만든 `*.bak.*` 파일은 건드리지 않으며 ownership manifest는 유지합니다.
+오프라인 회귀 검사처럼 외부 변경을 생략해야 할 때는 다음 환경 변수를 사용합니다. 각각 해당 단계의 등록·제거를 생략하며 생략 상태를 기록합니다. 이 경우 완료·검증 메시지는 생략 범위를 표시하며 전체 기본 설치 완료로 보고하지 않습니다.
 
 ```bash
-bash cleanup_backups.sh
+UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 \
+UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 ```
 
-## 폴더 구조
+### 사용자 파일 보호
 
-```text
-universal_research_agent_prompt_kit_final/
-├─ README.md
-├─ install.sh
-├─ install_all.sh
-├─ install_integrations.sh
-├─ install_tooling.sh
-├─ headroom/auto-wrap.sh
-├─ cleanup_backups.sh
-├─ verify_install.sh
-├─ scripts/validate_harness.sh
-├─ tests/
-│  ├─ test_resource_detector.sh
-│  ├─ test_install_regression.sh
-│  ├─ test_tooling_install.sh
-│  └─ fixtures/resources/
-├─ lib/install_common.sh
-├─ global_research_agents.gitignore
-├─ .gitignore
-├─ claude-code/
-│  ├─ CLAUDE.md
-│  ├─ install.sh
-│  ├─ README.md
-│  ├─ agents/*.md
-│  └─ skills/*/SKILL.md
-└─ codex/
-   ├─ AGENTS.md
-   ├─ install.sh
-   ├─ README.md
-   ├─ agents/*.toml
-   └─ skills/*/SKILL.md
-```
+설치기는 `~/.universal-research-agent-kit/` 아래 백업·소유 목록·실행 journal을 사용합니다. 동시 설치를 막고, 백업에 성공한 뒤 변경을 기록하며, 실패하면 journal에 등록된 키트 관리 경로를 복구합니다. 사용자 데이터 손실을 막는 경로 검사·백업·복구·소유 목록은 유지합니다. 외부 CLI가 만드는 캐시와 외부 등록 상태 전체까지 파일 journal로 복구한다고 주장하지 않습니다.
 
-## 실제 설치 위치
+`--cleanup-backups`는 설치 중에는 실행하지 않으며 키트 백업만 제거합니다. 소유 목록과 활성 설정은 보존합니다. `--verify`는 설치나 정리를 실행하지 않습니다.
 
-### Claude Code
+## 원본과 설치 위치
 
-```text
-~/.claude/CLAUDE.md
-~/.claude/agents/*.md
-~/.claude/skills/*/SKILL.md
-```
+공통 스킬은 **`skills/` 한 곳에서 관리**하고 두 플랫폼에 복사합니다. 설치 디렉터리는 각 플랫폼의 기존 위치를 유지합니다.
 
-### Codex
+| 원본 | 설치 위치 |
+|---|---|
+| `codex/AGENTS.md` | `~/.codex/AGENTS.md` |
+| `codex/agents/*.toml` | `~/.codex/agents/` |
+| `claude-code/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `claude-code/agents/*.md` | `~/.claude/agents/` |
+| `skills/*` | `~/.agents/skills/`, `~/.claude/skills/` |
+| Graphify CLI가 제공하는 스킬 | `~/.codex/skills/graphify/`, `~/.claude/skills/graphify/` |
+| `headroom/auto-wrap.sh` | `~/.config/headroom/auto-wrap.sh` |
 
-```text
-~/.codex/AGENTS.md
-~/.codex/agents/*.toml
-~/.agents/skills/*/SKILL.md
-```
+Codex agent 16개와 Claude agent 15개는 **플랫폼별 정의를 유지**합니다. 모델·effort·sandbox/도구 권한을 스킬에 합치지 않습니다. Codex는 역할별 TOML의 Astra 설정, Claude는 역할별 Opus/Sonnet 설정을 사용하며 실제 실행 시 호스트나 환경 override가 있는지 구분합니다. 주 에이전트의 모델을 이 키트가 대신 선택하지 않습니다.
 
-### Graphify와 Headroom
+위임은 독립 산출물, 큰 탐색의 요약, 중요한 결론의 전문 검토에 사용합니다. 최소 인원과 단계별 상호 호출을 강제하지 않습니다. 병렬 작성은 격리 worktree·소유권·병합 계획을 갖추고 자식은 재위임하지 않습니다. 큰 출력은 파일로, 부모에게는 요약과 근거 위치를 돌려줍니다.
 
-```text
-~/.claude/skills/graphify/SKILL.md
-~/.claude/skills/graphify/.graphify_version
-~/.claude/skills/graphify/references/
-~/.codex/skills/graphify/SKILL.md
-~/.codex/skills/graphify/.graphify_version
-~/.codex/skills/graphify/references/
-~/.config/headroom/auto-wrap.sh
-~/.universal-research-agent-kit/tooling/
-~/.universal-research-agent-kit/tooling.state
-~/.zshrc
-~/.bashrc
-```
+## 스킬 사용 범위
 
-`install_all.sh`는 Graphify `0.9.39`와 Headroom `0.34.0`을 고정해 설치하고 다음 두 전역 Graphify 등록을 수행합니다.
+| 스킬 | 필요한 시점 |
+|---|---|
+| `no-placeholder-development` | 연구 코드의 완전성·실패 처리·재현성을 구현하거나 확인할 때 |
+| `code-comment-hygiene` | 주석 감사나 코드와 설명의 불일치를 조사할 때; 일상 변경은 주변 주석을 함께 갱신 |
+| `research-domain-router` | 연구 분야가 교차하거나 필요한 근거가 불명확할 때 |
+| `research-repo-design` | 실제 실험의 저장소 구조를 선택하거나 변경할 때 |
+| `ai-ml-experiment` | ML 데이터 분할·평가·기준선·재현성을 설계하거나 판단할 때 |
+| `hardware-vivado` | RTL·합성·구현·타이밍·자원 보고를 다룰 때 |
+| `side-channel-analysis` | 부채널 실험·누설·방어 기법의 근거를 다룰 때 |
+| `hardware-capture-integrity` | 실제 장비를 사용한 모든 캡처와 진단 |
+| `evidence-gate` | 연구 결과나 중요한 구현·벤치마크·보고서 결론을 수용할 때 |
+| `review-budget` | 독립 의미 검토의 필요성과 범위를 정할 때 |
+| `adversarial-review` | 중요한 결론을 비판적으로 검토하거나 부정적 결과의 원인을 조사할 때 |
+| `planned-work` | 여러 세션의 복구나 실질적인 인계 기록이 필요할 때 |
+| `resource-aware-orchestration` | 독립 agent 작업, 로컬 동시 연산, 장기 실행을 조정할 때 |
+| `sequential-thinking-mcp` | 어려운 계획·불명확한 디버깅·비싼 실험 설계·복잡한 결론 판단 |
+| `report-writer` | 근거를 바탕으로 한국어 연구 보고서나 인계 문서를 작성할 때 |
 
-```bash
-graphify install --platform claude
-graphify install --platform codex
-```
+스킬과 참고 문서는 내용의 정확성을 위한 지침입니다. 모든 스킬을 읽는 고정 순서나 빈 템플릿 작성 의무는 없습니다. 문서의 수치·인용·확실성·근거 한계를 문체 때문에 바꾸지 않습니다.
 
-Headroom은 macOS의 zsh와 Ubuntu의 bash를 모두 지원하도록 두 rc 파일에 연결되며, `~/.config/headroom/auto-wrap.sh`의 함수가 평소 명령을 다음처럼 라우팅합니다.
-
-```bash
-claude                 # headroom wrap claude -- ...
-codex                  # headroom wrap codex -- ...
-claude_raw             # Headroom을 거치지 않고 원래 CLI 실행
-codex_raw              # Headroom을 거치지 않고 원래 CLI 실행
-```
-
-설치기는 `~/.zshrc`와 `~/.bashrc`에 wrapper source를 중복 없이 추가합니다. 설치 후 이미 열려 있는 셸에는 자동으로 적용되지 않으므로 새 터미널을 열거나 해당 rc 파일을 다시 source해야 합니다. Graphify 0.9.39의 Claude 등록 경로가 `~/.claude/CLAUDE.md`로 고정되어 있어, 이 설치기는 `CLAUDE_CONFIG_DIR`이 설정된 환경을 명시적으로 거부합니다. 해제한 뒤 다시 실행해야 합니다.
-
-## 자동 로드와 온디맨드 로드
-
-항상 로드되는 것은 전역 지침 파일입니다.
-
-- Claude Code: `~/.claude/CLAUDE.md`
-- Codex: `~/.codex/AGENTS.md`
-
-Subagent와 skill은 도구가 인식할 수 있는 위치에 설치됩니다. Skill 본문과 reference/template은 관련 작업일 때만 읽도록 지침화되어 있습니다.
-
-## 서브에이전트 위임
-
-전역 지침은 **적극 위임**을 기본 자세로 둡니다. non-trivial 작업은 위임 트리거를 먼저 찾아 분리 가능한 전문 산출물을 각각 서브에이전트에 맡깁니다. 트리거 6종: (1) 소유권이 명확한 구현·리팩터 슬라이스 → implementation-engineer, (2) 낯선 서브시스템 선행 탐색 → context-explorer, (3) 대형 테스트·로그·넓은 grep·문서 조회처럼 원본 출력이 부모 컨텍스트를 오염시킬 작업 → 요약 반환 서브에이전트, (4) 도메인 민감 설계·구현 변경·증거 해석·claim 리뷰 → 해당 도메인 리뷰어, (5) material한 research/benchmark/security/architecture/release/user-data 안전 claim의 최종 수용 → adversarial-reviewer, (6) 동시 진행 가능한 독립 워크스트림 → 각 1명 병렬. 큰 출력 작업은 원본을 artifact에 두고 요약·evidence pointer만 회수하고, 독립 자식을 띄운 뒤 부모는 의존 없는 작업을 계속하다 synthesis/acceptance 경계에서만 대기합니다.
-
-Claude Code는 부모=추론 강모델·자식=집중 모델 패턴입니다(claim acceptance 역할 opus, 구현·탐색·기계 작업 sonnet). Codex는 모든 역할이 `gpt-6-astra` 하나이고, 역할 차이는 모델 tier가 아니라 `model_reasoning_effort`·`sandbox_mode`·developer instructions로 만듭니다. `description`은 자동 위임을 돕는 휴리스틱일 뿐, 모델과 추론 강도를 보장하지 않습니다. 고정 역할이 필요하면 Claude Code는 Agent의 정확한 subagent type 또는 `@agent-name`을 사용하고, Codex는 `agent_type`과 역할별 `model`·`reasoning_effort`를 명시합니다. 같은 Codex spawn 호출에서 역할·모델·추론 override를 지정할 때는 현재 Multi-Agent V2 full-history 모드가 그 호출을 거부하므로 `fork_turns="none"` 또는 제한된 양의 turn 수를 사용합니다. override가 없으면 필요한 문맥에 따라 `"all"`도 사용할 수 있습니다.
-
-Codex 런타임이 selector나 모델 필드를 숨기는 경우 `resource-aware-orchestration/scripts/run_codex_agent.sh <role> <task>`가 설치된 agent TOML을 읽어 별도 `codex exec --ephemeral` 프로세스에 모델·추론 강도·sandbox·developer instructions를 명시합니다. 이는 네이티브 collaboration child가 아니라 격리 Codex child이며, 요청값과 실제값은 구분해 기록합니다. Claude Code에서는 `CLAUDE_CODE_SUBAGENT_MODEL`과 `CLAUDE_CODE_EFFORT_LEVEL` 환경 override도 함께 기록합니다.
-
-**핑퐁 방지**: 적극 위임이지만 라운드1에서 뺀 과잉은 되살리지 않습니다 — 강제 최소 인원 없음(child 1개도 0개도 유효), quick command는 직접 실행, semantic reviewer 1명(+delta 1회), 다중 리뷰 lane 없음, `max_depth = 1`. 트리거가 없으면 main-only로 처리하고 사유를 내부에 한 줄만 기록합니다.
-
-정책은 `Global Core → Domain Skill → Project Overlay` 순서로 적용되고, child의 nested delegation은 금지됩니다.
-
-### 위임 행동 시나리오 (릴리스 전 정성 확인)
-
-| 시나리오 | 기대 동작 |
-| --- | --- |
-| README 오탈자 1개 | child 0, main 직접 수정 |
-| 낯선 대형 repo 구조 파악 | context-explorer 1, 요약 회수 |
-| 5,000줄 테스트 로그 분석 | quality/debug child 1, 원본은 artifact·요약만 회수 |
-| 독립 조사 3건 | read-only child 최대 3개 병렬 |
-| 한 파일 긴밀한 10줄 수정 | main-only 또는 bounded writer 1 |
-| SCA key-recovery claim acceptance | reviewer 1(+delta 1회) |
-| Codex spawn schema에 `agent_type` 없음 | 격리 runner 사용 또는 capability unavailable 보고 |
-
-각 작업의 위임 판단은 planned-work의 `evidence.md`에 경량 ledger(task·trigger·delegated role·solo reason·parallel|isolation·useful|redundant·latency)로 남길 수 있습니다.
-
-## 자원 인식형 오케스트레이션
-
-작은 로컬 작업은 main agent가 단독 처리합니다. 감지된 slot은 목표가 아니라 상한입니다.
-
-resource detector는 macOS의 `sysctl`, `memory_pressure`, `vm_stat`, Linux/WSL의 `/proc`, PSI, cgroup v2 신호를 읽습니다. Linux에서는 현재 process의 cgroup v2 경로와 mount root를 해석하고 그 경로부터 mount root까지 가장 엄격한 memory, CPU, cpuset, OOM 제한을 적용합니다. `agent_slots`는 절대 메모리 headroom(가용 2GiB당 slot 1개, 1–6 clamp)과 CPU 한도, `HARNESS_MAX_THREADS`, `HARNESS_TASK_CAP`의 최솟값이며 기본 상한은 6입니다.
-
-신호는 등급으로 구분합니다. low swap이나 낮은 가용 비율은 `warnings`로만 기록하고 slot을 줄이지 않습니다. swapout 증가나 critical PSI는 `RESOURCE_CONSTRAINED`로 slot을 한 단계 줄이고 heavy 작업을 보류하며, OOM 증가만 slot을 1로 강제합니다. 감지 실패는 `RESOURCE_UNKNOWN`으로 자원 부족과 구분됩니다 — 이때 `agent_slots`는 설정된 상한을 유지하고 새 GPU/장비 작업만 보류합니다. 600초를 넘긴 snapshot은 `RESOURCE_STALE`로 재측정을 요구합니다. 새 측정 결과는 새 spawn에만 적용되고 이미 정상 실행 중인 작업을 소급 중단하지 않습니다. writer slot은 shared worktree당 하나입니다. Linux snapshot은 `--system-root`로 read-only replay할 수 있습니다.
-
-장기 실행 명령은 progress probe, checkpoint 경로, resume/graceful-cancel/cleanup 절차를 선언하고, 경과 시간이나 mailbox 응답 지연만으로는 절대 중단하지 않습니다. 부모 agent는 PID·로그·task 상태를 반복 조회하지 않고 completion event를 기다립니다. 일반 progress는 로그와 checkpoint에만 쓰고 모델 context에는 완료·실패·권한 요청·확정된 무진행·자원/장비 비상·operator intervention 이벤트만 전달합니다.
-
-Claude Code에서는 [`Monitor`](https://code.claude.com/docs/en/tools-reference#monitor-tool)를 우선 사용합니다. watcher가 긴 명령의 stdout/stderr를 artifact로 보내고 terminal event 한 줄만 내보내게 하면, 이벤트가 같은 세션에 도착할 때 부모가 이어서 검증할 수 있습니다. background subagent notification은 실행 중인 버전이 reliable completion semantics를 보장할 때만 사용합니다. 현재 설치본처럼 그 보장이 불확실하면 `Monitor` 또는 foreground blocking을 사용합니다.
-
-Codex의 direct background terminal은 완료 push가 아니라 이후 session wait나 `write_stdin`이 있어야 결과가 드러납니다. 명령이 한 번의 blocking wait보다 길면 child 하나가 실행·monitor·evidence를 소유하고, 부모는 의존 없는 작업을 마친 뒤 agent completion/mailbox event를 기다립니다. timeout 때 상태를 재해석하거나 로그를 다시 읽지 않고 허용된 가장 긴 wait를 다시 겁니다. scheduled task는 cadence polling이므로 사용자가 받아들이거나 원 세션 유지가 불가능한 경우에만 사용합니다.
-
-[`codex/config.toml.example`](codex/config.toml.example)의 agent 수 설정은 참고용이며 기본 설치기가 자동 병합하지 않습니다. `features.context_management.experimental_mode = true`는 자동 반영합니다. 컴퓨터별 실제 CPU·메모리·cgroup 제한이 다르므로 detector를 각 spawn wave 전에 다시 실행해야 합니다.
-
-Claude에서는 Fable을 main orchestrator 권장 모델로만 문서화하며 강제하지 않습니다. `CLAUDE_CODE_SUBAGENT_MODEL`이 설정되면 agent별 모델 선택을 덮어쓰므로 검증 기록에 해당 환경 변수를 남겨야 합니다.
-
-## 새로 보강된 주석 정책
-
-이 최종본은 다음을 강제합니다.
-
-- 주석은 현재 동작만 설명해야 합니다.
-- 오래된 버그 이력, phase 이력, 임시 수리 이력, 에이전트가 고쳤다는 설명은 소스 주석에 남기지 않습니다.
-- 기존 주석이 코드와 불일치하면 수정하거나 삭제합니다.
-- TODO/FIXME/HACK/temporary 주석은 accepted code에 남기지 않습니다.
-- 미완료 작업은 carry-over 문서나 issue tracker로 옮깁니다.
-- 주석은 구현 증거가 아닙니다. 실제 코드, 로그, 테스트, 데이터로 검증해야 합니다.
-
-## 연구 실험 레포 설계 정책
-
-새 연구 프로젝트, AI/ML 실험 레포, 하드웨어 실측 레포, side-channel/FPGA/embedded 실험 레포, 시뮬레이션 레포, handoff 기반 구조 정리 요청에서는 `research-repo-design` skill과 repository architect agent를 사용합니다.
-
-이 skill은 다음 방향을 강제합니다.
-
-- `scripts/`는 번호가 붙은 실험 프로토콜로 둡니다.
-- 짧은 root package는 라벨, 캡처, 세그먼트, 분석 같은 작은 재사용 함수만 담습니다.
-- 프로젝트 중심축을 먼저 고릅니다. 하드웨어/부채널은 `target/`, AI/ML은 `data/`와 model/training/evaluation, 시뮬레이션은 simulate/eval 흐름이 중심입니다.
-- `runs/`는 실험 산출물을 run 단위로 완결적으로 보관합니다.
-- `docs/`에는 현재 source of truth만 두고 오래된 계획은 archive로 보냅니다.
-- generic framework, plugin registry, config schema migration, mega CLI, 과도한 추상화를 피합니다.
-
-## planned-work 작업 대장
-
-다세션·handover 작업과 기존 실행 기록만으로 복구하기 어려운 연구 작업은 `.plans/ledger.json`에 현재 작업·상태·사용자 제약을 기록합니다. 짧은 `plan.md`에 다음 행동과 완료 근거를 남기고, 필요할 때만 `evidence.md`나 원문 handover를 추가합니다. 로그와 결과는 기존 산출물을 참조하며 같은 내용을 여러 문서에 복제하지 않습니다. 작업 수행에 대한 사용자 승인이 있으면 계획 갱신을 위해 다시 승인받지 않습니다.
-
-작은 로컬 수정에는 대장을 만들지 않습니다. 기존 ledger 스키마와 전역 위임·리뷰·취소 규칙을 유지하며, `.plans/`는 기본적으로 로컬 기록입니다.
-
-## Sequential Thinking MCP
-
-설치기는 Sequential Thinking MCP가 없으면 `@latest`로 자동 등록하고, 키트 이름으로 이미 있으나 구버전에 고정돼 있으면 최신으로 다시 등록합니다(모든 profile 공통, `SKIP_INTEGRATIONS`에서는 생략). genuinely hard planning, 원인이 불명확한 debugging, 비싼 실험 설계, claim acceptance에서만 사용하며 MCP 부재를 성공으로 가장하지 않습니다. Ponytail은 기본 profile의 통합 대상이고 그 밖의 MCP 서버는 별도로 관리합니다. 키트는 기존 사용자 MCP 등록(`arxiv`, `semantic-scholar`, Zotero 등)을 수정하거나 제거하지 않습니다.
-
-## Review와 evidence 계약
-
-deterministic verifier가 먼저 통과한 뒤 필요한 경우에만 semantic reviewer를 한 명 사용합니다. 기본 review는 최초 1회와 변경 delta에 대한 targeted re-review 1회까지입니다. 세 번째 review는 새 blocker, scope/criterion 변경, 사용자 요청이 있을 때만 허용합니다. `Optional Hardening`만 남으면 종료합니다.
-
-Evidence에는 origin, purpose, claim scope와 측정 대상인 경우 measurement scope를 기록합니다. 디버깅·교정용 diagnostic 결과는 claim-bearing 결과와 구분합니다. 탐색 결과는 탐색적 관찰로 보고할 수 있지만, 튜닝에 사용한 결과를 독립 확인으로 제시하지 않습니다. 기존 실행 기록에 필요한 분류가 있으면 별도 선언 문서를 만들지 않습니다. 물리 장비 capture가 포함된 경우에만 `hardware-capture-integrity` skill을 함께 사용하고 장비별 수치·attempt 한도는 project config/overlay에 둡니다. 이 skill은 canonical run 레이아웃과 필수 산출물 규약(`references/capture_run_layout.md`: manifest/capture_summary JSON·provenance·artifact_roles·진단 PNG·logs·실패 시 blocked.json)과 외부 스코프+MCU GPIO 트리거 rig의 첫-arm 안전 순서(`references/first_trigger_recovery.md`: audit-only warm-up→reset→eligible, trigger-swing gate, retry≤1)를 함께 담아 로깅·JSON·이미지 산출을 표준화하고 첫-트리거 누락을 예방합니다.
-
-RESOURCE 오류나 검증 실패는 해당 단계와 종속 단계, 최종 acceptance를 차단하지만 무관한 분석과 이미 생성된 evidence 보존은 계속할 수 있습니다. scoped retry 후에도 전체 목표가 불가능할 때만 task 전체를 `BLOCKED`로 판정합니다.
-
-## 연구용 코드 가드 철학
-
-적대적 리뷰는 논리 오류, 증거 부족, 재현성 붕괴, overclaim, fake-pass를 잡는 데 사용합니다. 현재 연구에 필요 없는 프로덕션 방어 코드와 추상화도 제거해야 할 수정 사항입니다.
-
-유지해야 하는 것은 연구 무결성 가드입니다.
-
-- synthetic evidence와 measured evidence 분리
-- dataset/trace/model/target/bitstream/config/seed/commit SHA/run ID provenance
-- missing artifact, fake metric, silent fallback 차단
-- `claim_scope` 기록과 논문 주장 범위 제한
-- 사용자 설정이나 데이터를 삭제·덮어쓰는 작업의 whitelist, backup, dry-run, fail-fast
-
-반대로 내부 연구 helper의 과도한 dtype/shape 검증, 중복 검증, DoS/resource cap, TOCTOU 방어, 복잡한 exception hierarchy, generic schema/registry/framework machinery는 현재 작업에 구체적인 필요가 없으면 제거합니다. 추가 실험은 현재 결론을 뒷받침하는 데 필수인지, 더 넓은 주장에 필요한 선택적 확장인지 구분합니다.
-
-이 레포의 설치·검증·정리 스크립트에 있는 `set -euo pipefail`, ownership manifest, 전용 백업 경계, symlink 거부, `exit 1`은 유지합니다. 이 스크립트들은 홈 설정과 백업을 다루므로 사용자 데이터 보호 장치가 필요합니다.
+장기 실행의 명령·체크포인트·재개·중단과 플랫폼별 역할 선택은 [위임 스킬](skills/resource-aware-orchestration/SKILL.md)의 필요한 참고 문서에 있습니다. 물리 캡처는 [캡처 스킬](skills/hardware-capture-integrity/SKILL.md)과 해당 장비의 프로젝트 설정을 사용합니다. 특정 PicoScope/MCU 레이아웃과 첫-trigger 복구 절차는 적용 대상일 때 읽으며 다른 장비에 강제하지 않습니다.
 
 ## 검증
 
-검증 범위는 변경 범위에 맞춥니다. 아래는 release 검증에서 영향 범위에 따라 고르는 주요 명령이며, 매 작업마다 전부 실행하는 기본값이 아닙니다.
-
-- prompt·문서만 바뀌면 focused static/contract check 하나만 실행합니다.
-- 코드가 바뀌면 syntax/type check와 변경 경로의 가장 작은 targeted test를 실행합니다.
-- installer·manifest·copy semantics·실행 권한이 바뀐 경우에만 install regression을 추가합니다.
-- integration 코드나 persisted state schema가 바뀐 경우에만 integration migration을 실행합니다.
-- research·benchmark·security·hardware claim은 evidence contract가 요구하는 전체 gate를 실행합니다. 물리 안전과 capture-integrity 검사는 diagnostic run을 포함한 모든 physical capture에 적용합니다.
-
-좁은 delta 뒤에는 이미 통과했고 영향받지 않은 suite를 다시 돌리지 않습니다. 실패나 새 cross-cutting risk가 발견될 때만 한 단계 넓힙니다.
+변경 경로의 검사부터 실행합니다. 문구의 정확한 일치나 특정 줄 수만으로 모델의 행동을 검증했다고 주장하지 않습니다.
 
 ```bash
 bash scripts/validate_harness.sh
+bash tests/test_codex_agent_runner.sh
 bash tests/test_resource_detector.sh
 bash tests/test_install_regression.sh
+bash tests/test_integration_migration.sh
 bash tests/test_tooling_install.sh
-bash verify_install.sh
+bash tests/test_default_install.sh
 ```
 
-CI workflow는 macOS와 Ubuntu의 live detector 및 공통 회귀 검사를 실행하도록 구성되어 있지만, 이 변경의 remote CI 실행 결과는 아직 확인되지 않았습니다. 현재 로컬 실측은 macOS에 한정되고 WSL은 fixture로 detector 경로만 검증합니다. 실제 WSL runtime, 실제 hardware capture, 호스트별 최대 부하 성능은 별도 검증이 필요합니다.
+- 문서·프롬프트 수정: 구조·참조와 내용의 정합성을 확인합니다.
+- 코드 수정: 구문 검사와 영향을 받는 동작의 작은 검사를 실행합니다.
+- 설치·복사·권한 수정: 임시 홈의 최초/반복 설치, 사용자 파일 보존, 실패 복구를 확인합니다.
+- 통합·도구 설치 변경: 가짜 외부 CLI로 등록·보존·정리·실패 경로를 확인합니다. 기본 전체 설치 검사는 skip 없이 최초·반복 설치와 필수 구성 누락을 확인합니다.
+- 연구 주장: 해당 결론에 필요한 실제 근거를 확인합니다. 물리 안전·무결성 검사는 모든 물리 캡처에 적용합니다.
 
-### 릴리스 전 수동 행동 체크리스트
+이미 통과한 무관한 검사는 반복하지 않습니다. 구조 검사는 모델 행동이나 실제 외부 서비스 설치 성공의 증거가 아닙니다. 행동을 평가할 때는 작은 수정, 중요한 결론 검토, 장기 실행, 읽기 전용 요청처럼 구분되는 실제 작업에서 범위·근거·완료 동작을 확인합니다.
 
-기계 검증(detector 신호 등급, low-swap 비직렬화, RESOURCE_UNKNOWN, 설치 롤백)은 위 테스트가 자동으로 다룹니다. 다음 LLM 행동 시나리오는 릴리스 전에 실제 세션에서 수동으로 확인하고, remote CI green과 함께 release blocker로 취급합니다.
-
-| 시나리오                           | 기대 동작                                  |
-| ---------------------------------- | ------------------------------------------ |
-| README 한 문장 수정                | main-only, child 0                         |
-| 단일 shell bug 수정                | writer 1, 직접 테스트, reviewer 0–1        |
-| AI/ML metric 변경                  | 구현 + 통계/ML reviewer만                  |
-| SCA claim 변경                     | SCA reviewer와 evidence gate               |
-| 장시간 무출력 테스트               | elapsed time만으로 중단하지 않음           |
-| 외부 plugin policy 충돌            | 키트 review/delegation budget이 우선       |
-
-## 중요 원칙
-
-절대 다음을 acceptance 근거로 삼지 않습니다.
-
-- “테스트 통과”라는 말만 있는 경우
-- 로그가 없는 경우
-- 부분 실험을 전체 성공처럼 말하는 경우
-- TODO/placeholder/dummy/stub가 남은 경우
-- stale comment가 남은 경우
-- fallback 또는 하드코딩으로 통과한 경우
-- 연구 무결성 가드가 필요한데 선택적 하드닝처럼 무시한 경우
-- LLM 리뷰가 템플릿만 반복한 경우
-- daemon restart로 문제가 사라진 것처럼 보이는 경우
-
-완료 판단은 실제 산출물·관련 검증·현재 설명·주장 범위가 일치할 때 내립니다. semantic review는 Review Necessity Gate가 요구할 때만 수행합니다.
+CI는 macOS·Ubuntu의 구조 검사, detector/runner, 격리 설치와 mock 통합을 실행합니다. 원격 CI·실제 Linux/WSL 호스트·물리 장비·모델 행동은 실행 근거가 있을 때만 검증됐다고 보고합니다.

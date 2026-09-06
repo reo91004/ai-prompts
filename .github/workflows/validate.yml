@@ -15,9 +15,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: Check POSIX bootstrap syntax
+      - name: Check POSIX shell entry point
         if: runner.os == 'Linux'
-        run: dash -n install.sh
+        run: dash install.sh --help
       - name: Validate harness contracts
         run: bash scripts/validate_harness.sh
       - name: Test resource detector including WSL fixtures
@@ -29,7 +29,7 @@ jobs:
         run: |
           output_file="$(mktemp)"
           trap 'rm -f "$output_file"' EXIT
-          bash codex/skills/resource-aware-orchestration/scripts/detect_resources.sh > "$output_file"
+          bash skills/resource-aware-orchestration/scripts/detect_resources.sh > "$output_file"
           cat "$output_file"
           grep -Eq '^status=(OK|RESOURCE_CONSTRAINED)$' "$output_file"
           agent_slots="$(sed -n 's/^agent_slots=//p' "$output_file")"
@@ -52,6 +52,10 @@ jobs:
         run: bash tests/test_install_regression.sh
       - name: Test integration migration with mock CLIs
         run: bash tests/test_integration_migration.sh
+      - name: Test tooling installation with mock CLIs
+        run: bash tests/test_tooling_install.sh
+      - name: Test complete default installation with mock CLIs
+        run: bash tests/test_default_install.sh
       - name: Check patch whitespace
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
