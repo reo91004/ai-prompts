@@ -42,7 +42,7 @@ printf '<%s>\n' "$@"
 CODEX
 chmod +x "$fixture_root/bin/codex"
 
-runner="$ROOT/codex/skills/resource-aware-orchestration/scripts/run_codex_agent.sh"
+runner="$ROOT/skills/resource-aware-orchestration/scripts/run_codex_agent.sh"
 output="$(
   CODEX_HOME="$fixture_root/home" \
     PATH="$fixture_root/bin:$PATH" \

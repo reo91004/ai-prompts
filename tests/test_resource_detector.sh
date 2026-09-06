@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DETECTOR="$ROOT/codex/skills/resource-aware-orchestration/scripts/detect_resources.sh"
+DETECTOR="$ROOT/skills/resource-aware-orchestration/scripts/detect_resources.sh"
 FIXTURES="$ROOT/tests/fixtures/resources"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/resource-detector.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM

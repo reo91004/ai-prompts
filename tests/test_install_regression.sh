@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REAL_HOME="$HOME"
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1
+export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
 ROLLBACK_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-rollback.XXXXXX")"
 CONFIG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-config.XXXXXX")"
@@ -46,9 +47,15 @@ cat > "$TMP_HOME/expected-config.toml" <<'EOF'
 experimental_mode = true
 EOF
 cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
+# A valid ownership record permits pruning only the obsolete kit entry.
+printf '%s\n' obsolete-kit >> "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills"
+cksum "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills" | awk '{ print $1 ":" $2 }' > "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills.cksum"
+mkdir -p "$TMP_HOME/.agents/skills/obsolete-kit"
+printf '%s\n' obsolete > "$TMP_HOME/.agents/skills/obsolete-kit/SKILL.md"
 echo "Install regression run 2 (repeat install)"
-HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh"
+HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh"
 
+[ ! -e "$TMP_HOME/.agents/skills/obsolete-kit" ]
 cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
 
 echo "Codex context management config merge regression"
@@ -66,7 +73,7 @@ experimental_mode = true
   else
     sed 's/experimental_mode = false/experimental_mode = true/' "$CONFIG_HOME/.codex/config.toml" > "$CONFIG_HOME/expected.toml"
   fi
-  HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh"
+  HOME="$CONFIG_HOME" bash "$ROOT/install.sh"
   cmp "$CONFIG_HOME/expected.toml" "$CONFIG_HOME/.codex/config.toml"
 done
 
@@ -78,7 +85,7 @@ max_threads = 9
 [features.context_management]
 experimental_mode = true
 EOF
-HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh"
+HOME="$CONFIG_HOME" bash "$ROOT/install.sh"
 cmp "$CONFIG_HOME/expected.toml" "$CONFIG_HOME/.codex/config.toml"
 
 for unsupported in \
@@ -106,7 +113,7 @@ experimental_mode = false
 """'; do
   printf '%s\n' "$unsupported" > "$CONFIG_HOME/.codex/config.toml"
   cp "$CONFIG_HOME/.codex/config.toml" "$CONFIG_HOME/expected.toml"
-  if HOME="$CONFIG_HOME" bash "$ROOT/codex/install.sh" > "$CONFIG_HOME/unsupported.log" 2>&1; then
+  if HOME="$CONFIG_HOME" bash "$ROOT/install.sh" > "$CONFIG_HOME/unsupported.log" 2>&1; then
     echo "Unsupported config unexpectedly accepted: $unsupported" >&2
     exit 1
   fi
@@ -128,8 +135,8 @@ for manifest in claude-agents claude-skills codex-agents codex-skills; do
 done
 
 state_file="$TMP_HOME/.universal-research-agent-kit/integrations.state"
-grep -Fqx 'requested_profile=none' "$state_file" || {
-  echo "integrations state did not record profile none" >&2
+grep -Fqx 'requested_profile=ponytail' "$state_file" || {
+  echo "integrations state did not record requested profile" >&2
   exit 1
 }
 grep -Fqx 'codex_ponytail=skipped_env' "$state_file" || {
@@ -145,12 +152,38 @@ grep -Fqx 'codex_ponytail=skipped_env' "$state_file" || {
 [ -x "$TMP_HOME/.claude/skills/resource-aware-orchestration/scripts/detect_resources.sh" ]
 [ -x "$TMP_HOME/.agents/skills/resource-aware-orchestration/scripts/run_codex_agent.sh" ]
 [ -x "$TMP_HOME/.claude/skills/resource-aware-orchestration/scripts/run_codex_agent.sh" ]
-HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/verify_install.sh"
+snapshot_home() {
+  (cd "$TMP_HOME" && find . -type f -exec cksum {} \; | sort)
+}
+verify_before="$(snapshot_home)"
+HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh" --verify
+[ "$verify_before" = "$(snapshot_home)" ] || { echo "verification changed HOME" >&2; exit 1; }
+# Verification must reject a drifted required feature without repairing it.
+sed 's/experimental_mode = true/experimental_mode = false/' "$TMP_HOME/.codex/config.toml" > "$TMP_HOME/drift.toml"
+cp "$TMP_HOME/drift.toml" "$TMP_HOME/.codex/config.toml"
+if HOME="$TMP_HOME" bash "$ROOT/install.sh" --verify > "$TMP_HOME/verify-drift.log" 2>&1; then
+  echo "verification accepted disabled context management" >&2; exit 1
+fi
+cmp "$TMP_HOME/drift.toml" "$TMP_HOME/.codex/config.toml"
+cp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
+
+state="$TMP_HOME/.universal-research-agent-kit"
+mkdir "$state/.lock"
+if HOME="$TMP_HOME" sh "$ROOT/install.sh" --cleanup-backups > "$TMP_HOME/cleanup-lock.log" 2>&1; then
+  echo "cleanup ignored an active install lock" >&2; exit 1
+fi
+[ -d "$state/backups" ]
+rmdir "$state/.lock"
+HOME="$TMP_HOME" sh "$ROOT/install.sh" --cleanup-backups
+[ ! -e "$state/backups" ]
+[ -f "$state/manifests/codex-skills" ]
+grep -Fqx 'third-party-codex-skill' "$TMP_HOME/.agents/skills/third-party/SKILL.md"
+
 
 echo "Unit regression: kit_restore_entry must not delete a target without its backup"
 (
   set -euo pipefail
-  source "$ROOT/lib/install_common.sh"
+  source "$ROOT/install.sh"
   unit_dir="$(mktemp -d "${TMPDIR:-/tmp}/restore-unit.XXXXXX")"
   printf 'precious\n' > "$unit_dir/target"
   rc=0
@@ -169,7 +202,7 @@ printf 'user agent\n' > "$BACKUP_FAIL_HOME/.claude/agents/user-agent.md"
 claude_md_before="$(cksum "$BACKUP_FAIL_HOME/.claude/CLAUDE.md")"
 chmod 000 "$BACKUP_FAIL_HOME/.claude/agents"
 set +e
-HOME="$BACKUP_FAIL_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh" >/dev/null 2>&1
+HOME="$BACKUP_FAIL_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh" >/dev/null 2>&1
 backup_fail_rc=$?
 set -e
 chmod 700 "$BACKUP_FAIL_HOME/.claude/agents"
@@ -198,7 +231,7 @@ mkdir -p "$MARKER_HOME/.config/git"
 printf '%s\n' 'user rule' '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# BEGIN UNIVERSAL RESEARCH AGENT KIT' 'stale' '# END UNIVERSAL RESEARCH AGENT KIT' > "$MARKER_HOME/.config/git/ignore"
 ignore_before="$(cksum "$MARKER_HOME/.config/git/ignore")"
 set +e
-HOME="$MARKER_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh" >/dev/null 2>&1
+HOME="$MARKER_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh" >/dev/null 2>&1
 marker_rc=$?
 set -e
 [ "$marker_rc" -ne 0 ] || { echo "install unexpectedly succeeded with malformed markers" >&2; rm -rf "$MARKER_HOME"; exit 1; }
@@ -214,7 +247,7 @@ echo "Rollback regression: fail the gitignore phase and expect full restore"
 mkdir -p "$ROLLBACK_HOME/.claude/skills/third-party" "$ROLLBACK_HOME/.config/git/ignore"
 printf '%s\n' 'third-party-claude-skill' > "$ROLLBACK_HOME/.claude/skills/third-party/SKILL.md"
 set +e
-HOME="$ROLLBACK_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install_all.sh" >/dev/null 2>&1
+HOME="$ROLLBACK_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh" >/dev/null 2>&1
 rollback_rc=$?
 set -e
 [ "$rollback_rc" -ne 0 ] || { echo "install unexpectedly succeeded with a broken gitignore target" >&2; exit 1; }
