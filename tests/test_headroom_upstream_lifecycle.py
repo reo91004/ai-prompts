@@ -177,6 +177,14 @@ def mcp_registration(adapter):
         for agent in ("codex", "claude"):
             adapter.install_mcp(agent)
         assert not calls and all(path.read_bytes() == data for path, data in before.items())
+        path = seed("codex", {})
+        path.write_text(path.read_text() + '[plugins.user]\nenabled = true\n# --- end Headroom MCP server ---\n')
+        original = path.read_bytes()
+        adapter.migrate_legacy()
+        adapter.install_mcp("codex")
+        assert path.read_bytes() == original and not calls
+        assert install_everywhere(agents=["codex"], registrars=registrars)["codex"].status == RegisterStatus.ALREADY
+        assert path.read_bytes() == original
         for agent in ("codex", "claude"):
             for env in ({}, {"HEADROOM_PROXY_URL": adapter.BASE_URL}):
                 path = seed(agent, env)
@@ -204,6 +212,7 @@ def mcp_registration(adapter):
                     raise AssertionError("Custom MCP settings were accepted")
                 assert path.read_bytes() == original
     return {"explicit_default_mismatch_reproduced": True, "equivalent_existing_bytes_preserved": True,
+            "orphan_mcp_comment_and_user_tables_preserved": True,
             "fresh_and_repeat_install": True, "custom_url_and_env_conflicts_preserved": True}
 
 

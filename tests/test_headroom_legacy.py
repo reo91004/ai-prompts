@@ -165,6 +165,28 @@ class LegacyTests(unittest.TestCase):
                 result = self.migrate(original)
                 self.assertEqual(result, 'model = "keep"\n' if command.startswith(str(runtime.KIT)) else original)
 
+    def test_orphan_mcp_end_preserves_all_existing_settings(self):
+        for command in (str(runtime.KIT / "tooling/bin/headroom"), "/custom/headroom"):
+            with self.subTest(command=command):
+                original = ('model = "keep"\n[mcp_servers.headroom]\ncommand = "' + command
+                            + '"\nargs = ["mcp", "serve"]\n[plugins.user]\nenabled = true\n'
+                            '# --- end Headroom MCP server ---\n[features]\nkeep = true\n')
+                self.assertEqual(self.migrate(original), original)
+
+    def test_orphan_mcp_end_does_not_weaken_other_marker_or_toml_checks(self):
+        end = '# --- end Headroom MCP server ---\n'
+        known = ('# --- Headroom MCP server ---\n[mcp_servers.headroom]\ncommand = "'
+                 + str(runtime.KIT / "tooling/bin/headroom")
+                 + '"\nargs = ["mcp", "serve"]\n' + end)
+        self.assertEqual(self.migrate(end + known + end), end + end)
+        for original in (end + 'model = [\n', end + runtime.LEGACY_END + '\n',
+                         end + '# --- Headroom MCP server ---\n[mcp_servers.headroom]\n'):
+            with self.subTest(original=original):
+                runtime.CONFIG.write_text(original)
+                with self.assertRaises((RuntimeError, ValueError)):
+                    runtime.migrate_legacy()
+                self.assertEqual(runtime.CONFIG.read_text(), original)
+
     def test_custom_duplicate_mcp_and_other_malformed_data_are_not_modified(self):
         known = ('# --- Headroom MCP server ---\n[mcp_servers.headroom]\n'
                  'command = "' + str(runtime.KIT / "tooling/bin/headroom")

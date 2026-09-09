@@ -155,6 +155,8 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 기존 ai-prompts를 설치한 호스트도 같은 `sh install.sh`로 갱신합니다. 이전 kit wrapper와 설치 상태가 확인되면 Codex의 정확한 legacy Headroom 표식만 제거하고, root provider의 `# was:` 또는 이전 백업의 해당 root 값만 복구합니다. 백업 이후 추가한 MCP·프로젝트·모델 설정은 현재 파일에서 유지합니다. 알려진 kit 경로를 가리키는 중복 Headroom MCP는 정리 후 다시 등록합니다. 재구성 때 kit의 옛 pip fallback venv도 tooling 백업에 보존하고 활성 경로에서는 제거합니다. 이 재구성은 키트 밖에 별도로 설치한 Python·Headroom·Graphify와 로그인 정보를 삭제하지 않습니다. 경로가 symlink여서 관리 범위를 확정할 수 없는 경우에는 자동 삭제를 거절합니다.
 
+과거 Headroom 처리에서 MCP 시작 주석이 없어지고 종료 주석만 남은 경우에는 그 주석과 기존 설정을 그대로 보존하며 진행합니다. 주석 앞의 테이블을 키트 소유로 추정해 삭제하지 않습니다. 끝나지 않은 블록이나 provider 표식의 불균형, 잘못된 TOML은 계속 중단하고 문제의 표식을 알립니다.
+
 소유 기록이 없는 custom provider·동명 MCP·다른 서비스의 8787 포트 사용은 자동 인수하지 않고 충돌 위치를 알립니다. kit 소유 서비스는 앞의 종료 확인 후 필요한 경우 옛 Python runner를 복구합니다. 일반 세션은 프로젝트의 옛 Claude proxy 설정을 세션 범위에서 덮어쓰며, Claude Remote Control은 파일에 남은 proxy 설정의 충돌을 안내합니다. 실행 중인 과거 wrapper가 파일을 쓸 수 있으므로 프로젝트 파일을 일괄 삭제하지 않습니다.
 
 설치 후 새 터미널을 여세요. 이미 열린 셸의 함수·alias는 자식 설치 프로세스가 바꿀 수 없습니다. 직접 만든 `codex`/`claude` alias가 있다면 해당 alias를 해제하고 kit wrapper를 사용해야 합니다. 패키지 정리 권한이 부족하면 검증된 새 native 설치를 유지한 채 오류를 보고하며, 기존 패키지가 정리된 것처럼 성공 처리하지 않습니다. 로그인·인증·세션 디렉터리는 제거 대상이 아닙니다.

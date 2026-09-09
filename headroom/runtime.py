@@ -209,19 +209,26 @@ def toml_lines(text):
         yield line, outside
 
 
-def strip_legacy_blocks(text, start, end, owned):
+def strip_legacy_blocks(text, start, end, owned, preserve_orphan_end=False):
     """Remove balanced owned spans, preserving strings and unrelated blocks."""
     kept, block = [], None
     removed = 0
-    for line, outside in toml_lines(text):
+    opening_line = None
+    for line_number, (line, outside) in enumerate(toml_lines(text), 1):
         marker = line.rstrip("\r\n") if outside else ""
         if marker == start:
             if block is not None:
-                fail("Nested legacy Headroom markers; Codex configuration was preserved.")
+                fail(f"Nested Headroom marker in {CONFIG} at parsed line {line_number}: {start!r}; "
+                     f"the block at line {opening_line} has not ended. Configuration was preserved.")
             block = [line]
+            opening_line = line_number
         elif marker == end:
             if block is None:
-                fail("Unbalanced legacy Headroom markers; Codex configuration was preserved.")
+                if preserve_orphan_end:
+                    kept.append(line)
+                    continue
+                fail(f"Unbalanced Headroom marker in {CONFIG} at parsed line {line_number}: {end!r} "
+                     f"has no matching {start!r}. Configuration was preserved.")
             if owned(tomllib.loads("".join(block[1:]))):
                 removed += 1
             else:
@@ -232,7 +239,8 @@ def strip_legacy_blocks(text, start, end, owned):
         else:
             kept.append(line)
     if block is not None:
-        fail("Unbalanced legacy Headroom markers; Codex configuration was preserved.")
+        fail(f"Unbalanced Headroom marker in {CONFIG} at parsed line {opening_line}: {start!r} "
+             f"has no matching {end!r}. Configuration was preserved.")
     return "".join(kept), removed
 
 
@@ -252,8 +260,11 @@ def migrate_legacy():
 
     # Known duplicate MCP tables must be removed before full TOML parsing.
     # A custom same-name server is not a candidate for kit replacement.
+    # Upstream wrap can consume an MCP opening comment. Its orphan closing
+    # comment is inert; retain it without treating preceding tables as owned.
     cleaned, mcp_removed = strip_legacy_blocks(original, "# --- Headroom MCP server ---",
-                                               "# --- end Headroom MCP server ---", owned_mcp)
+                                               "# --- end Headroom MCP server ---", owned_mcp,
+                                               preserve_orphan_end=True)
     current = tomllib.loads(cleaned)
     remaining = current.get("mcp_servers", {}).get("headroom")
     if mcp_removed and remaining is not None and remaining.get("command") not in known_commands:
