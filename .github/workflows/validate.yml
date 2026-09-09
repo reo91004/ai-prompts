@@ -15,6 +15,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - name: Check POSIX shell entry point
         if: runner.os == 'Linux'
         run: dash install.sh --help
@@ -56,6 +59,13 @@ jobs:
         run: bash tests/test_tooling_install.sh
       - name: Test complete default installation with mock CLIs
         run: bash tests/test_default_install.sh
+      - name: Test CLI bootstrap and explicit Remote Control
+        run: bash tests/test_cli_bootstrap.sh
+      - name: Test session dispatch and persistent runtime ownership
+        run: |
+          python3 tests/test_headroom_dispatch.py
+          python3 tests/test_headroom_runtime.py
+          python3 tests/test_headroom_legacy.py
       - name: Check patch whitespace
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then

@@ -10,6 +10,7 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 MOCK_BIN="$WORK/bin"
 mkdir -p "$MOCK_BIN"
+ln -s "$(command -v node)" "$MOCK_BIN/node"
 
 # Mock CLIs replay plugin/marketplace state from JSON files and record every
 # invocation, so reconciliation logic is testable without real CLIs, network,
@@ -21,6 +22,8 @@ STATE="${CODEX_MOCK_STATE:?}"
 cmd="$*"
 printf 'codex %s\n' "$cmd" >> "$STATE/calls.log"
 case "$cmd" in
+  --version) echo "codex 0.153.4" ;;
+  *--help) : ;;
   "plugin list --json")
     # Like the real CLI, the enabled flag is overlaid from the
     # [plugins."<id>"] sections of ~/.codex/config.toml.
@@ -80,8 +83,8 @@ case "$cmd" in
   "mcp remove sequential_thinking")
     rm -f "$STATE/mcp_sequential"
     ;;
-  "mcp add sequential_thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@latest")
-    printf 'args: -y %s\n' "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
+  "mcp add sequential_thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@latest")
+    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
     ;;
   "mcp list")
     config="$HOME/.codex/config.toml"
@@ -100,6 +103,8 @@ STATE="${CLAUDE_MOCK_STATE:?}"
 cmd="$*"
 printf 'claude %s\n' "$cmd" >> "$STATE/calls.log"
 case "$cmd" in
+  --version) echo "2.1.0 (Claude Code)" ;;
+  *--help) : ;;
   "plugin list --json")
     cat "$STATE/plugins.json"
     ;;
@@ -129,8 +134,8 @@ case "$cmd" in
   "mcp remove sequential-thinking -s user")
     rm -f "$STATE/mcp_sequential"
     ;;
-  "mcp add -s user sequential-thinking -- npx -y @modelcontextprotocol/server-sequential-thinking@latest")
-    printf 'args: -y %s\n' "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
+  "mcp add -s user sequential-thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@latest")
+    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
     ;;
   *)
     echo "claude mock: unhandled command: $cmd" >&2
@@ -216,11 +221,43 @@ seed_claude_mock_state() {
   ' "$state_dir" "$market_path"
 }
 
+# Native install layout fixtures keep orchestration tests offline.
+seed_native_clis() {
+  local home="$1" name target
+  [ ! -d "$home/.codex/packages/standalone/current/bin" ] || return 0
+  mkdir -p "$home/.codex/packages/standalone/current/bin" "$home/.local/bin" "$home/.local/share/claude/versions"
+  for name in codex claude; do
+    if [ "$name" = codex ]; then target="$home/.codex/packages/standalone/current/bin/codex"
+    else target="$home/.local/share/claude/versions/2.1.0"; fi
+    printf '#!/bin/bash\nexec %q "$@"\n' "$MOCK_BIN/$name" > "$target"
+    chmod +x "$target"
+  done
+  ln -s "$home/.local/share/claude/versions/2.1.0" "$home/.local/bin/claude"
+}
+cat > "$MOCK_BIN/npm" <<'MOCK'
+#!/bin/sh
+case "$*" in
+  'root --global') echo "$HOME/empty-npm/lib/node_modules" ;;
+  --version) echo 10.0.0 ;;
+  *) exit 99 ;;
+esac
+MOCK
+cat > "$MOCK_BIN/brew" <<'MOCK'
+#!/bin/sh
+case "$*" in
+  --prefix) echo "$HOME/empty-brew" ;;
+  'list --cask --versions'|'list --formula --versions') : ;;
+  *) exit 99 ;;
+esac
+MOCK
+chmod +x "$MOCK_BIN/npm" "$MOCK_BIN/brew"
+
 run_kit() {
   local home="$1"
   local codex_state="$2"
   local claude_state="$3"
   shift 3
+  seed_native_clis "$home"
   HOME="$home" PATH="$MOCK_BIN:$PATH" \
     UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 \
     CODEX_MOCK_STATE="$codex_state" CLAUDE_MOCK_STATE="$claude_state" \
@@ -467,7 +504,7 @@ printf '%s\n' \
   '' \
   '# --- Headroom MCP server ---' \
   '[mcp_servers.headroom]' \
-  'command = "/old/headroom"' \
+  "command = \"$E_HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" \
   'args = ["mcp", "serve"]' \
   '# --- end Headroom MCP server ---' \
   '' \
@@ -476,7 +513,7 @@ printf '%s\n' \
   '' \
   '# --- Headroom MCP server ---' \
   '[mcp_servers.headroom]' \
-  'command = "/managed/headroom"' \
+  "command = \"$E_HOME/.universal-research-agent-kit/tooling/bin/headroom\"" \
   'args = ["mcp", "serve"]' \
   '' \
   '[mcp_servers.headroom.env]' \
@@ -501,7 +538,7 @@ printf '%s\n' \
   '' \
   '# --- Headroom MCP server ---' \
   '[mcp_servers.headroom]' \
-  'command = "/home/reo/.local/bin/headroom"' \
+  "command = \"$F_HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" \
   'args = ["mcp", "serve"]' \
   '# --- end Headroom MCP server ---' > "$F_HOME/.codex/config.toml"
 run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null

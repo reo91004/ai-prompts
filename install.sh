@@ -7,13 +7,28 @@ GRAPHIFY_VERSION=0.9.39
 HEADROOM_VERSION=0.34.0
 EXPECTED_GRAPHIFY_VERSION="$GRAPHIFY_VERSION"
 EXPECTED_HEADROOM_VERSION="$HEADROOM_VERSION"
+KIT_PYTHON_VERSION=3.13
+KIT_UV_VERSION=0.12.10
 GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
 HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
+source "$ROOT/scripts/bootstrap_cli.sh"
 
 
 kit_die() {
   echo "Error: $*" >&2
   exit 1
+}
+
+download_file() {
+  local url="$1" destination="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl --fail --location --silent --show-error --connect-timeout 15 --retry 2 "$url" --output "$destination" ||
+      kit_die "Download failed: $url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q --timeout=30 -O "$destination" "$url" || kit_die "Download failed: $url"
+  else
+    kit_die "curl or wget is required to download the managed runtimes."
+  fi
 }
 
 kit_validate_home() {
@@ -208,6 +223,13 @@ kit_handle_exit() {
   local status="$1"
   trap - EXIT
   if [ "$status" -ne 0 ]; then
+    if [ "${KIT_HEADROOM_CREATED:-0}" = 1 ] && [ -f "$KIT_STATE_ROOT/headroom.json" ]; then
+      if ! "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" remove; then
+        echo "Warning: runtime cleanup failed. Kept its environment/configuration and journal at $KIT_BACKUP_DIR for recovery; inspect --headroom-status before retrying." >&2
+        kit_release_lock
+        exit "$status"
+      fi
+    fi
     echo "Install failed with status $status; rolling back journaled changes." >&2
     if kit_rollback_run; then
       echo "Rollback complete. Backups remain in $KIT_BACKUP_DIR" >&2
@@ -577,6 +599,21 @@ repair_duplicate_headroom_mcp() {
 
   [ -f "$config" ] || return 0
   headroom_sections="$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)"
+  if [ "$headroom_sections" -gt 0 ] && ! awk -v first="$expected_command" \
+      -v second="command = \"$HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" '
+    /^\[/ {
+      if (section && !owned) bad=1
+      section=($0 == "[mcp_servers.headroom]"); owned=0
+    }
+    section && ($0 == first || $0 == second) { owned=1 }
+    END { if (section && !owned) bad=1; exit bad }
+  ' "$config"; then
+    if [ "$headroom_sections" -gt 1 ] || [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+      kit_die "Unowned Headroom MCP configuration was preserved; resolve its name/path conflict before kit installation."
+    fi
+    (cd "$HOME" && codex mcp list >/dev/null 2>&1) || kit_die "Invalid user MCP configuration was preserved."
+    return 0
+  fi
   if [ "$headroom_sections" -gt 1 ]; then
     needs_repair=1
   elif [ "$headroom_sections" -eq 1 ] &&
@@ -606,7 +643,7 @@ repair_duplicate_headroom_mcp() {
 
   (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
     kit_die "Removing duplicate Headroom MCP sections did not produce a valid Codex config: $config"
-  echo "Removed $headroom_sections stale or duplicate Headroom MCP section(s) from ~/.codex/config.toml; Headroom wrap will register one canonical entry."
+  echo "Removed $headroom_sections stale or duplicate Headroom MCP section(s) from ~/.codex/config.toml; Headroom installation will register one canonical entry."
 }
 
 # Sequential Thinking MCP is add-or-repin: a registration under the kit's own
@@ -614,27 +651,30 @@ repair_duplicate_headroom_mcp() {
 # install alone converges a registration frozen at an older version. A
 # registration under any other name is never inspected, replaced, or removed.
 mcp_package_matches() {
-  grep -Eq '(^|[^[:alnum:]_/@.-])@modelcontextprotocol/server-sequential-thinking@latest([^[:alnum:]_/@.-]|$)'
+  local description
+  description="$(cat)"
+  printf '%s\n' "$description" | grep -Eq '(^|[^[:alnum:]_/@.-])@modelcontextprotocol/server-sequential-thinking@latest([^[:alnum:]_/@.-]|$)' &&
+    printf '%s\n' "$description" | grep -Fq "$HOME/.universal-research-agent-kit/cli/bin/kit-npx"
 }
 
 ensure_codex_sequential_thinking() {
   local current
   if current="$(cd "$HOME" && codex mcp get sequential_thinking 2>/dev/null)"; then
     if printf '%s\n' "$current" | mcp_package_matches; then
-      echo "Codex sequential_thinking MCP already tracks the latest package; leaving it unchanged."
+      echo "Codex sequential_thinking MCP already has the package and host-local launcher; leaving it unchanged."
       CODEX_SEQTHINK_STATE="preexisting"
       return
     fi
     echo "Re-registering the Codex sequential_thinking MCP against the latest package."
     (cd "$HOME" && codex mcp remove sequential_thinking)
-    (cd "$HOME" && codex mcp add sequential_thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE")
+    (cd "$HOME" && codex mcp add sequential_thinking -- "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" -y "$SEQUENTIAL_THINKING_PACKAGE")
     (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1) ||
       kit_die "Failed to re-register the Codex sequential_thinking MCP."
     CODEX_SEQTHINK_STATE="repinned_kit"
     return
   fi
   echo "Registering the Sequential Thinking MCP (latest) for Codex."
-  (cd "$HOME" && codex mcp add sequential_thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE")
+  (cd "$HOME" && codex mcp add sequential_thinking -- "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" -y "$SEQUENTIAL_THINKING_PACKAGE")
   (cd "$HOME" && codex mcp get sequential_thinking >/dev/null 2>&1) ||
     kit_die "Failed to register the Codex sequential_thinking MCP."
   CODEX_SEQTHINK_STATE="registered_kit"
@@ -644,20 +684,20 @@ ensure_claude_sequential_thinking() {
   local current
   if current="$(claude mcp get sequential-thinking 2>/dev/null)"; then
     if printf '%s\n' "$current" | mcp_package_matches; then
-      echo "Claude sequential-thinking MCP already tracks the latest package; leaving it unchanged."
+      echo "Claude sequential-thinking MCP already has the package and host-local launcher; leaving it unchanged."
       CLAUDE_SEQTHINK_STATE="preexisting"
       return
     fi
     echo "Re-registering the Claude sequential-thinking MCP against the latest package."
     claude mcp remove sequential-thinking -s user
-    claude mcp add -s user sequential-thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE"
+    claude mcp add -s user sequential-thinking -- "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" -y "$SEQUENTIAL_THINKING_PACKAGE"
     claude mcp get sequential-thinking >/dev/null 2>&1 ||
       kit_die "Failed to re-register the Claude sequential-thinking MCP."
     CLAUDE_SEQTHINK_STATE="repinned_kit"
     return
   fi
   echo "Registering the Sequential Thinking MCP (latest) for Claude Code."
-  claude mcp add -s user sequential-thinking -- npx -y "$SEQUENTIAL_THINKING_PACKAGE"
+  claude mcp add -s user sequential-thinking -- "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" -y "$SEQUENTIAL_THINKING_PACKAGE"
   claude mcp get sequential-thinking >/dev/null 2>&1 ||
     kit_die "Failed to register the Claude sequential-thinking MCP."
   CLAUDE_SEQTHINK_STATE="registered_kit"
@@ -1235,7 +1275,8 @@ EOF
 }
 
 
-install_tooling() {
+prepare_tooling() {
+[ "${KIT_TOOLING_PREPARED:-0}" -eq 0 ] || return 0
 TOOL_ROOT="$KIT_STATE_ROOT/tooling"
 TOOL_BIN_DIR="$TOOL_ROOT/bin"
 TOOL_UV_DIR="$TOOL_ROOT/uv-tools"
@@ -1264,65 +1305,69 @@ prepare_managed_tool_root() {
   TOOL_ROOT_PREPARED=1
 }
 
+ensure_uv() {
+  [ -n "${KIT_UV_BIN:-}" ] && return 0
+  prepare_managed_tool_root
+  KIT_UV_BIN="$TOOL_ROOT/uv-bin/uv"
+  if [ ! -x "$KIT_UV_BIN" ]; then
+    kit_require_real_dir "$TOOL_ROOT/uv-bin"
+    if command -v uv >/dev/null 2>&1 && tool_version_matches uv "$KIT_UV_VERSION"; then
+      cp "$(command -v uv)" "$KIT_UV_BIN"
+    else
+      echo "Preparing kit-local uv $KIT_UV_VERSION (no system Python required)."
+      download_file "https://astral.sh/uv/$KIT_UV_VERSION/install.sh" "$KIT_BACKUP_DIR/install-uv.sh"
+      UV_UNMANAGED_INSTALL="$TOOL_ROOT/uv-bin" sh "$KIT_BACKUP_DIR/install-uv.sh" || kit_die "uv bootstrap failed."
+    fi
+  fi
+  tool_version_matches "$KIT_UV_BIN" "$KIT_UV_VERSION" || kit_die "Kit uv does not report $KIT_UV_VERSION."
+  kit_require_real_dir "$TOOL_ROOT/python"
+  export UV_PYTHON_INSTALL_DIR="$TOOL_ROOT/python"
+  export UV_TOOL_DIR="$TOOL_UV_DIR"
+  export UV_TOOL_BIN_DIR="$TOOL_BIN_DIR"
+  export UV_PYTHON_DOWNLOADS=automatic
+  "$KIT_UV_BIN" --no-config python install --managed-python --no-bin "$KIT_PYTHON_VERSION" ||
+    kit_die "Failed to provision kit Python $KIT_PYTHON_VERSION."
+}
+
 ensure_tool() {
   local command_name="$1"
   local package="$2"
   local expected_version="$3"
   local install_state_var="$4"
-  local uv_python="${5:-}"
-  local command_path
-  local venv_dir
+  local distribution="$5"
+  local command_path="$TOOL_BIN_DIR/$1"
+  local python_path="$TOOL_UV_DIR/$5/bin/python"
+  local ready=0
 
-  command_path="$(command -v "$command_name" 2>/dev/null || true)"
-  if [ -n "$command_path" ] && tool_version_matches "$command_name" "$expected_version"; then
-    printf -v "$install_state_var" '%s' 'present'
+  if [ -x "$command_path" ] && [ -x "$python_path" ] &&
+      tool_version_matches "$command_path" "$expected_version" &&
+      "$python_path" -I -B "$ROOT/headroom/runtime.py" environment "$distribution" "$expected_version"; then
+    if [ "$command_name" != headroom ] ||
+        "$python_path" -I -B "$ROOT/headroom/runtime.py" dependencies "$expected_version"; then
+      ready=1
+    fi
+  fi
+  if [ "$ready" -eq 1 ]; then
+    printf -v "$install_state_var" '%s' present
     return
   fi
 
-  prepare_managed_tool_root
-  if [ -n "$command_path" ]; then
-    echo "$command_name is not version $expected_version; installing the pinned managed copy."
-  fi
-
-  if command -v uv >/dev/null 2>&1; then
-    echo "Installing $command_name with uv in $TOOL_ROOT."
-    if [ -n "$uv_python" ]; then
-      UV_TOOL_DIR="$TOOL_UV_DIR" XDG_BIN_HOME="$TOOL_BIN_DIR" \
-        uv tool install --python "$uv_python" --upgrade "$package" \
-        || kit_die "Failed to install $command_name with uv."
-    else
-      UV_TOOL_DIR="$TOOL_UV_DIR" XDG_BIN_HOME="$TOOL_BIN_DIR" \
-        uv tool install --upgrade "$package" \
-        || kit_die "Failed to install $command_name with uv."
-    fi
-  elif command -v python3 >/dev/null 2>&1; then
-    echo "Installing $command_name with python3 -m pip in $TOOL_ROOT."
-    venv_dir="$TOOL_ROOT/python-venv"
-    validate_tool_path "$venv_dir"
-    if [ ! -x "$venv_dir/bin/python" ]; then
-      python3 -m venv "$venv_dir" || kit_die "Failed to create the managed Python environment for $command_name."
-    fi
-    "$venv_dir/bin/python" -m pip install --upgrade "$package" \
-      || kit_die "Failed to install $command_name with python3 -m pip."
-    [ -x "$venv_dir/bin/$command_name" ] ||
-      kit_die "The managed Python environment did not provide the $command_name command."
-    kit_remove_owned_entry "$TOOL_BIN_DIR" "$command_name"
-    ln -s "$venv_dir/bin/$command_name" "$TOOL_BIN_DIR/$command_name"
-  else
-    kit_die "Cannot install $command_name: neither uv nor python3 is available."
-  fi
-
-  # Verify the copy just installed, by path. A PATH lookup can resolve to an
-  # older same-named binary earlier in PATH and reject a good install.
+  ensure_uv
+  echo "Installing/repairing $command_name in its kit-managed Python environment."
+  "$KIT_UV_BIN" --no-config tool install --managed-python --python "$KIT_PYTHON_VERSION" \
+    --reinstall "$package" || kit_die "Failed to install $command_name with uv."
   hash -r 2>/dev/null || true
-  command_path="$TOOL_BIN_DIR/$command_name"
-  if [ ! -x "$command_path" ]; then
-    kit_die "$command_name installation completed but produced no executable at $command_path."
-  fi
-  if ! tool_version_matches "$command_path" "$expected_version"; then
+  [ -x "$command_path" ] && [ -x "$python_path" ] ||
+    kit_die "Managed $command_name command or interpreter is missing."
+  tool_version_matches "$command_path" "$expected_version" ||
     kit_die "$command_path does not report version $expected_version after installation."
+  "$python_path" -I -B "$ROOT/headroom/runtime.py" environment "$distribution" "$expected_version" ||
+    kit_die "Managed Python environment verification failed for $command_name."
+  if [ "$command_name" = headroom ]; then
+    "$python_path" -I -B "$ROOT/headroom/runtime.py" dependencies "$expected_version" ||
+      kit_die "Headroom proxy/MCP dependency verification failed in $python_path."
   fi
-  printf -v "$install_state_var" '%s' 'installed'
+  printf -v "$install_state_var" '%s' installed
 }
 
 # Always put the managed bin first. A previous run leaves this directory in the
@@ -1334,18 +1379,29 @@ hash -r 2>/dev/null || true
 
 GRAPHIFY_STATE=""
 HEADROOM_STATE=""
-ensure_tool graphify "$GRAPHIFY_PACKAGE" "$GRAPHIFY_VERSION" GRAPHIFY_STATE
+ensure_tool graphify "$GRAPHIFY_PACKAGE" "$GRAPHIFY_VERSION" GRAPHIFY_STATE graphifyy
 GRAPHIFY_BIN="$(command -v graphify 2>/dev/null || true)"
 [ -n "$GRAPHIFY_BIN" ] || kit_die "Graphify installation completed but its command is not on PATH: $TOOL_BIN_DIR"
 
-ensure_tool headroom "$HEADROOM_PACKAGE" "$HEADROOM_VERSION" HEADROOM_STATE 3.13
+ensure_tool headroom "$HEADROOM_PACKAGE" "$HEADROOM_VERSION" HEADROOM_STATE headroom-ai
 HEADROOM_BIN="$(command -v headroom 2>/dev/null || true)"
 [ -n "$HEADROOM_BIN" ] || kit_die "Headroom installation completed but its command is not on PATH: $TOOL_BIN_DIR"
+KIT_HEADROOM_PYTHON="$TOOL_UV_DIR/headroom-ai/bin/python"
+KIT_TOOLING_PREPARED=1
+}
+
+install_tooling() {
+prepare_tooling
 
 HEADROOM_WRAPPER="$HOME/.config/headroom/auto-wrap.sh"
 kit_require_regular_or_absent "$HEADROOM_WRAPPER"
 kit_backup_path "$HEADROOM_WRAPPER" "tooling/headroom-auto-wrap.sh"
 kit_replace_file "$ROOT/headroom/auto-wrap.sh" "$HEADROOM_WRAPPER" || kit_die "Failed to install the Headroom wrapper."
+kit_require_regular_or_absent "$HOME/.config/headroom/runtime.py"
+kit_backup_path "$HOME/.config/headroom/runtime.py" "tooling/headroom-runtime.py"
+kit_replace_file "$ROOT/headroom/runtime.py" "$HOME/.config/headroom/runtime.py"
+KIT_HEADROOM_PYTHON="$TOOL_UV_DIR/headroom-ai/bin/python"
+
 
 GRAPHIFY_CLAUDE_PROMPT="$HOME/.claude/CLAUDE.md"
 GRAPHIFY_CLAUDE_SKILL="$HOME/.claude/skills/graphify"
@@ -1420,6 +1476,10 @@ case ":$PATH:" in
   *) PATH="$HOME/.local/bin:$PATH" ; export PATH ;;
 esac
 case ":$PATH:" in
+  *:"$HOME/.universal-research-agent-kit/cli/bin":*) ;;
+  *) PATH="$HOME/.universal-research-agent-kit/cli/bin:$PATH" ; export PATH ;;
+esac
+case ":$PATH:" in
   *:"$HOME/.universal-research-agent-kit/tooling/bin":*) ;;
   *) PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH" ; export PATH ;;
 esac
@@ -1432,9 +1492,32 @@ kit_replace_managed_block "$HOME/.bashrc" "$SHELL_BLOCK" "shell/bashrc" '# BEGIN
 "$GRAPHIFY_BIN" install --platform claude || kit_die "Graphify Claude global installation failed."
 "$GRAPHIFY_BIN" install --platform codex || kit_die "Graphify Codex global installation failed."
 
+# Install shared MCP configuration once; normal sessions never rewrite it.
+kit_backup_path "$HOME/.codex/config.toml" "tooling/headroom-codex-config"
+for mcp_path in "$HOME/.claude.json" "$HOME/.claude/mcp.json"; do
+  kit_require_regular_or_absent "$mcp_path"
+done
+kit_backup_path "$HOME/.claude.json" "tooling/headroom-claude-config"
+kit_backup_path "$HOME/.claude/mcp.json" "tooling/headroom-claude-legacy-mcp"
+"$HEADROOM_BIN" mcp install --agent codex || kit_die "Headroom Codex MCP registration failed."
+"$HEADROOM_BIN" mcp install --agent claude || kit_die "Headroom Claude MCP registration failed."
+
+kit_require_regular_or_absent "$KIT_STATE_ROOT/headroom.json"
+kit_backup_path "$KIT_STATE_ROOT/headroom.json" "tooling/headroom-state"
+KIT_HEADROOM_CREATED=0
+[ -f "$KIT_STATE_ROOT/headroom.json" ] || KIT_HEADROOM_CREATED=1
+"$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" install || kit_die "Persistent Headroom installation failed."
+if [ "$(uname -s)" = Linux ]; then
+  if ! command -v loginctl >/dev/null 2>&1 ||
+      [ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null || true)" != yes ]; then
+    echo "Note: user systemd is ready, but SSH-logout/reboot persistence needs linger. Ask your administrator or run: loginctl enable-linger $(id -un)"
+  fi
+fi
+
+
 kit_write_tooling_state "installed" "$GRAPHIFY_STATE" "$HEADROOM_STATE" "installed" \
   "$GRAPHIFY_VERSION" "$HEADROOM_VERSION" "$TOOL_BIN_DIR"
-echo "Installed Graphify global wiring and Headroom shell wrappers."
+echo "Installed Graphify, Headroom MCP, process-local launchers and the host persistent proxy."
 
 }
 verify_install() {
@@ -1467,7 +1550,7 @@ esac
 # The managed bin goes on last so it wins. The three directories above can each
 # hold an older same-named tool, and verifying one of those would report the
 # wrong version for a correct install.
-PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH"
+PATH="$HOME/.universal-research-agent-kit/tooling/bin:$HOME/.universal-research-agent-kit/cli/bin:$PATH"
 export PATH
 hash -r 2>/dev/null || true
 
@@ -1846,9 +1929,19 @@ else
       check_tool_command headroom
       check_tool_version graphify "$graphify_version"
       check_tool_version headroom "$headroom_version"
+      "$HOME/.universal-research-agent-kit/tooling/uv-tools/graphifyy/bin/python" -I -B \
+        "$ROOT/headroom/runtime.py" environment graphifyy "$EXPECTED_GRAPHIFY_VERSION" || missing=1
       check_graphify_skill_layout "$HOME/.claude/skills/graphify"
       check_graphify_skill_layout "$HOME/.codex/skills/graphify"
       check_same_file "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
+      check_same_file "$ROOT/headroom/runtime.py" "$HOME/.config/headroom/runtime.py"
+      runtime_python="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
+      if [ -x "$runtime_python" ]; then
+        "$runtime_python" -I -B "$ROOT/headroom/runtime.py" dependencies "$EXPECTED_HEADROOM_VERSION" || missing=1
+        "$runtime_python" -I -B "$ROOT/headroom/runtime.py" check || missing=1
+      else
+        echo "Missing kit Headroom interpreter: $runtime_python"; missing=1
+      fi
       check_file "$HOME/.zshrc"
       check_file "$HOME/.bashrc"
       if [ -f "$HOME/.zshrc" ]; then
@@ -1924,6 +2017,10 @@ elif [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = "1" ]; then
   scoped=1
 else
   requested_profile="$(read_state requested_profile)"
+  if ! verify_native_clis; then
+    echo "Official native CLI installation or kit launcher is missing/broken; rerun sh install.sh."
+    missing=1
+  fi
   echo "Integrations profile: ${requested_profile:-unknown}"
   case "$requested_profile" in none|ponytail) ;; *) echo "Unknown requested integration profile"; missing=1 ;; esac
 
@@ -2095,6 +2192,7 @@ else
 
 fi
 
+[ "${KIT_VERIFY_REMOTE:-1}" != 1 ] || verify_codex_remote || missing=1
 if [ "$missing" -ne 0 ]; then
   echo "Install verification failed."
   exit 1
@@ -2139,6 +2237,7 @@ echo "Kit backup snapshots deleted."
 }
 main() {
   PROFILE=ponytail
+  ENABLE_CODEX_REMOTE=0
   action=install
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -2147,14 +2246,25 @@ main() {
         case "$2" in none|ponytail) PROFILE="$2" ;; *) kit_die "Unknown integration profile: $2" ;; esac
         shift 2 ;;
       --verify) [ "$action" = install ] || kit_die "Choose only one action"; action=verify; shift ;;
+      --enable-codex-remote-control) ENABLE_CODEX_REMOTE=1; shift ;;
+      --disable-codex-remote-control) [ "$action" = install ] || kit_die "Choose only one action"; action=remote_disable; shift ;;
+      --remote-control-status) [ "$action" = install ] || kit_die "Choose only one action"; action=remote_status; shift ;;
+      --headroom-status) [ "$action" = install ] || kit_die "Choose only one action"; action=headroom_status; shift ;;
+      --remove-headroom) [ "$action" = install ] || kit_die "Choose only one action"; action=headroom_remove; shift ;;
       --cleanup-backups) [ "$action" = install ] || kit_die "Choose only one action"; action=cleanup; shift ;;
       -h|--help)
         cat <<'HELP'
 Usage: sh install.sh [--integrations ponytail|none] [--verify | --cleanup-backups]
 Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify and Headroom.
-Requires Codex, Claude, Node.js and npx on PATH before changing HOME (unless integrations explicitly skipped).
+Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
+Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
   --verify             Check source and installed files without installing or changing HOME.
+  --enable-codex-remote-control  Opt this host into managed Codex Remote Control (pair separately).
+  --disable-codex-remote-control Disable Remote Control on this host; preserve local tools.
+  --remote-control-status       Read-only remote host status.
+  --headroom-status    Check the kit service, readiness, interpreter and Codex routing.
+  --remove-headroom    Remove only the kit persistent service/provider; restore prior root settings.
   --cleanup-backups    Delete backup snapshots only; refuse while an install holds the lock.
 Environment: UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 leaves integrations untouched;
 UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 leaves Graphify/Headroom untouched.
@@ -2164,19 +2274,44 @@ HELP
       *) kit_die "Unknown argument: $1" ;;
     esac
   done
+  [ -z "${CODEX_HOME:-}" ] || [ "$CODEX_HOME" = "$HOME/.codex" ] ||
+    kit_die "Custom CODEX_HOME is not supported; unset it before running this installer. No paths were changed."
+  [ "$ENABLE_CODEX_REMOTE" -eq 0 ] || [ "$action" = install ] ||
+    kit_die "--enable-codex-remote-control cannot be combined with a read-only/removal action."
   case "$action" in
     verify) verify_install; return ;;
     cleanup) cleanup_backups; return ;;
+    remote_status) show_codex_remote; return ;;
+    remote_disable)
+      kit_init_state
+      trap 'kit_release_lock' EXIT
+      disable_codex_remote
+      return ;;
+    headroom_status)
+      "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B "$ROOT/headroom/runtime.py" check
+      return ;;
+    headroom_remove)
+      kit_init_state
+      trap 'kit_release_lock' EXIT
+      kit_backup_path "$HOME/.codex/config.toml" "headroom-remove/config.toml"
+      "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B "$ROOT/headroom/runtime.py" remove
+      return ;;
   esac
   [ -z "${CLAUDE_CONFIG_DIR:-}" ] || kit_die "CLAUDE_CONFIG_DIR is not supported by this installer; unset it and rerun."
-  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
-    for prerequisite in codex claude node npx; do
-      command -v "$prerequisite" >/dev/null 2>&1 ||
-        kit_die "Required CLI unavailable: $prerequisite. Install it and rerun, or explicitly set UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 for a scoped core/tooling install."
-    done
+  if [ "$ENABLE_CODEX_REMOTE" -eq 1 ] && [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = 1 ]; then
+    kit_die "Remote Control host setup requires the persistent Headroom tooling step."
   fi
   kit_init_state
   kit_enable_rollback
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
+    bootstrap_cli
+  fi
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+    prepare_tooling
+    kit_require_regular_or_absent "$HOME/.codex/config.toml"
+    kit_backup_path "$HOME/.codex/config.toml" "legacy/config.toml"
+    "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" migrate-legacy || kit_die "Legacy Headroom migration failed."
+  fi
   install_core
   kit_replace_managed_block "$HOME/.config/git/ignore" "$ROOT/global_research_agents.gitignore" git/ignore '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = 1 ]; then
@@ -2189,7 +2324,26 @@ HELP
   else
     install_tooling
   fi
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ] &&
+      [ -f "$KIT_STATE_ROOT/codex-remote-control.state" ] &&
+      grep -Fqx 'enabled=1' "$KIT_STATE_ROOT/codex-remote-control.state"; then
+    ENABLE_CODEX_REMOTE=1
+  fi
+  if [ "$ENABLE_CODEX_REMOTE" -eq 1 ] || [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = 1 ]; then KIT_VERIFY_REMOTE=0; fi
   verify_install
+  # Package manager removals cannot be rolled back by the file journal. Keep
+  # the verified replacement installed if a manager reports a cleanup failure.
+  trap 'kit_release_lock' EXIT
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
+    cleanup_legacy_clis
+  fi
+  if [ "$ENABLE_CODEX_REMOTE" -eq 1 ]; then
+    # The validated kit remains installed if a host's auth/network prevents RC.
+    trap 'kit_release_lock' EXIT
+    KIT_HEADROOM_PYTHON="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
+    enable_codex_remote
+    verify_codex_remote
+  fi
   echo "Done for the verified scope. Restart Claude Code and Codex sessions."
 }
 [ "${BASH_SOURCE[0]}" != "$0" ] || main "$@"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export KIT_TEST_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+export KIT_TEST_MOCK_RUNTIME="$ROOT/tests/mock_runtime.py"
 KIT_TEST_FIXTURES_ONLY=1 source "$ROOT/tests/test_integration_migration.sh"
 unset UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING
 export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="$WORK/claude"
-ln -s "$(command -v node)" "$MOCK_BIN/node"
 export PATH="$MOCK_BIN:/usr/bin:/bin"
 export TOOLING_TEST_CALLS="$WORK/tooling-calls.log" UV_TOOL_BIN_DIR="$HOME/.universal-research-agent-kit/tooling/bin"
 mkdir -p "$HOME"
@@ -12,10 +13,13 @@ cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'uv %s\n' "$*" >> "$TOOLING_TEST_CALLS"
+[ "${1:-}" != "--version" ] || { echo "uv 0.12.10"; exit 0; }
 [ "${TOOLING_TEST_UV_FAIL:-0}" != "1" ] || exit 42
 MOCK_TOOL_BIN="${XDG_BIN_HOME:-$UV_TOOL_BIN_DIR}"
 mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
+  --version) echo 'uv 0.12.10' ;;
+  *'python install'*) : ;;
   'tool dir --bin')
     printf '%s\n' "$UV_TOOL_BIN_DIR"
     ;;
@@ -47,16 +51,23 @@ case "$*" in
       '  *) exit 1 ;;' \
       'esac' > "$MOCK_TOOL_BIN/graphify"
     chmod +x "$MOCK_TOOL_BIN/graphify"
+    mkdir -p "$UV_TOOL_DIR/graphifyy/bin"
+    printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/graphifyy/bin/python"
+    chmod +x "$UV_TOOL_DIR/graphifyy/bin/python"
     ;;
   *headroom-ai*)
     printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
+    mkdir -p "$UV_TOOL_DIR/headroom-ai/bin"
+    printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/headroom-ai/bin/python"
+    chmod +x "$UV_TOOL_DIR/headroom-ai/bin/python"
+    rm -f "$HOME/.broken-headroom"
     ;;
 esac
 EOF
 
 chmod +x "$MOCK_BIN/uv"
-printf '%s\n' '#!/bin/sh' 'exit 99' > "$MOCK_BIN/npx"
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo 10.0.0; else exit 99; fi' > "$MOCK_BIN/npx"
 chmod +x "$MOCK_BIN/npx"
 seed_codex_mock_state "$CODEX_MOCK_STATE" "$HOME" empty
 seed_claude_mock_state "$CLAUDE_MOCK_STATE" "$HOME" empty
@@ -131,12 +142,20 @@ assert_defaults() {
   node -e 'const fs=require("fs"),c=JSON.parse(fs.readFileSync(process.argv[1])).installed.find(x=>x.pluginId==="ponytail@ponytail"),a=JSON.parse(fs.readFileSync(process.argv[2])).find(x=>x.id==="ponytail@ponytail");if(!c?.installed||!c.enabled||!a?.enabled)process.exit(1);' "$CODEX_MOCK_STATE/plugins.json" "$CLAUDE_MOCK_STATE/plugins.json"
   bash "$ROOT/install.sh" --verify
 }
-# Missing required CLIs fail before any kit or core directories are created.
+# Bootstrap failures are explicit and roll back core changes; no real download.
+cat > "$MOCK_BIN/curl" <<'MOCK'
+#!/bin/sh
+exit 22
+MOCK
+chmod +x "$MOCK_BIN/curl"
+seed_native_clis "$HOME"
+rm "$HOME/.local/bin/claude"
 mv "$MOCK_BIN/claude" "$MOCK_BIN/claude-hidden"
 expect_failure bash "$ROOT/install.sh"
-grep -Fq 'Required CLI unavailable: claude' "$WORK/expected-failure.log"
-[ ! -e "$HOME/.universal-research-agent-kit" ] && [ ! -e "$HOME/.codex" ]
+grep -Fq 'Download failed: https://claude.ai/install.sh' "$WORK/expected-failure.log"
+[ ! -e "$HOME/.codex/AGENTS.md" ]
 mv "$MOCK_BIN/claude-hidden" "$MOCK_BIN/claude"
+ln -s "$HOME/.local/share/claude/versions/2.1.0" "$HOME/.local/bin/claude"
 echo 'Full default install from empty HOME'
 sh "$ROOT/install.sh"
 assert_defaults

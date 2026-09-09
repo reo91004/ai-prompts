@@ -3,6 +3,8 @@ set -euo pipefail
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export KIT_TEST_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+export KIT_TEST_MOCK_RUNTIME="$ROOT/tests/mock_runtime.py"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tooling-install.XXXXXX")"
 TMP_HOME="$TMP_ROOT/home"
 MOCK_BIN="$TMP_ROOT/mock-bin"
@@ -10,6 +12,8 @@ CALLS="$TMP_ROOT/calls.log"
 trap 'rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 mkdir -p "$TMP_HOME" "$MOCK_BIN"
+printf '%s\n' '#!/bin/sh' 'echo "Unexpected test network download" >&2; exit 22' > "$MOCK_BIN/curl"
+chmod +x "$MOCK_BIN/curl"
 printf '%s\n' '# user-owned zshrc content' > "$TMP_HOME/.zshrc"
 printf '%s\n' '# user-owned bashrc content' > "$TMP_HOME/.bashrc"
 mkdir -p "$TMP_HOME/.claude"
@@ -19,10 +23,13 @@ cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'uv %s\n' "$*" >> "$TOOLING_TEST_CALLS"
+[ "${1:-}" != "--version" ] || { echo "uv 0.12.10"; exit 0; }
 [ "${TOOLING_TEST_UV_FAIL:-0}" != "1" ] || exit 42
 MOCK_TOOL_BIN="${XDG_BIN_HOME:-$UV_TOOL_BIN_DIR}"
 mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
+  --version) echo 'uv 0.12.10' ;;
+  *'python install'*) : ;;
   'tool dir --bin')
     printf '%s\n' "$UV_TOOL_BIN_DIR"
     ;;
@@ -54,10 +61,17 @@ case "$*" in
       '  *) exit 1 ;;' \
       'esac' > "$MOCK_TOOL_BIN/graphify"
     chmod +x "$MOCK_TOOL_BIN/graphify"
+    mkdir -p "$UV_TOOL_DIR/graphifyy/bin"
+    printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/graphifyy/bin/python"
+    chmod +x "$UV_TOOL_DIR/graphifyy/bin/python"
     ;;
   *headroom-ai*)
     printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
+    mkdir -p "$UV_TOOL_DIR/headroom-ai/bin"
+    printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/headroom-ai/bin/python"
+    chmod +x "$UV_TOOL_DIR/headroom-ai/bin/python"
+    rm -f "$HOME/.broken-headroom"
     ;;
 esac
 EOF
@@ -80,8 +94,8 @@ run_tooling() {
 UV_TOOL_BIN_DIR="$TMP_ROOT/tool-bin"
 run_tooling
 
-grep -Fqx 'uv tool install --upgrade graphifyy==0.9.39' "$CALLS"
-grep -Fqx 'uv tool install --python 3.13 --upgrade headroom-ai[all]==0.34.0' "$CALLS"
+grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall graphifyy==0.9.39' "$CALLS"
+grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[all]==0.34.0' "$CALLS"
 grep -Fqx 'graphify install --platform claude' "$CALLS"
 grep -Fqx 'graphify install --platform codex' "$CALLS"
 grep -Fqx 'status=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
@@ -112,8 +126,8 @@ HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CA
   claude_raw prompt
   codex_raw prompt
 '
-grep -Fqx 'headroom wrap claude -- prompt' "$CALLS"
-grep -Fqx 'headroom wrap codex -- prompt' "$CALLS"
+grep -Fqx 'runtime launch claude prompt' "$CALLS"
+grep -Fqx 'runtime launch codex prompt' "$CALLS"
 grep -Fqx 'claude prompt' "$CALLS"
 grep -Fqx 'codex prompt' "$CALLS"
 
@@ -125,8 +139,8 @@ HOME="$TMP_HOME" PATH="$SHADOW_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOO
   source "$HOME/.config/headroom/auto-wrap.sh"
   codex shadowed
 '
-grep -Fqx 'headroom wrap codex -- shadowed' "$CALLS"
-grep -Fqx "headroom-resolved $TMP_HOME/.universal-research-agent-kit/tooling/bin/headroom" "$CALLS"
+grep -Fqx 'runtime launch codex shadowed' "$CALLS"
+! grep -Fq "shadow headroom" "$CALLS"
 ! grep -Fq 'shadow headroom' "$CALLS"
 
 HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" zsh -fc '
@@ -134,11 +148,11 @@ HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CA
   claude zsh-prompt
   codex zsh-prompt
 '
-grep -Fqx 'headroom wrap claude -- zsh-prompt' "$CALLS"
-grep -Fqx 'headroom wrap codex -- zsh-prompt' "$CALLS"
+grep -Fqx 'runtime launch claude zsh-prompt' "$CALLS"
+grep -Fqx 'runtime launch codex zsh-prompt' "$CALLS"
 
 run_tooling
-[ "$(grep -Fc 'uv tool install' "$CALLS")" -eq 2 ]
+[ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq 2 ]
 [ "$(grep -Fc 'graphify install --platform claude' "$CALLS")" -eq 2 ]
 [ "$(grep -Fc 'graphify install --platform codex' "$CALLS")" -eq 2 ]
 [ "$(grep -Fxc '# BEGIN UNIVERSAL RESEARCH AGENT KIT HEADROOM' "$TMP_HOME/.zshrc")" -eq 1 ]
@@ -155,7 +169,7 @@ HOME="$BAD_VERSION_HOME" PATH="$BAD_VERSION_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/
   bash "$ROOT/install.sh" >/dev/null
 grep -Fqx 'graphify=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom=installed' "$BAD_VERSION_HOME/.universal-research-agent-kit/tooling.state"
-[ "$(grep -Fc 'uv tool install' "$CALLS")" -eq 4 ]
+[ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq 4 ]
 
 # A repeat install on a machine whose rc already exports the managed bin, with a
 # stale same-named binary ahead of it (Ubuntu's ~/.profile prepends ~/.local/bin).
@@ -238,7 +252,7 @@ HOME="$FAIL_HOME" PATH="$MOCK_BIN:/usr/bin:/bin" UV_TOOL_BIN_DIR="$TMP_ROOT/fail
 failure_rc=$?
 set -e
 [ "$failure_rc" -ne 0 ]
-grep -Fq 'Failed to install graphify with uv.' "$TMP_ROOT/failure.out"
+grep -Fq 'Failed to provision kit Python 3.13.' "$TMP_ROOT/failure.out"
 [ ! -f "$FAIL_HOME/.universal-research-agent-kit/tooling.state" ]
 
 CONFIG_DIR_HOME="$TMP_ROOT/config-dir-home"
