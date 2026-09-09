@@ -1621,8 +1621,8 @@ for mcp_path in "$HOME/.claude.json" "$HOME/.claude/mcp.json"; do
 done
 kit_backup_path "$HOME/.claude.json" "tooling/headroom-claude-config"
 kit_backup_path "$HOME/.claude/mcp.json" "tooling/headroom-claude-legacy-mcp"
-"$HEADROOM_BIN" mcp install --agent codex || kit_die "Headroom Codex MCP registration failed."
-"$HEADROOM_BIN" mcp install --agent claude || kit_die "Headroom Claude MCP registration failed."
+"$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" install-mcp codex || kit_die "Headroom Codex MCP registration failed."
+"$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" install-mcp claude || kit_die "Headroom Claude MCP registration failed."
 
 kit_require_regular_or_absent "$KIT_STATE_ROOT/headroom.json"
 kit_backup_path "$KIT_STATE_ROOT/headroom.json" "tooling/headroom-state"

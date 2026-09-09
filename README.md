@@ -113,6 +113,8 @@ curl -fsS http://127.0.0.1:8787/health
 
 예전 `headroom-default`도 `sh install.sh` 하나로 인계합니다. 로컬 8787 포트의 표준 Codex persistent-service인지 manifest·runner·OS 서비스 정의로 확인한 뒤 정상 종료하고, 배포·서비스 정의·Codex 설정·소유 기록을 백업합니다. 관리 Python과 의존성을 검사·복구한 뒤 표준 provider 블록을 검증하고 키트 소유로 등록합니다. 기존 서비스 이름과 manifest, provider 설정을 유지하면서 runner를 관리 Python으로 갱신하므로 별도 제거 스크립트나 Headroom의 `install remove` 명령이 필요하지 않습니다. 인증 방식이 바뀐 경우 기존 키트 설치와 동일하게 provider의 인증 플래그만 갱신하며, 이 인계 과정에서 인증 파일이나 세션 DB를 초기화하거나 세션 분류를 바꾸지 않습니다. 실패하면 파일 복구 후 원래 실행 중이던 서비스를 재개합니다. 사용자 지정 환경변수·proxy 옵션·provider 블록은 자동 인계하지 않습니다.
 
+기존 Headroom MCP의 실행 경로·인수가 키트 설정과 같고 `HEADROOM_PROXY_URL`이 기본 주소 `http://127.0.0.1:8787`이거나 생략되어 있으면 설정을 그대로 재사용합니다. 주소의 명시 여부 때문에 재설치가 중단되지 않으며, 다른 주소·명령·추가 환경변수는 강제로 덮어쓰지 않습니다.
+
 `No module named fastapi`와 같은 오류가 나면 작업을 마치고 `sh install.sh`를 다시 실행합니다. 설치기가 키트 소유 Headroom 서비스·MCP를 정상 종료한 뒤 관리 uv·Python·패키지 버전과 의존성을 검사합니다. 하나라도 실패하면 `~/.universal-research-agent-kit/tooling/`을 백업한 뒤 비우고 새 환경을 자동 설치합니다. 별도 복구 옵션이나 system Python의 수동 pip 작업은 필요하지 않습니다. 정상 환경은 재사용하며, 새 설치도 검증에 실패하면 안전하게 복구할 수 있는 경우 이전 상태로 되돌리고 오류를 알립니다. 중지된 키트 서비스가 예전 interpreter를 가리키는 경우에도 재설치 때 runner를 복구합니다.
 
 서비스와 provider를 명시적으로 제거한 뒤 다시 구성하려면 다음 명령을 사용합니다.

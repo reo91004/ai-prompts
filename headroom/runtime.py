@@ -399,6 +399,36 @@ def adopt_default(record):
     print("Adopted the existing default Headroom service; provider configuration and sessions preserved.")
 
 
+def install_mcp(agent):
+    """Reuse the exact kit MCP when its default proxy URL is explicit or omitted."""
+    if agent == "codex":
+        paths, key = [CONFIG], "mcp_servers"
+    elif agent == "claude":
+        paths, key = [HOME / ".claude.json", HOME / ".claude/mcp.json"], "mcpServers"
+    else:
+        fail("Unsupported MCP agent: " + agent)
+    for path in paths:
+        safe_path(path)
+        if not path.exists():
+            continue
+        data = tomllib.loads(path.read_text()) if agent == "codex" else read_json(path)
+        servers = data.get(key, {}) if isinstance(data, dict) else {}
+        entry = servers.get("headroom") if isinstance(servers, dict) else None
+        if entry is None:
+            continue
+        if (isinstance(entry, dict) and not set(entry) - {"command", "args", "env", "type"}
+                and entry.get("command") == str(KIT / "tooling/bin/headroom")
+                and entry.get("args") == ["mcp", "serve"] and entry.get("type", "stdio") == "stdio"
+                and entry.get("env", {}) in ({}, {"HEADROOM_PROXY_URL": BASE_URL})):
+            print("Reusing the existing kit Headroom MCP for " + agent + "; configuration preserved.")
+            return
+        break
+    # Headroom 0.34 compares env dictionaries literally and omits its default
+    # URL even with --proxy-url. Keep its normal conflict handling for all
+    # other entries; never force-replace a user's MCP configuration.
+    headroom("mcp", "install", "--agent", agent)
+
+
 def codex_oauth():
     from headroom.providers.codex.install import codex_uses_chatgpt_auth
     return codex_uses_chatgpt_auth(CONFIG.parent / "auth.json")
@@ -697,6 +727,8 @@ def main():
         migrate_legacy()
     elif action == "adopt-default":
         adopt_default(args[0])
+    elif action == "install-mcp":
+        install_mcp(args[0])
     elif action == "install":
         install()
     elif action == "check":

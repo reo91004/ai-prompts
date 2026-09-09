@@ -25,6 +25,9 @@ elif action == "profile":
 elif action == "dependencies":
     if (home / ".broken-headroom").exists():
         sys.exit(1)
+elif action == "install-mcp":
+    import subprocess
+    sys.exit(subprocess.call([str(home / ".universal-research-agent-kit/tooling/bin/headroom"), "mcp", "install", "--agent", rest[0]]))
 elif action == "install":
     state.write_text(json.dumps({"profile": "research-agent-kit", "previous_provider": {}}))
 elif action == "check":

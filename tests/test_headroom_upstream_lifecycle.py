@@ -133,6 +133,80 @@ def default_adoption(adapter, maintenance, database, artifacts):
     return results
 
 
+def mcp_registration(adapter):
+    """Exercise real registrars on isolated TOML/JSON; no CLI or service runs."""
+    from headroom.mcp_registry import any_succeeded, install_everywhere
+    from headroom.mcp_registry.base import RegisterStatus
+    from headroom.mcp_registry.codex import CodexRegistrar
+    from headroom.mcp_registry.claude import ClaudeRegistrar
+    registrars = [CodexRegistrar(home_dir=adapter.HOME), ClaudeRegistrar(home_dir=adapter.HOME, claude_cli=None)]
+    (adapter.HOME / ".claude").mkdir(exist_ok=True)
+    claude_config = adapter.HOME / ".claude.json"
+    command = str(adapter.KIT / "tooling/bin/headroom")
+
+    def seed(agent, env):
+        entry = {"command": command, "args": ["mcp", "serve"], "env": env}
+        if agent == "codex":
+            path = adapter.CONFIG
+            text = ('# preserve formatting\n[mcp_servers.headroom]\ncommand = ' + json.dumps(command)
+                    + '\nargs = ["mcp", "serve"]\n[mcp_servers.headroom.env]\n'
+                    + ''.join(key + ' = ' + json.dumps(value) + '\n' for key, value in env.items())
+                    + '\n[profiles.user]\nmodel_provider = "headroom"\n')
+        else:
+            path = claude_config
+            text = json.dumps({"user_setting": "keep", "mcpServers": {"headroom": {"type": "stdio", **entry}}}, indent=4)
+        path.write_text(text)
+        return path
+
+    seed("codex", {"HEADROOM_PROXY_URL": adapter.BASE_URL})
+    seed("claude", {})
+    before = {path: path.read_bytes() for path in (adapter.CONFIG, claude_config)}
+    baseline = install_everywhere(proxy_url=adapter.BASE_URL, registrars=registrars)
+    assert baseline["codex"].status == RegisterStatus.MISMATCH
+    assert baseline["claude"].status == RegisterStatus.ALREADY
+    calls = []
+
+    def register(*args):
+        assert args[:3] == ("mcp", "install", "--agent"), args
+        calls.append(args)
+        result = install_everywhere(agents=[args[3]], registrars=registrars)
+        if not any_succeeded(result):
+            raise subprocess.CalledProcessError(1, args)
+
+    with patch.object(adapter, "headroom", side_effect=register):
+        for agent in ("codex", "claude"):
+            adapter.install_mcp(agent)
+        assert not calls and all(path.read_bytes() == data for path, data in before.items())
+        for agent in ("codex", "claude"):
+            for env in ({}, {"HEADROOM_PROXY_URL": adapter.BASE_URL}):
+                path = seed(agent, env)
+                original = path.read_bytes()
+                adapter.install_mcp(agent)
+                assert path.read_bytes() == original and not calls
+        adapter.CONFIG.write_text('[features]\nuser_setting = true\n')
+        claude_config.write_text('{"user_setting":"keep"}')
+        for agent in ("codex", "claude"):
+            adapter.install_mcp(agent)
+        assert len(calls) == 2
+        installed = {path: path.read_bytes() for path in (adapter.CONFIG, claude_config)}
+        for agent in ("codex", "claude"):
+            adapter.install_mcp(agent)
+        assert len(calls) == 2 and all(path.read_bytes() == data for path, data in installed.items())
+        for agent in ("codex", "claude"):
+            for env in ({"HEADROOM_PROXY_URL": "http://127.0.0.1:9999"}, {"USER_SETTING": "keep"}):
+                path = seed(agent, env)
+                original = path.read_bytes()
+                try:
+                    adapter.install_mcp(agent)
+                except subprocess.CalledProcessError:
+                    pass
+                else:
+                    raise AssertionError("Custom MCP settings were accepted")
+                assert path.read_bytes() == original
+    return {"explicit_default_mismatch_reproduced": True, "equivalent_existing_bytes_preserved": True,
+            "fresh_and_repeat_install": True, "custom_url_and_env_conflicts_preserved": True}
+
+
 def smoke(runtime_path):
     assert importlib.metadata.version("headroom-ai") == "0.34.0"
     root = Path(__file__).resolve().parents[1]
@@ -312,6 +386,7 @@ def smoke(runtime_path):
         assert database.read_bytes() == original[database]
         evidence["auth_transition"] = "logged-out -> OAuth -> API-key: owned field only, repeat unchanged"
         evidence["default_adoption"] = default_adoption(adapter, maintenance, database, artifacts)
+        evidence["mcp_registration"] = mcp_registration(adapter)
         evidence["readiness_probes"] = probes
         evidence["status"] = "passed"
         (artifacts / "summary.json").write_text(json.dumps(evidence, indent=2))

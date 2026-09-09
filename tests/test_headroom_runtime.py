@@ -92,6 +92,39 @@ class RuntimeTests(unittest.TestCase):
             runtime.adopt_default(record)
         self.assertFalse(runtime.STATE.exists())
 
+    def test_mcp_reuses_explicit_or_implicit_default_without_rewriting(self):
+        command = str(runtime.KIT / "tooling/bin/headroom")
+        for agent in ("codex", "claude"):
+            for env in ({}, {"HEADROOM_PROXY_URL": runtime.BASE_URL}):
+                with self.subTest(agent=agent, env=env):
+                    if agent == "codex":
+                        path = runtime.CONFIG
+                        text = ('# user formatting\n[mcp_servers.headroom]\ncommand = ' + json.dumps(command)
+                                + '\nargs = ["mcp", "serve"]\n[mcp_servers.headroom.env]\n')
+                        text += ''.join(key + ' = ' + json.dumps(value) + '\n' for key, value in env.items())
+                        text += '\n[profiles.saved]\nmodel_provider = "headroom"\n'
+                    else:
+                        path = runtime.HOME / ".claude.json"
+                        text = json.dumps({"user_setting": "keep", "mcpServers": {"headroom": {
+                            "type": "stdio", "command": command, "args": ["mcp", "serve"], "env": env}}}, indent=4)
+                    path.write_text(text)
+                    with patch.object(runtime, "headroom") as register:
+                        runtime.install_mcp(agent)
+                        register.assert_not_called()
+                    self.assertEqual(path.read_text(), text)
+
+    def test_mcp_other_url_or_command_uses_normal_conflict_handling(self):
+        for command, env in ((str(runtime.KIT / "tooling/bin/headroom"), {"HEADROOM_PROXY_URL": "http://127.0.0.1:9999"}),
+                             ("/user/headroom", {"HEADROOM_PROXY_URL": runtime.BASE_URL})):
+            path = runtime.HOME / ".claude.json"
+            value = {"mcpServers": {"headroom": {"command": command, "args": ["mcp", "serve"], "env": env}}}
+            path.write_text(json.dumps(value))
+            before = path.read_bytes()
+            with patch.object(runtime, "headroom") as register:
+                runtime.install_mcp("claude")
+                register.assert_called_once_with("mcp", "install", "--agent", "claude")
+            self.assertEqual(path.read_bytes(), before)
+
     def test_install_lock_blocks_new_sessions_but_allows_installer_lifecycle(self):
         (runtime.KIT / ".lock").mkdir()
         for running in (False, True):
