@@ -131,6 +131,65 @@ sys.exit(row.get('exit', 0))
         self.assertFalse((self.kit / "cli").exists())
         self.assertFalse((self.kit / ".lock").exists())
 
+    def test_owned_shutdown_precedes_bootstrap_and_failure_resumes_service(self):
+        self.kit.mkdir()
+        (self.kit / "headroom.json").write_text('{"profile":"research-agent-kit"}')
+        result = self.run_shell('''kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  if [ "$1" = pause ]; then echo '{}' > "$2"; fi
+}
+bootstrap_cli() { echo bootstrap >> "$GUARD_EVENTS"; return 42; }
+main
+''')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "bootstrap", "resume"])
+        self.assertFalse((self.kit / "tooling").exists())
+
+    def test_failed_shutdown_never_reaches_bootstrap(self):
+        self.kit.mkdir()
+        (self.kit / "headroom.json").write_text('{"profile":"research-agent-kit"}')
+        result = self.run_shell('''kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  if [ "$1" = pause ]; then echo '{}' > "$2"; return 42; fi
+}
+bootstrap_cli() { echo unexpected >> "$GUARD_EVENTS"; }
+main
+''')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "resume"])
+        self.assertFalse((self.kit / "tooling").exists())
+
+    def test_restarted_service_stops_before_rollback_and_resumes_after_restore(self):
+        for stop_fails in (False, True):
+            with self.subTest(stop_fails=stop_fails):
+                sentinel = self.kit / "tooling/sentinel"
+                sentinel.parent.mkdir(parents=True, exist_ok=True)
+                sentinel.write_text("original")
+                self.events.unlink(missing_ok=True)
+                stop_status = 42 if stop_fails else 0
+                result = self.run_shell('''kit_init_state
+kit_enable_rollback
+KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
+echo '{}' > "$KIT_MAINTENANCE_RECORD"
+kit_backup_path "$KIT_STATE_ROOT/tooling" tooling/environment
+echo new > "$KIT_STATE_ROOT/tooling/sentinel"
+KIT_HEADROOM_ACTIVATION_STARTED=1
+kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  if [ "$1" = stop-service ]; then
+    [ "$(cat "$KIT_STATE_ROOT/tooling/sentinel")" = new ] || exit 90
+    return ''' + str(stop_status) + '''
+  fi
+  [ "$(cat "$KIT_STATE_ROOT/tooling/sentinel")" = original ] || exit 91
+}
+exit 99
+''')
+                self.assertEqual(result.returncode, 99)
+                self.assertEqual(self.events.read_text().splitlines(), ["stop-service"] if stop_fails else ["stop-service", "resume"])
+                self.assertEqual(sentinel.read_text(), "new\n" if stop_fails else "original")
+                if stop_fails:
+                    self.assertTrue(list((self.kit / "backups").glob("run.*/journal.tsv")))
+
     def test_checks_precede_tool_root_python_and_package_mutations(self):
         uv = self.bin / "uv"
         self.executable(uv, '''#!/bin/sh

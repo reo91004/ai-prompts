@@ -120,12 +120,32 @@ kit_tooling_idle() (
         ;;
     esac
     if [ "$busy" -eq 1 ]; then
-      echo "Headroom or a managed tool environment is in use (PID $pid). Finish its sessions and stop it yourself before installing; no process was stopped." >&2
+      echo "A tool environment is still in use (PID $pid). Close its owning client or job before retrying; environment changes are blocked." >&2
       return 1
     fi
   done <<< "$snapshot"
   [ "$seen" -eq 1 ] || { echo "Empty process inspection; installation was not cleared to modify environments." >&2; return 1; }
 )
+
+kit_maintenance_run() {
+  local candidate
+  # Maintenance must also work when Headroom's third-party dependencies or
+  # venv links are broken. Probe only the stdlib helper, never install Python
+  # into an environment that is still in use.
+  for candidate in \
+    "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" \
+    "$HOME/.universal-research-agent-kit/tooling/python-venv/bin/python" \
+    "$(command -v python3 2>/dev/null || true)" \
+    "$HOME/.universal-research-agent-kit/tooling/python"/cpython-*/bin/python3; do
+    [ -x "$candidate" ] || continue
+    if "$candidate" -I -B "$ROOT/headroom/maintenance.py" probe >/dev/null 2>&1; then
+      "$candidate" -I -B "$ROOT/headroom/maintenance.py" "$@"
+      return $?
+    fi
+  done
+  echo "No runnable Python 3.8+ is available for safe Headroom shutdown. Close its clients/service and retry; no environment was replaced." >&2
+  return 1
+}
 
 kit_init_state() {
   kit_validate_home
@@ -290,6 +310,14 @@ kit_handle_exit() {
   local status="$1"
   trap - EXIT
   if [ "$status" -ne 0 ]; then
+    if [ "${KIT_HEADROOM_CREATED:-0}" != 1 ] && [ "${KIT_HEADROOM_ACTIVATION_STARTED:-0}" = 1 ] &&
+        [ -f "${KIT_MAINTENANCE_RECORD:-}" ]; then
+      if ! kit_maintenance_run stop-service; then
+        echo "Warning: the restarted service could not be stopped. Kept its environment and journal at $KIT_BACKUP_DIR for recovery." >&2
+        kit_release_lock
+        exit "$status"
+      fi
+    fi
     if [ "${KIT_HEADROOM_CREATED:-0}" = 1 ] && [ -f "$KIT_STATE_ROOT/headroom.json" ]; then
       if ! "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" remove; then
         echo "Warning: runtime cleanup failed. Kept its environment/configuration and journal at $KIT_BACKUP_DIR for recovery; inspect --headroom-status before retrying." >&2
@@ -300,6 +328,9 @@ kit_handle_exit() {
     echo "Install failed with status $status; rolling back journaled changes." >&2
     if kit_rollback_run; then
       echo "Rollback complete. Backups remain in $KIT_BACKUP_DIR" >&2
+      if [ -f "${KIT_MAINTENANCE_RECORD:-}" ] && ! kit_maintenance_run resume "$KIT_MAINTENANCE_RECORD"; then
+        echo "Warning: files were restored, but Headroom could not resume. Recovery record: $KIT_MAINTENANCE_RECORD" >&2
+      fi
     else
       echo "Warning: automatic rollback incomplete; restore manually from $KIT_BACKUP_DIR" >&2
     fi
@@ -1597,6 +1628,7 @@ kit_require_regular_or_absent "$KIT_STATE_ROOT/headroom.json"
 kit_backup_path "$KIT_STATE_ROOT/headroom.json" "tooling/headroom-state"
 KIT_HEADROOM_CREATED=0
 [ -f "$KIT_STATE_ROOT/headroom.json" ] || KIT_HEADROOM_CREATED=1
+KIT_HEADROOM_ACTIVATION_STARTED=1
 "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" install || kit_die "Persistent Headroom installation failed."
 if [ "$(uname -s)" = Linux ]; then
   if ! command -v loginctl >/dev/null 2>&1 ||
@@ -2329,6 +2361,7 @@ echo "Kit backup snapshots deleted."
 main() {
   PROFILE=ponytail
   ENABLE_CODEX_REMOTE=0
+  KIT_STOP_HEADROOM=0
   action=install
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -2349,7 +2382,8 @@ Usage: sh install.sh [--integrations ponytail|none] [--verify | --cleanup-backup
 Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify and Headroom.
 Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
-Invalid managed tooling is backed up, cleared and rebuilt automatically; active environments block installation.
+Kit-owned Headroom services/MCP servers are stopped normally before installation and the service starts afterward.
+Invalid managed tooling is backed up, cleared and rebuilt automatically; unrelated active jobs block replacement.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
   --verify             Check source and installed files without installing or changing HOME.
   --enable-codex-remote-control  Opt this host into managed Codex Remote Control (pair separately).
@@ -2393,13 +2427,25 @@ HELP
   if [ "$ENABLE_CODEX_REMOTE" -eq 1 ] && [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = 1 ]; then
     kit_die "Remote Control host setup requires the persistent Headroom tooling step."
   fi
+  kit_validate_home
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
-    kit_tooling_idle || kit_die "Installation stopped before changing this host."
+    if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
+      kit_maintenance_run inspect || kit_die "Installation stopped before changing this host."
+      KIT_STOP_HEADROOM=1
+    fi
   fi
   kit_init_state
   kit_enable_rollback
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+    if [ "$KIT_STOP_HEADROOM" -eq 1 ]; then
+      KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
+      echo "Pausing kit Headroom for installation. MCP clients may need to reconnect afterward."
+      kit_maintenance_run pause "$KIT_MAINTENANCE_RECORD" || kit_die "Headroom shutdown failed; environment replacement was not started."
+    fi
     kit_tooling_idle || kit_die "Installation stopped after acquiring its lock."
+    if [ "$KIT_STOP_HEADROOM" -eq 1 ]; then
+      kit_backup_path "$HOME/.headroom/deploy/research-agent-kit" "maintenance/deployment"
+    fi
   fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
     bootstrap_cli

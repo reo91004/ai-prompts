@@ -111,7 +111,7 @@ curl -fsS http://127.0.0.1:8787/health
 
 정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile = research-agent-kit`를 함께 확인합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 포트 8787이 다른 서비스·기존 임시 Headroom에 사용 중이거나 사용자 소유 persistent provider가 있으면 설치를 중단하고 충돌 위치를 안내합니다. 해당 서비스의 소유 도구로 정리하거나 포트를 옮긴 뒤 다시 설치하세요. 설치기는 임의의 프로세스를 종료하지 않습니다.
 
-`No module named fastapi`와 같은 오류가 나면 실행 중인 Headroom·MCP를 중지한 뒤 `sh install.sh`를 다시 실행합니다. 관리 uv·Python·패키지 버전과 의존성을 검사하고, 하나라도 실패하면 `~/.universal-research-agent-kit/tooling/`을 백업한 뒤 비우고 새 환경을 자동 설치합니다. 별도 복구 옵션이나 system Python의 수동 pip 작업은 필요하지 않습니다. 정상 환경은 재사용하며, 새 설치도 검증에 실패하면 안전하게 복구할 수 있는 경우 이전 상태로 되돌리고 오류를 알립니다. 중지된 키트 서비스가 예전 interpreter를 가리키는 경우에도 재설치 때 runner를 복구합니다.
+`No module named fastapi`와 같은 오류가 나면 작업을 마치고 `sh install.sh`를 다시 실행합니다. 설치기가 키트 소유 Headroom 서비스·MCP를 정상 종료한 뒤 관리 uv·Python·패키지 버전과 의존성을 검사합니다. 하나라도 실패하면 `~/.universal-research-agent-kit/tooling/`을 백업한 뒤 비우고 새 환경을 자동 설치합니다. 별도 복구 옵션이나 system Python의 수동 pip 작업은 필요하지 않습니다. 정상 환경은 재사용하며, 새 설치도 검증에 실패하면 안전하게 복구할 수 있는 경우 이전 상태로 되돌리고 오류를 알립니다. 중지된 키트 서비스가 예전 interpreter를 가리키는 경우에도 재설치 때 runner를 복구합니다.
 
 서비스와 provider를 명시적으로 제거한 뒤 다시 구성하려면 다음 명령을 사용합니다.
 
@@ -143,15 +143,15 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 ### 사용자 파일 보호
 
-기본 설치는 **현재 계정의 Headroom 프록시·MCP 또는 kit 관리 Python/도구가 실행 중이면 시작하지 않습니다.** 정상 설치를 다시 실행하는 경우에도 적용합니다. CLI 다운로드와 환경 변경 전에 검사하고, 실행 상태를 확인할 수 없을 때도 설치를 중단합니다. 기존 프로세스는 자동 종료하지 않습니다. `--verify`와 상태 조회는 계속 사용할 수 있습니다.
+기본 설치는 **키트 소유 Headroom 서비스와 MCP 서버를 정상 종료한 뒤 진행합니다.** 서비스는 등록 정보와 실제 실행 정의를 확인하고 macOS에서는 `launchctl bootout`, Ubuntu에서는 `systemctl --user stop`으로 중지합니다. MCP는 정확한 키트 실행 경로와 프로세스 시작 시각·명령을 다시 확인한 뒤 `SIGTERM`을 보냅니다. 종료를 확인하기 전에는 CLI 다운로드나 환경 교체를 시작하지 않습니다. `SIGKILL`로 강제 종료하지 않으며, 다른 Python·Graphify 작업이나 소유권을 확인할 수 없는 프로세스가 남아 있으면 설치를 중단합니다. `--verify`와 상태 조회는 종료 처리를 하지 않습니다.
 
-갱신 전에는 작업을 마치고 Headroom MCP를 사용 중인 클라이언트를 종료한 뒤, 이 kit의 서비스를 직접 중지합니다. Ubuntu에서는 `systemctl --user stop headroom-research-agent-kit.service`, macOS에서는 `launchctl bootout "gui/$(id -u)/com.headroom.research-agent-kit"`를 사용합니다. 다른 profile이나 과거 `headroom wrap` 세션은 해당 세션에서 종료하세요. 이후 `sh install.sh`가 검증과 서비스 시작을 진행합니다.
+갱신 전에는 진행 중인 작업을 마치세요. 설치 중에는 Headroom 연결이 잠시 끊기며, 완료 후 서비스는 다시 시작됩니다. stdio MCP 연결은 원래 클라이언트가 관리하므로 필요하면 Codex·Claude를 재시작해 다시 연결합니다. 클라이언트가 MCP를 즉시 재실행하거나 정상 종료를 거부하면 해당 클라이언트를 닫고 재시도합니다. 자동 중지가 불가능한 서비스는 Ubuntu의 `systemctl --user stop headroom-research-agent-kit.service`, macOS의 `launchctl bootout "gui/$(id -u)/com.headroom.research-agent-kit"`로 직접 중지할 수 있습니다. 다른 profile이나 과거 `headroom wrap` 세션은 해당 세션에서 종료하세요.
 
-설치 잠금이 유지되는 동안 새 kit CLI 세션은 시작을 거절합니다. Python/패키지 교체 직전과 환경 rollback 전에도 실행 상태를 다시 확인합니다. 설치 도중 외부에서 프로세스를 시작해 복구가 안전하지 않게 되면 환경과 journal을 유지하고 실패를 알립니다. 이 검사는 인식 가능한 프로세스의 snapshot에 기반합니다. 별도 Headroom 직접 실행이나 OS의 자동 재시작까지 원자적으로 차단하는 방식은 아니므로 설치가 끝날 때까지 관련 클라이언트·서비스를 다시 시작하지 마세요.
+설치 잠금이 유지되는 동안 새 kit CLI 세션은 시작을 거절합니다. Python/패키지 교체 직전과 환경 rollback 전에도 실행 상태를 다시 확인합니다. 실패 시 설치 중 재시작된 키트 서비스를 다시 중지하고 환경·이전 runner를 복구한 뒤, 설치 전에 실행 중이었던 서비스를 재개합니다. 중지나 복구가 안전하지 않으면 환경·journal·재개 기록을 보존하고 실패를 알립니다. 프로세스 검사는 snapshot에 기반하며 외부에서 직접 시작하는 프로세스까지 원자적으로 막지는 못하므로 설치가 끝날 때까지 관련 클라이언트·서비스를 다시 시작하지 마세요. 종료 도우미는 패키지 의존성이 깨져도 실행할 수 있는 표준 라이브러리만 사용하며, 사용할 수 있는 Python 3.8 이상이 전혀 없으면 직접 중지를 안내합니다.
 
 기존 ai-prompts를 설치한 호스트도 같은 `sh install.sh`로 갱신합니다. 이전 kit wrapper와 설치 상태가 확인되면 Codex의 정확한 legacy Headroom 표식만 제거하고, root provider의 `# was:` 또는 이전 백업의 해당 root 값만 복구합니다. 백업 이후 추가한 MCP·프로젝트·모델 설정은 현재 파일에서 유지합니다. 알려진 kit 경로를 가리키는 중복 Headroom MCP는 정리 후 다시 등록합니다. 재구성 때 kit의 옛 pip fallback venv도 tooling 백업에 보존하고 활성 경로에서는 제거합니다. 이 재구성은 키트 밖에 별도로 설치한 Python·Headroom·Graphify와 로그인 정보를 삭제하지 않습니다. 경로가 symlink여서 관리 범위를 확정할 수 없는 경우에는 자동 삭제를 거절합니다.
 
-소유 기록이 없는 custom provider·동명 MCP·다른 서비스의 8787 포트 사용은 자동 인수하지 않고 충돌 위치를 알립니다. kit 소유의 중지된 서비스가 옛 Python runner를 가리키면 runner를 복구합니다. 실행 중인 서비스는 앞의 설치 전 검사에서 중단 안내를 받습니다. 일반 세션은 프로젝트의 옛 Claude proxy 설정을 세션 범위에서 덮어쓰며, Claude Remote Control은 파일에 남은 proxy 설정의 충돌을 안내합니다. 실행 중인 과거 wrapper가 파일을 쓸 수 있으므로 프로젝트 파일을 일괄 삭제하지 않습니다.
+소유 기록이 없는 custom provider·동명 MCP·다른 서비스의 8787 포트 사용은 자동 인수하지 않고 충돌 위치를 알립니다. kit 소유 서비스는 앞의 종료 확인 후 필요한 경우 옛 Python runner를 복구합니다. 일반 세션은 프로젝트의 옛 Claude proxy 설정을 세션 범위에서 덮어쓰며, Claude Remote Control은 파일에 남은 proxy 설정의 충돌을 안내합니다. 실행 중인 과거 wrapper가 파일을 쓸 수 있으므로 프로젝트 파일을 일괄 삭제하지 않습니다.
 
 설치 후 새 터미널을 여세요. 이미 열린 셸의 함수·alias는 자식 설치 프로세스가 바꿀 수 없습니다. 직접 만든 `codex`/`claude` alias가 있다면 해당 alias를 해제하고 kit wrapper를 사용해야 합니다. 패키지 정리 권한이 부족하면 검증된 새 native 설치를 유지한 채 오류를 보고하며, 기존 패키지가 정리된 것처럼 성공 처리하지 않습니다. 로그인·인증·세션 디렉터리는 제거 대상이 아닙니다.
 
@@ -215,6 +215,7 @@ bash tests/test_tooling_install.sh
 bash tests/test_default_install.sh
 bash tests/test_cli_bootstrap.sh
 python3 tests/test_install_busy_guard.py
+python3 tests/test_headroom_maintenance.py
 python3 tests/test_headroom_dispatch.py
 python3 tests/test_headroom_runtime.py
 python3 tests/test_headroom_legacy.py

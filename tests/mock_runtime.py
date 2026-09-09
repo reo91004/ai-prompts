@@ -16,8 +16,10 @@ home = Path(os.environ["HOME"])
 state = home / ".universal-research-agent-kit/headroom.json"
 with open(os.environ["TOOLING_TEST_CALLS"], "a") as log:
     log.write("runtime " + " ".join([action, *rest]) + "\n")
-if action in ("environment", "migrate-legacy"):
+if action in ("environment", "migrate-legacy", "probe", "inspect", "stop-service", "resume"):
     pass
+elif action == "pause":
+    Path(rest[0]).write_text(json.dumps({"profile": "research-agent-kit", "resume_service": state.exists()}))
 elif action == "dependencies":
     if (home / ".broken-headroom").exists():
         sys.exit(1)

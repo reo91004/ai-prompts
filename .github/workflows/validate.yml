@@ -64,6 +64,7 @@ jobs:
       - name: Test session dispatch and persistent runtime ownership
         run: |
           python3 tests/test_install_busy_guard.py
+          python3 tests/test_headroom_maintenance.py
           python3 tests/test_headroom_dispatch.py
           python3 tests/test_headroom_runtime.py
           python3 tests/test_headroom_legacy.py

@@ -9,6 +9,14 @@ export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="
 export PATH="$MOCK_BIN:/usr/bin:/bin"
 export TOOLING_TEST_CALLS="$WORK/tooling-calls.log" UV_TOOL_BIN_DIR="$HOME/.universal-research-agent-kit/tooling/bin"
 mkdir -p "$HOME"
+cat > "$MOCK_BIN/python3" <<'EOF'
+#!/bin/sh
+case "$*" in
+  *'/headroom/maintenance.py '*) exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@" ;;
+esac
+exec "$KIT_TEST_PYTHON" "$@"
+EOF
+chmod +x "$MOCK_BIN/python3"
 cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail

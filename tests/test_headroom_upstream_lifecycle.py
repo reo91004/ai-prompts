@@ -57,6 +57,9 @@ def smoke(runtime_path):
         spec = importlib.util.spec_from_file_location("kit_headroom_runtime", runtime_path)
         adapter = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(adapter)
+        maintenance_spec = importlib.util.spec_from_file_location("kit_headroom_maintenance", root / "headroom/maintenance.py")
+        maintenance = importlib.util.module_from_spec(maintenance_spec)
+        maintenance_spec.loader.exec_module(maintenance)
         from headroom.install.models import DeploymentManifest
         from headroom.install.state import save_manifest
         from headroom.install import runtime as upstream_runtime, supervisors
@@ -136,7 +139,12 @@ def smoke(runtime_path):
                 managed.write_text(valid_entrypoint)
                 service = adapter.service_path()
                 service.parent.mkdir(parents=True, exist_ok=True)
-                service.write_text("synthetic service artifact; never installed\n")
+                if system == "darwin":
+                    _, definition = supervisors._macos_launchd_plist(deployment, adapter.DEPLOY / "run-headroom.sh")
+                else:
+                    _, definition = supervisors._linux_service_unit(deployment, adapter.DEPLOY / "run-headroom.sh")
+                service.write_text(definition)
+                assert maintenance.owned_service()
                 # A pidfile must not cause direct signaling, even during removal.
                 (adapter.DEPLOY / "runner.pid").write_text("999999999\n")
                 adapter.start_service()
@@ -144,6 +152,16 @@ def smoke(runtime_path):
                 if system == "darwin":
                     identity = f"gui/{os.getuid()}/com.headroom.{adapter.PROFILE}"
                     assert commands == [["launchctl", "kickstart", "-k", identity]], commands
+                    commands.clear()
+                    def after_bootout(command, **kwargs):
+                        result = os_command(command, **kwargs)
+                        if command[1] == "kickstart":
+                            return subprocess.CompletedProcess(command, 113, "", "service is not registered")
+                        return result
+                    with patch("subprocess.run", side_effect=after_bootout):
+                        adapter.start_service()
+                    assert commands == [["launchctl", "kickstart", "-k", identity],
+                                        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(service)]], commands
                 else:
                     identity = "headroom-" + adapter.PROFILE
                     assert commands == [["systemctl", "--user", "restart", identity]], commands
@@ -166,8 +184,10 @@ def smoke(runtime_path):
                     "wrong_interpreter_rejected": True, "stopped_runner_repaired": True,
                     "state_and_manifest_unchanged": True, "running_stale_repair_refused": True,
                     "config_and_sqlite_unchanged": True,
+                    "maintenance_accepts_upstream_service_definition": True,
+                    "start_after_bootout": system == "darwin",
                     "missing_manifest_cleanup": commands, "pid_signals": 0})
-        assert len(probes) == 2, probes
+        assert len(probes) == 3, probes
         # Exercise the real upstream auth detector against synthetic metadata.
         # No account token or keyring is used, and login status cannot execute.
         auth = adapter.CONFIG.parent / "auth.json"

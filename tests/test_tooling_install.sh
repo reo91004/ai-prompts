@@ -15,6 +15,14 @@ mkdir -p "$TMP_HOME" "$MOCK_BIN"
 # This fixture does not inspect or mutate the real host's running tools.
 printf '%s\n' '#!/bin/sh' 'echo "42 /usr/bin/idle-fixture"' > "$MOCK_BIN/ps"
 chmod +x "$MOCK_BIN/ps"
+cat > "$MOCK_BIN/python3" <<'EOF'
+#!/bin/sh
+case "$*" in
+  *'/headroom/maintenance.py '*) exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@" ;;
+esac
+exec "$KIT_TEST_PYTHON" "$@"
+EOF
+chmod +x "$MOCK_BIN/python3"
 printf '%s\n' '#!/bin/sh' 'echo "Unexpected test network download" >&2; exit 22' > "$MOCK_BIN/curl"
 chmod +x "$MOCK_BIN/curl"
 printf '%s\n' '# user-owned zshrc content' > "$TMP_HOME/.zshrc"
