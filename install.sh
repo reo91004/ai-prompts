@@ -2383,6 +2383,7 @@ Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify and He
 Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
 Kit-owned Headroom services/MCP servers are stopped normally before installation and the service starts afterward.
+Standard existing headroom-default deployments are backed up and adopted in place, retaining their profile and sessions.
 Invalid managed tooling is backed up, cleared and rebuilt automatically; unrelated active jobs block replacement.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
   --verify             Check source and installed files without installing or changing HOME.
@@ -2429,8 +2430,15 @@ HELP
   fi
   kit_validate_home
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
-    if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
-      kit_maintenance_run inspect || kit_die "Installation stopped before changing this host."
+    if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] ||
+        [ -f "$HOME/.headroom/deploy/default/manifest.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
+      if ! kit_maintenance_run inspect; then
+        # The initial busy check is quiet because recognized Headroom can be
+        # paused automatically. On refusal, show the remaining PID so the
+        # user can identify an older installation or a different active job.
+        kit_tooling_idle || true
+        kit_die "Installation stopped before changing this host."
+      fi
       KIT_STOP_HEADROOM=1
     fi
   fi
@@ -2444,7 +2452,16 @@ HELP
     fi
     kit_tooling_idle || kit_die "Installation stopped after acquiring its lock."
     if [ "$KIT_STOP_HEADROOM" -eq 1 ]; then
-      kit_backup_path "$HOME/.headroom/deploy/research-agent-kit" "maintenance/deployment"
+      KIT_HEADROOM_PROFILE="$(kit_maintenance_run profile "$KIT_MAINTENANCE_RECORD")" || kit_die "Cannot identify the paused Headroom deployment."
+      case "$KIT_HEADROOM_PROFILE" in default|research-agent-kit) ;; *) kit_die "Unexpected maintenance profile." ;; esac
+      kit_backup_path "$HOME/.headroom/deploy/$KIT_HEADROOM_PROFILE" "maintenance/deployment"
+      if [ "$(uname -s)" = Darwin ]; then
+        kit_backup_path "$HOME/Library/LaunchAgents/com.headroom.$KIT_HEADROOM_PROFILE.plist" "maintenance/service.plist"
+      else
+        kit_backup_path "$HOME/.config/systemd/user/headroom-$KIT_HEADROOM_PROFILE.service" "maintenance/service.unit"
+      fi
+      kit_require_regular_or_absent "$KIT_STATE_ROOT/headroom.json"
+      kit_backup_path "$KIT_STATE_ROOT/headroom.json" "maintenance/ownership"
     fi
   fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
@@ -2455,6 +2472,9 @@ HELP
     kit_require_regular_or_absent "$HOME/.codex/config.toml"
     kit_backup_path "$HOME/.codex/config.toml" "legacy/config.toml"
     "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" migrate-legacy || kit_die "Legacy Headroom migration failed."
+    if [ -f "${KIT_MAINTENANCE_RECORD:-}" ]; then
+      "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" adopt-default "$KIT_MAINTENANCE_RECORD" || kit_die "Default Headroom adoption failed."
+    fi
   fi
   install_core
   kit_replace_managed_block "$HOME/.config/git/ignore" "$ROOT/global_research_agents.gitignore" git/ignore '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'

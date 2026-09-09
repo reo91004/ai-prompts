@@ -109,7 +109,9 @@ sh install.sh --headroom-status
 curl -fsS http://127.0.0.1:8787/health
 ```
 
-정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile = research-agent-kit`를 함께 확인합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 포트 8787이 다른 서비스·기존 임시 Headroom에 사용 중이거나 사용자 소유 persistent provider가 있으면 설치를 중단하고 충돌 위치를 안내합니다. 해당 서비스의 소유 도구로 정리하거나 포트를 옮긴 뒤 다시 설치하세요. 설치기는 임의의 프로세스를 종료하지 않습니다.
+정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile`이 키트 소유 기록과 같은지 함께 확인합니다. 새 설치의 profile은 `research-agent-kit`이며, 기존 표준 설치를 인계한 호스트는 `default`를 유지합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 다른 서비스가 8787 포트를 사용하거나 사용자 설정이 표준 설치와 다르면 충돌 위치를 안내합니다.
+
+예전 `headroom-default`도 `sh install.sh` 하나로 인계합니다. 로컬 8787 포트의 표준 Codex persistent-service인지 manifest·runner·OS 서비스 정의로 확인한 뒤 정상 종료하고, 배포·서비스 정의·Codex 설정·소유 기록을 백업합니다. 관리 Python과 의존성을 검사·복구한 뒤 표준 provider 블록을 검증하고 키트 소유로 등록합니다. 기존 서비스 이름과 manifest, provider 설정을 유지하면서 runner를 관리 Python으로 갱신하므로 별도 제거 스크립트나 Headroom의 `install remove` 명령이 필요하지 않습니다. 인증 방식이 바뀐 경우 기존 키트 설치와 동일하게 provider의 인증 플래그만 갱신하며, 이 인계 과정에서 인증 파일이나 세션 DB를 초기화하거나 세션 분류를 바꾸지 않습니다. 실패하면 파일 복구 후 원래 실행 중이던 서비스를 재개합니다. 사용자 지정 환경변수·proxy 옵션·provider 블록은 자동 인계하지 않습니다.
 
 `No module named fastapi`와 같은 오류가 나면 작업을 마치고 `sh install.sh`를 다시 실행합니다. 설치기가 키트 소유 Headroom 서비스·MCP를 정상 종료한 뒤 관리 uv·Python·패키지 버전과 의존성을 검사합니다. 하나라도 실패하면 `~/.universal-research-agent-kit/tooling/`을 백업한 뒤 비우고 새 환경을 자동 설치합니다. 별도 복구 옵션이나 system Python의 수동 pip 작업은 필요하지 않습니다. 정상 환경은 재사용하며, 새 설치도 검증에 실패하면 안전하게 복구할 수 있는 경우 이전 상태로 되돌리고 오류를 알립니다. 중지된 키트 서비스가 예전 interpreter를 가리키는 경우에도 재설치 때 runner를 복구합니다.
 
@@ -122,7 +124,7 @@ sh install.sh
 
 제거는 키트 소유 서비스·provider에만 적용합니다. 기존 root provider 설정과 블록 밖의 사용자 설정을 보존하고 Python 도구 환경·MCP는 남깁니다. 서비스 중지·제거에 실패하면 소유 기록과 환경, 백업을 보존하고 오류를 보고합니다. 권한·서비스 관리자 문제를 해결한 뒤 `--remove-headroom`으로 재시도합니다. 일반 세션을 모두 닫고 제거하세요. 제거 후 기본 설치 검증은 서비스가 없으므로 실패하며, 다음 설치가 서비스를 다시 만듭니다.
 
-서비스 로그는 macOS의 `~/.headroom/deploy/research-agent-kit/`, Ubuntu의 해당 디렉터리와 `journalctl --user -u headroom-research-agent-kit.service`에서 확인합니다. API 키·pairing code·로그의 인증 정보를 저장소나 공유 보고서에 넣지 마세요.
+서비스 로그는 macOS의 `~/.headroom/deploy/research-agent-kit/`, Ubuntu의 해당 디렉터리와 `journalctl --user -u headroom-research-agent-kit.service`에서 확인합니다. 인계한 설치는 경로와 서비스 이름의 `research-agent-kit`을 `default`로 바꿉니다. API 키·pairing code·로그의 인증 정보를 저장소나 공유 보고서에 넣지 마세요.
 
 ### 기존 환경 정리
 

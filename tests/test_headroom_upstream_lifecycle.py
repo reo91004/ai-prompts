@@ -31,6 +31,108 @@ def closed_port(*args, **kwargs):
     raise ConnectionRefusedError("Simulated closed port; no socket created")
 
 
+def default_adoption(adapter, maintenance, database, artifacts):
+    """Use upstream-generated default deployments, intercepting all OS work."""
+    from headroom.install import planner, supervisors
+    from headroom.install.state import save_manifest
+    from headroom.providers.codex import install as provider
+    results = []
+    database_before = database.read_bytes()
+    for system in ("darwin", "linux"):
+        with patch.object(sys, "platform", system):
+            adapter.STATE.unlink(missing_ok=True)
+            adapter.select_profile("default")
+            maintenance.select_profile("default")
+            adapter.CONFIG.write_text('model = "user-model"\n[profiles.user]\nmodel_provider = "headroom"\n')
+            deployment = planner.build_manifest(
+                profile="default", preset="persistent-service", runtime_kind="python", scope="provider",
+                provider_mode="manual", targets=["codex"], port=8787, backend="anthropic", anyllm_provider=None,
+                region=None, proxy_mode="cache", memory_enabled=False, telemetry_enabled=False,
+                image="ghcr.io/headroomlabs-ai/headroom:latest")
+            with patch.object(provider, "retag_to_headroom"):
+                deployment.mutations = [provider.apply_provider_scope(deployment)]
+            deployment.artifacts = supervisors.render_runner_scripts(deployment)
+            save_manifest(deployment)
+            runner = adapter.DEPLOY / "run-headroom.sh"
+            runner.write_text(runner.read_text().replace(str(adapter.KIT / "tooling/bin/headroom"), "/old/bin/headroom"))
+            service = adapter.service_path()
+            service.parent.mkdir(parents=True, exist_ok=True)
+            _, definition = (supervisors._macos_launchd_plist(deployment, runner) if system == "darwin"
+                             else supervisors._linux_service_unit(deployment, runner))
+            service.write_text(definition)
+            before = {p: p.read_bytes() for p in (adapter.CONFIG, database, runner, service, adapter.DEPLOY / "manifest.json")}
+            state = {"active": True, "registered": True}
+            calls = []
+
+            def service_command(args, **kwargs):
+                calls.append(args)
+                text = ""
+                if args[0] == "ps":
+                    text = "42 Wed Sep 9 10:00:00 2026 /usr/bin/idle-fixture\n"
+                elif args[:3] == ["systemctl", "--user", "show"]:
+                    text = ("LoadState=loaded\nActiveState=" + ("active" if state["active"] else "inactive")
+                            + "\nFragmentPath=" + str(service) + "\nExecStart={ path=" + str(runner)
+                            + " ; argv[]=" + str(runner) + " ; }\n")
+                elif args[:2] == ["launchctl", "print"] and len(args) == 3 and "/com.headroom." in args[2]:
+                    if not state["registered"]:
+                        return subprocess.CompletedProcess(args, 113, "", "Could not find service")
+                    text = ("path = " + str(service) + "\nprogram = " + str(runner) + "\narguments = {\n"
+                            + str(runner) + "\n}\nstate = " + ("running" if state["active"] else "waiting"))
+                elif "bootout" in args or "stop" in args:
+                    state["active"] = False
+                    if "bootout" in args:
+                        state["registered"] = False
+                elif "kickstart" in args and not state["registered"]:
+                    return subprocess.CompletedProcess(args, 113, "", "service is not registered")
+                elif any(action in args for action in ("kickstart", "bootstrap", "restart", "start")):
+                    state.update(active=True, registered=True)
+                elif args not in (["launchctl", "print", maintenance.DOMAIN], ["systemctl", "--user", "show-environment"]):
+                    raise AssertionError(args)
+                return subprocess.CompletedProcess(args, 0, text, "")
+
+            def headroom_status(*args, **kwargs):
+                assert args == ("install", "status", "--profile", "default"), args
+                assert state["active"]
+                return subprocess.CompletedProcess(args, 0, "Status: running\nHealthy: yes\n")
+
+            with patch("subprocess.run", side_effect=service_command), \
+                    patch.object(adapter, "port_open", side_effect=lambda: state["active"]), \
+                    patch.object(maintenance, "port_open", side_effect=lambda: state["active"]), \
+                    patch.object(maintenance, "ready", side_effect=lambda: state["active"]), \
+                    patch.object(adapter, "probe", return_value={"version": adapter.VERSION, "deployment": {"profile": "default", "preset": "persistent-service"}}), \
+                    patch.object(adapter, "headroom", side_effect=headroom_status), \
+                    patch.object(adapter, "restore_thread_routing", side_effect=forbidden):
+                record = adapter.KIT / "default-maintenance.json"
+                maintenance.pause(record)
+                assert not state["active"]
+                adapter.adopt_default(record)
+                adapter.select_profile("research-agent-kit")
+                with patch.object(sys, "argv", ["runtime.py", "install"]):
+                    adapter.main()
+                assert state["active"] and adapter.read_json(adapter.STATE)["profile"] == "default"
+                assert sys.executable + " -m headroom.cli install agent run --profile default" in runner.read_text()
+                assert all(p.read_bytes() == content for p, content in before.items() if p != runner)
+                installed_runner = runner.read_bytes()
+                adapter.install()
+                assert runner.read_bytes() == installed_runner
+                maintenance.select_profile("research-agent-kit")
+                with patch.object(sys, "argv", ["maintenance.py", "stop-service"]):
+                    maintenance.main()
+                adapter.STATE.unlink()
+                runner.write_bytes(before[runner])
+                maintenance.resume(record)
+                assert state["active"] and all(p.read_bytes() == content for p, content in before.items())
+                results.append({"platform": system, "adopted_in_place": True, "repeat_reused": True,
+                                "config_and_database_unchanged": True, "previous_service_resumed": True})
+            (artifacts / (system + "-default-adoption-commands.json")).write_text(json.dumps(calls, indent=2))
+            adapter.shutil.rmtree(adapter.DEPLOY)
+            service.unlink()
+    assert database.read_bytes() == database_before
+    adapter.select_profile("research-agent-kit")
+    maintenance.select_profile("research-agent-kit")
+    return results
+
+
 def smoke(runtime_path):
     assert importlib.metadata.version("headroom-ai") == "0.34.0"
     root = Path(__file__).resolve().parents[1]
@@ -209,6 +311,7 @@ def smoke(runtime_path):
         assert adapter.CONFIG.read_text() == owned
         assert database.read_bytes() == original[database]
         evidence["auth_transition"] = "logged-out -> OAuth -> API-key: owned field only, repeat unchanged"
+        evidence["default_adoption"] = default_adoption(adapter, maintenance, database, artifacts)
         evidence["readiness_probes"] = probes
         evidence["status"] = "passed"
         (artifacts / "summary.json").write_text(json.dumps(evidence, indent=2))

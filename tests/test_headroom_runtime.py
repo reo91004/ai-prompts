@@ -21,6 +21,7 @@ class RuntimeTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         home = Path(self.temp.name)
         for name, path in {
+            "PROFILE": "research-agent-kit",
             "HOME": home, "KIT": home / ".universal-research-agent-kit",
             "STATE": home / ".universal-research-agent-kit/headroom.json",
             "DEPLOY": home / ".headroom/deploy/research-agent-kit",
@@ -41,6 +42,55 @@ class RuntimeTests(unittest.TestCase):
         self.enterContext(patch.object(runtime, "port_open", lambda: self.running))
         self.enterContext(patch.object(runtime.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)))
         runtime.CONFIG.write_text('model_provider = "openai"\nmodel = "user-model"\n[features]\nuser_flag = true\n')
+
+    def seed_default_adoption(self):
+        runtime.select_profile("default")
+        runtime.write_json(runtime.DEPLOY / "manifest.json", {
+            "profile": "default", "port": 8787, "host": "127.0.0.1", "preset": "persistent-service",
+            "runtime_kind": "python", "supervisor_kind": "service", "scope": "provider", "targets": ["codex"]})
+        runtime.CONFIG.write_text(runtime.START + '\nmodel_provider = "headroom"\n'
+                                  'openai_base_url = "http://127.0.0.1:8787/v1"\n[model_providers.headroom]\n'
+                                  'name = "Headroom persistent proxy"\nbase_url = "http://127.0.0.1:8787/v1"\n'
+                                  'supports_websockets = true\n' + runtime.END + '\n[profiles.user]\n'
+                                  'model_provider = "headroom"\nopenai_base_url = "https://user.example/v1"\n')
+        record = runtime.KIT / "maintenance.json"
+        runtime.write_json(record, {"profile": "default", "adopt_service": True, "resume_service": True})
+        return record
+
+    def test_default_adoption_preserves_config_auth_database_and_service_manifest(self):
+        record = self.seed_default_adoption()
+        for name in ("auth.json", "state_5.sqlite"):
+            (runtime.CONFIG.parent / name).write_bytes(b"user-data-sentinel")
+        before = {path: path.read_bytes() for path in runtime.HOME.rglob("*") if path.is_file()}
+        runtime.adopt_default(record)
+        self.assertEqual(before, {path: path.read_bytes() for path in before})
+        self.assertEqual(runtime.read_json(runtime.STATE)["profile"], "default")
+        self.assertEqual(runtime.read_json(runtime.STATE)["previous_provider"], {})
+        self.assertEqual(self.calls, [])
+        runtime.restore_thread_routing.assert_not_called()
+        with patch.object(runtime, "check") as check, patch.object(sys, "argv", ["runtime.py", "check"]):
+            runtime.select_profile("research-agent-kit")
+            runtime.main()
+            self.assertEqual(runtime.PROFILE, "default")
+            self.assertEqual(runtime.DEPLOY.name, "default")
+            check.assert_called_once_with()
+
+    def test_default_adoption_rejects_custom_provider_without_writes(self):
+        record = self.seed_default_adoption()
+        runtime.CONFIG.write_text(runtime.CONFIG.read_text().replace(runtime.END, 'custom_option = "keep"\n' + runtime.END))
+        before = runtime.CONFIG.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "custom settings"):
+            runtime.adopt_default(record)
+        self.assertEqual(runtime.CONFIG.read_bytes(), before)
+        self.assertFalse(runtime.STATE.exists())
+        self.assertEqual(self.calls, [])
+
+    def test_default_adoption_refuses_a_restarted_service(self):
+        record = self.seed_default_adoption()
+        self.running = True
+        with self.assertRaisesRegex(RuntimeError, "restarted before adoption"):
+            runtime.adopt_default(record)
+        self.assertFalse(runtime.STATE.exists())
 
     def test_install_lock_blocks_new_sessions_but_allows_installer_lifecycle(self):
         (runtime.KIT / ".lock").mkdir()

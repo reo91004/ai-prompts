@@ -55,6 +55,14 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def select_profile(profile):
+    global PROFILE, DEPLOY
+    if profile not in ("research-agent-kit", "default"):
+        fail("Unsupported kit Headroom profile; its configuration was preserved.")
+    PROFILE = profile
+    DEPLOY = HOME / ".headroom/deploy" / profile
+
+
 def safe_path(path):
     for parent in (path, *path.parents):
         if parent == HOME.parent:
@@ -349,6 +357,48 @@ def check_provider():
         fail("Codex authentication changed since installation. Rerun install.sh, then restart Desktop/daemon.")
 
 
+def adopt_default(record):
+    """Keep the standard deployment and provider; change only kit ownership."""
+    safe_path(Path(record))
+    saved = read_json(Path(record))
+    if not saved.get("adopt_service"):
+        return
+    if saved.get("profile") != "default" or STATE.exists():
+        fail("Default Headroom adoption conflicts with the ownership record.")
+    select_profile("default")
+    for path in (STATE, DEPLOY, service_path(), CONFIG):
+        safe_path(path)
+    if port_open():
+        fail("Default Headroom restarted before adoption; its environment was preserved.")
+    manifest(check_runner=False)
+    safe_path(CONFIG)
+    original = CONFIG.read_text()
+    tomllib.loads(original)
+
+    def standard_provider(values):
+        providers = values.get("model_providers", {})
+        provider = providers.get("headroom", {}) if isinstance(providers, dict) else {}
+        expected = {"model_provider": "headroom", "openai_base_url": BASE_URL + "/v1",
+                    "model_providers": {"headroom": {"name": "Headroom persistent proxy", "base_url": BASE_URL + "/v1",
+                                                     "supports_websockets": True}}}
+        if isinstance(provider, dict) and isinstance(provider.get("requires_openai_auth"), bool):
+            expected["model_providers"]["headroom"]["requires_openai_auth"] = provider["requires_openai_auth"]
+        if values != expected:
+            fail("The default Headroom provider has custom settings; Codex configuration was preserved.")
+        return True
+
+    without_provider, count = strip_legacy_blocks(original, START, END, standard_provider)
+    if count != 1:
+        fail("The default Headroom provider markers are missing or ambiguous; configuration was preserved.")
+    outside = tomllib.loads(without_provider)
+    previous = {key: outside[key] for key in ("model_provider", "openai_base_url") if key in outside}
+    # Upstream does not store pre-install provider values. Do not infer them
+    # from old backups or rewrite/retag existing Codex sessions during adoption.
+    write_json(STATE, {"profile": PROFILE, "port": PORT, "previous_provider": previous,
+                       "python": sys.executable, "version": VERSION, "adopted_default": True})
+    print("Adopted the existing default Headroom service; provider configuration and sessions preserved.")
+
+
 def codex_oauth():
     from headroom.providers.codex.install import codex_uses_chatgpt_auth
     return codex_uses_chatgpt_auth(CONFIG.parent / "auth.json")
@@ -636,12 +686,17 @@ def launch(tool, args):
 
 def main():
     action, *args = sys.argv[1:]
+    if action not in ("dependencies", "environment", "migrate-legacy", "adopt-default") and STATE.exists():
+        safe_path(STATE)
+        select_profile(read_json(STATE).get("profile"))
     if action == "dependencies":
         dependencies(args[0])
     elif action == "environment":
         environment(*args)
     elif action == "migrate-legacy":
         migrate_legacy()
+    elif action == "adopt-default":
+        adopt_default(args[0])
     elif action == "install":
         install()
     elif action == "check":

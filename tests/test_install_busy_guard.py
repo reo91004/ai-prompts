@@ -131,18 +131,28 @@ sys.exit(row.get('exit', 0))
         self.assertFalse((self.kit / "cli").exists())
         self.assertFalse((self.kit / ".lock").exists())
 
+    def test_ownership_refusal_reports_the_remaining_pid(self):
+        self.set_snapshots("246 /outside/bin/headroom mcp serve\n")
+        result = self.run_shell('''kit_maintenance_run() { echo 'No owned Headroom found.' >&2; return 1; }
+main
+''')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PID 246", result.stderr)
+        self.assertEqual(list(self.home.iterdir()), [])
+
     def test_owned_shutdown_precedes_bootstrap_and_failure_resumes_service(self):
         self.kit.mkdir()
         (self.kit / "headroom.json").write_text('{"profile":"research-agent-kit"}')
         result = self.run_shell('''kit_maintenance_run() {
   echo "$1" >> "$GUARD_EVENTS"
   if [ "$1" = pause ]; then echo '{}' > "$2"; fi
+  if [ "$1" = profile ]; then echo research-agent-kit; fi
 }
 bootstrap_cli() { echo bootstrap >> "$GUARD_EVENTS"; return 42; }
 main
 ''')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "bootstrap", "resume"])
+        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "profile", "bootstrap", "resume"])
         self.assertFalse((self.kit / "tooling").exists())
 
     def test_failed_shutdown_never_reaches_bootstrap(self):
@@ -158,6 +168,30 @@ main
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "resume"])
         self.assertFalse((self.kit / "tooling").exists())
+
+    def test_stopped_default_is_inspected_backed_up_and_resumed_on_failure(self):
+        deployment = self.home / ".headroom/deploy/default"
+        deployment.mkdir(parents=True)
+        manifest = deployment / "manifest.json"
+        manifest.write_text('{"profile":"default","port":8787}')
+        result = self.run_shell('''kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  case "$1" in
+    pause) echo '{"profile":"default","adopt_service":true}' > "$2" ;;
+    profile) echo default ;;
+  esac
+}
+bootstrap_cli() {
+  test -f "$KIT_BACKUP_DIR/maintenance/deployment/manifest.json" || exit 91
+  echo bootstrap >> "$GUARD_EVENTS"
+  return 42
+}
+main
+''')
+        self.assertEqual(result.returncode, 42)
+        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "profile", "bootstrap", "resume"])
+        self.assertEqual(manifest.read_text(), '{"profile":"default","port":8787}')
+        self.assertFalse((self.kit / "headroom.json").exists())
 
     def test_restarted_service_stops_before_rollback_and_resumes_after_restore(self):
         for stop_fails in (False, True):
@@ -189,6 +223,40 @@ exit 99
                 self.assertEqual(sentinel.read_text(), "new\n" if stop_fails else "original")
                 if stop_fails:
                     self.assertTrue(list((self.kit / "backups").glob("run.*/journal.tsv")))
+
+    def test_failed_default_activation_restores_unowned_record_and_old_runner(self):
+        deployment = self.home / ".headroom/deploy/default"
+        deployment.mkdir(parents=True)
+        runner = deployment / "run-headroom.sh"
+        runner.write_text("old-runner")
+        result = self.run_shell('''kit_init_state
+kit_enable_rollback
+KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
+echo '{"profile":"default","adopt_service":true,"resume_service":true}' > "$KIT_MAINTENANCE_RECORD"
+kit_backup_path "$KIT_STATE_ROOT/headroom.json" maintenance/ownership
+kit_backup_path "$HOME/.headroom/deploy/default" maintenance/deployment
+echo '{"profile":"default"}' > "$KIT_STATE_ROOT/headroom.json"
+echo new-runner > "$HOME/.headroom/deploy/default/run-headroom.sh"
+KIT_HEADROOM_ACTIVATION_STARTED=1
+KIT_HEADROOM_CREATED=0
+kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  if [ "$1" = stop-service ]; then
+    test -f "$KIT_STATE_ROOT/headroom.json" || exit 91
+    test "$(cat "$HOME/.headroom/deploy/default/run-headroom.sh")" = new-runner || exit 92
+  elif [ "$1" = resume ]; then
+    test ! -e "$KIT_STATE_ROOT/headroom.json" || exit 93
+    test "$(cat "$HOME/.headroom/deploy/default/run-headroom.sh")" = old-runner || exit 94
+  else
+    exit 95
+  fi
+}
+exit 42
+''')
+        self.assertEqual(result.returncode, 42)
+        self.assertEqual(self.events.read_text().splitlines(), ["stop-service", "resume"])
+        self.assertFalse((self.kit / "headroom.json").exists())
+        self.assertEqual(runner.read_text(), "old-runner")
 
     def test_checks_precede_tool_root_python_and_package_mutations(self):
         uv = self.bin / "uv"

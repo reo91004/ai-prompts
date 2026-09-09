@@ -23,8 +23,9 @@ class MaintenanceTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         home = Path(temporary.name) / "home with spaces"
         home.mkdir()
-        for name, value in {"HOME": home, "KIT": home / ".universal-research-agent-kit",
-                            "DEPLOY": home / ".headroom/deploy" / maintenance.PROFILE}.items():
+        for name, value in {"HOME": home, "KIT": home / ".universal-research-agent-kit", "PROFILE": "research-agent-kit",
+                            "SERVICE": "headroom-research-agent-kit", "LABEL": "com.headroom.research-agent-kit",
+                            "DEPLOY": home / ".headroom/deploy/research-agent-kit"}.items():
             self.enterContext(patch.object(maintenance, name, value))
         self.enterContext(patch.dict(os.environ, {"HOME": str(home)}, clear=True))
         self.enterContext(patch.object(sys, "platform", "linux"))
@@ -41,20 +42,37 @@ class MaintenanceTests(unittest.TestCase):
         maintenance.KIT.mkdir()
         self.record = maintenance.KIT / "resume.json"
 
-    def seed_service(self):
-        maintenance.DEPLOY.mkdir(parents=True)
+    def seed_service(self, adopting=False):
+        if adopting:
+            maintenance.select_profile("default")
+        maintenance.DEPLOY.mkdir(parents=True, exist_ok=True)
         state = {"profile": maintenance.PROFILE, "port": maintenance.PORT}
         (maintenance.KIT / "headroom.json").write_text(json.dumps(state))
         manifest = {**state, "host": "127.0.0.1", "preset": "persistent-service", "runtime_kind": "python",
                     "supervisor_kind": "service", "scope": "provider", "targets": ["codex"],
                     "service_name": maintenance.SERVICE}
+        exports = ""
+        if adopting:
+            (maintenance.KIT / "headroom.json").unlink()
+            env = {"HEADROOM_PORT": "8787", "HEADROOM_HOST": "127.0.0.1", "HEADROOM_MODE": "cache",
+                   "HEADROOM_BACKEND": "anthropic", "HEADROOM_TELEMETRY": "off"}
+            manifest.update(backend="anthropic", anyllm_provider=None, region=None, proxy_mode="cache",
+                            memory_enabled=False, telemetry_enabled=False, base_env=env,
+                            tool_envs={"codex": {"OPENAI_BASE_URL": "http://127.0.0.1:8787/v1"}},
+                            proxy_args=["--host", "127.0.0.1", "--port", "8787", "--mode", "cache", "--backend", "anthropic", "--no-telemetry"],
+                            mutations=[{"target": "codex", "kind": "toml-block", "path": str(maintenance.HOME / ".codex/config.toml"), "data": {}}])
+            exports = "".join("export " + key + "=" + value + "\n" for key, value in env.items())
         (maintenance.DEPLOY / "manifest.json").write_text(json.dumps(manifest))
         runner = str(maintenance.DEPLOY / "run-headroom.sh")
-        Path(runner).write_text("#!/usr/bin/env bash\nset -euo pipefail\nexec /owned/headroom install agent run --profile " + maintenance.PROFILE + "\n")
+        Path(runner).write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + exports + "exec /owned/headroom install agent run --profile " + maintenance.PROFILE + "\n")
         path = maintenance.service_path()
-        path.parent.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
         if sys.platform == "darwin":
-            path.write_bytes(plistlib.dumps({"Label": maintenance.LABEL, "ProgramArguments": [runner], "KeepAlive": True}))
+            path.write_bytes(plistlib.dumps({"Label": maintenance.LABEL, "ProgramArguments": [runner], "KeepAlive": True, "RunAtLoad": True}))
+        elif adopting:
+            path.write_text("[Unit]\nDescription=Headroom (default)\nAfter=network-online.target\n\n"
+                            "[Service]\nType=simple\nExecStart=" + runner + "\nRestart=on-failure\nRestartSec=5\n\n"
+                            "[Install]\nWantedBy=default.target\n")
         else:
             path.write_text("[Service]\nExecStart=" + runner + "\nRestart=on-failure\n")
         self.registered = self.active = True
@@ -248,6 +266,102 @@ class MaintenanceTests(unittest.TestCase):
         maintenance.resume(self.record)
         self.assertFalse(self.active)
         self.assertFalse(any("start" in event or "bootstrap" in event for event in self.events))
+
+    def test_other_deployment_is_named_before_stopping_anything(self):
+        self.add_mcp()
+        deployment = maintenance.HOME / ".headroom/deploy/custom"
+        deployment.mkdir(parents=True)
+        manifest = deployment / "manifest.json"
+        original = '{"profile":"default","port":8787}'
+        manifest.write_text(original)
+        with self.assertRaisesRegex(RuntimeError, "another Headroom deployment") as error:
+            maintenance.pause(self.record)
+        self.assertIn(str(deployment), str(error.exception))
+        self.assertIn("Stopping its process alone", str(error.exception))
+        self.assertEqual(self.events, [])
+        self.assertIn(246, self.table)
+        self.assertEqual(manifest.read_text(), original)
+        self.assertFalse(self.record.exists())
+
+    def test_standard_default_service_can_pause_and_resume_without_kit_record(self):
+        self.seed_service(adopting=True)
+        before = {path: path.read_bytes() for path in maintenance.HOME.rglob("*") if path.is_file()}
+        maintenance.pause(self.record)
+        self.assertFalse(self.active)
+        saved = json.loads(self.record.read_text())
+        self.assertEqual(saved["profile"], "default")
+        self.assertTrue(saved["adopt_service"])
+        self.assertEqual(before, {path: path.read_bytes() for path in before})
+        self.assertFalse((maintenance.KIT / "headroom.json").exists())
+        maintenance.resume(self.record)
+        self.assertTrue(self.active)
+        self.assertIn(("systemctl", "--user", "stop", "headroom-default"), self.events)
+        self.assertIn(("systemctl", "--user", "start", "headroom-default"), self.events)
+
+    def test_custom_default_runtime_is_preserved_before_service_commands(self):
+        self.seed_service(adopting=True)
+        path = maintenance.DEPLOY / "manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["base_env"]["CUSTOM_OPTION"] = "keep"
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(RuntimeError, "custom runtime/provider settings"):
+            maintenance.pause(self.record)
+        self.assertEqual(self.events, [])
+        self.assertTrue(self.active)
+        self.assertFalse(self.record.exists())
+
+    def test_default_service_file_environment_and_hooks_are_preserved(self):
+        for platform, setting in (("darwin", "EnvironmentVariables"), ("darwin", "WorkingDirectory"),
+                                  ("linux", "Environment"), ("linux", "EnvironmentFile"), ("linux", "ExecStartPre")):
+            with self.subTest(platform=platform, setting=setting), patch.object(sys, "platform", platform):
+                self.seed_service(adopting=True)
+                path = maintenance.service_path()
+                if platform == "darwin":
+                    definition = plistlib.loads(path.read_bytes())
+                    definition[setting] = {"HEADROOM_CONFIG_DIR": "/custom/config"} if setting == "EnvironmentVariables" else "/custom"
+                    path.write_bytes(plistlib.dumps(definition))
+                else:
+                    path.write_text(path.read_text().replace("[Service]\n", "[Service]\n" + setting + "=/custom\n"))
+                before = path.read_bytes()
+                with self.assertRaisesRegex(RuntimeError, "custom service settings"):
+                    maintenance.pause(self.record)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertEqual(self.events, [])
+                self.assertTrue(self.active)
+                self.assertFalse(self.record.exists())
+
+    def test_loaded_default_environment_and_hooks_are_preserved(self):
+        for platform, setting in (("darwin", "environment"), ("darwin", "inherited environment"),
+                                  ("linux", "Environment"), ("linux", "EnvironmentFiles"), ("linux", "ExecStartPre")):
+            with self.subTest(platform=platform, setting=setting), patch.object(sys, "platform", platform):
+                self.seed_service(adopting=True)
+                self.events.clear()
+                def loaded_custom(args):
+                    result = self.os_command(args)
+                    extra = ("\n" + setting + " = {\nHEADROOM_CONFIG_DIR => /custom/config\n}\n" if platform == "darwin"
+                             else "\n" + setting + "=/custom/config\n")
+                    return subprocess.CompletedProcess(args, result.returncode, result.stdout + extra, result.stderr)
+                with patch.object(maintenance, "command", side_effect=loaded_custom):
+                    with self.assertRaisesRegex(RuntimeError, "loaded default.*custom runtime"):
+                        maintenance.pause(self.record)
+                self.assertTrue(self.active)
+                self.assertFalse(self.record.exists())
+                self.assertTrue(all(event[:2] == ("launchctl", "print") or event[:3] == ("systemctl", "--user", "show") for event in self.events))
+
+    def test_default_loaded_platform_defaults_are_accepted(self):
+        for platform in ("darwin", "linux"):
+            with self.subTest(platform=platform), patch.object(sys, "platform", platform):
+                self.seed_service(adopting=True)
+                def loaded_defaults(args):
+                    result = self.os_command(args)
+                    extra = ("\ninherited environment = {\nSSH_AUTH_SOCK => /tmp/user-socket\n}\n"
+                             "default environment = {\nPATH => /usr/bin:/bin\n}\n"
+                             "environment = {\nOSLogRateLimit => 64\nXPC_SERVICE_NAME => com.headroom.default\n}\n"
+                             if platform == "darwin" else "\nWorkingDirectory=!" + str(maintenance.HOME) + "\nEnvironment=\n")
+                    return subprocess.CompletedProcess(args, result.returncode, result.stdout + extra, result.stderr)
+                with patch.object(maintenance, "command", side_effect=loaded_defaults):
+                    self.assertEqual(maintenance.inspect()[:3], (True, True, True))
+                self.assertFalse(self.record.exists())
 
     def test_snapshot_parser_uses_start_time_without_logging_arguments(self):
         with patch.object(maintenance, "command", return_value=subprocess.CompletedProcess([], 0, "246 Wed Sep 9 10:00:00 2026 /bin/example SECRET_ARG\n", "")):
