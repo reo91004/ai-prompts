@@ -548,12 +548,19 @@ def claude_direct_check():
                 fail(f"Claude Remote Control needs direct Anthropic. Remove ANTHROPIC_BASE_URL from {path}; the kit left your file unchanged.")
 
 
+def require_no_install():
+    if (KIT / ".lock").exists():
+        fail("The kit installer is running. Wait for it to finish before starting a new Headroom session.")
+
+
 def ensure_running():
+    require_no_install()
     if not port_open():
         # Only the stopped-to-running transition needs serialization. Healthy
         # sessions share the service without holding a lock for their lifetime.
         with (KIT / "headroom-start.lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            require_no_install()
             preflight()
             manifest()
             if not port_open():

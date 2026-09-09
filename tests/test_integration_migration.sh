@@ -10,6 +10,9 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 MOCK_BIN="$WORK/bin"
 mkdir -p "$MOCK_BIN"
+# This fixture does not inspect or mutate the real host's running tools.
+printf '%s\n' '#!/bin/sh' 'echo "42 /usr/bin/idle-fixture"' > "$MOCK_BIN/ps"
+chmod +x "$MOCK_BIN/ps"
 ln -s "$(command -v node)" "$MOCK_BIN/node"
 
 # Mock CLIs replay plugin/marketplace state from JSON files and record every

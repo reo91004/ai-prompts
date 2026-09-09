@@ -20,6 +20,7 @@ mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
   --version) echo 'uv 0.12.10' ;;
   *'python install'*) : ;;
+  '--no-config pip check --python '*) : ;;
   'tool dir --bin')
     printf '%s\n' "$UV_TOOL_BIN_DIR"
     ;;

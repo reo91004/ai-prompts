@@ -2,6 +2,10 @@ _universal_research_agent_kit_headroom_command() {
   local headroom_bin
   local python_headroom_bin
 
+  if [ -d "$HOME/.universal-research-agent-kit/.lock" ]; then
+    echo "The kit installer is running. Wait for it to finish before starting a new Headroom session." >&2
+    return 1
+  fi
   if [ -x "$HOME/.universal-research-agent-kit/tooling/bin/headroom" ]; then
     PATH="$HOME/.universal-research-agent-kit/tooling/bin:$PATH" \
       command "$HOME/.universal-research-agent-kit/tooling/bin/headroom" "$@"

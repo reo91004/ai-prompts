@@ -12,6 +12,9 @@ CALLS="$TMP_ROOT/calls.log"
 trap 'rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 mkdir -p "$TMP_HOME" "$MOCK_BIN"
+# This fixture does not inspect or mutate the real host's running tools.
+printf '%s\n' '#!/bin/sh' 'echo "42 /usr/bin/idle-fixture"' > "$MOCK_BIN/ps"
+chmod +x "$MOCK_BIN/ps"
 printf '%s\n' '#!/bin/sh' 'echo "Unexpected test network download" >&2; exit 22' > "$MOCK_BIN/curl"
 chmod +x "$MOCK_BIN/curl"
 printf '%s\n' '# user-owned zshrc content' > "$TMP_HOME/.zshrc"
@@ -30,6 +33,10 @@ mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
   --version) echo 'uv 0.12.10' ;;
   *'python install'*) : ;;
+  '--no-config pip check --python '*)
+    [ "${TOOLING_TEST_PIP_FAIL:-0}" != 1 ] || exit 44
+    [ ! -f "$(dirname "$5")/dependency-conflict" ] || exit 43
+    ;;
   'tool dir --bin')
     printf '%s\n' "$UV_TOOL_BIN_DIR"
     ;;
@@ -266,5 +273,67 @@ set -e
 [ "$config_dir_rc" -ne 0 ]
 grep -Fq 'CLAUDE_CONFIG_DIR is not supported' "$TMP_ROOT/config-dir-failure.out"
 [ ! -e "$CONFIG_DIR_HOME/.universal-research-agent-kit" ]
+
+# Reuse a healthy environment, but replace its whole managed tree when a
+# runtime, package manager, import or dependency check fails. Keep user data
+# outside that tree and retain the old tree in the completed backup.
+MANAGED_ROOT="$TMP_HOME/.universal-research-agent-kit/tooling"
+mkdir -p "$TMP_HOME/.local/bin" "$TMP_HOME/custom-venv/bin" "$TMP_HOME/.codex" "$TMP_HOME/.claude"
+printf 'external Python\n' > "$TMP_HOME/custom-venv/bin/python"
+printf 'external Headroom\n' > "$TMP_HOME/.local/bin/headroom"
+printf '{"fixture_token":"keep-codex"}\n' > "$TMP_HOME/.codex/auth.json"
+printf '{"fixture_token":"keep-claude"}\n' > "$TMP_HOME/.claude/.credentials.json"
+printf 'healthy marker\n' > "$MANAGED_ROOT/keep-if-healthy"
+before_tools="$(grep -Fc 'tool install --managed-python' "$CALLS")"
+run_tooling > "$TMP_ROOT/healthy-repeat.out" 2>&1
+[ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq "$before_tools" ]
+[ -f "$MANAGED_ROOT/keep-if-healthy" ]
+
+for corruption in uv python imports dependencies; do
+  mkdir -p "$MANAGED_ROOT/python-venv/bin"
+  printf 'old shared environment: %s\n' "$corruption" > "$MANAGED_ROOT/python-venv/bin/old-tool"
+  case "$corruption" in
+    uv) printf '%s\n' '#!/bin/sh' 'echo "uv 0.0.1"' > "$MANAGED_ROOT/uv-bin/uv" ;;
+    python)
+      rm "$MANAGED_ROOT/uv-tools/headroom-ai/bin/python"
+      ln -s /missing-kit-python "$MANAGED_ROOT/uv-tools/headroom-ai/bin/python"
+      ;;
+    imports) touch "$TMP_HOME/.broken-headroom" ;;
+    dependencies) touch "$MANAGED_ROOT/uv-tools/headroom-ai/bin/dependency-conflict" ;;
+  esac
+  before_tools="$(grep -Fc 'tool install --managed-python' "$CALLS")"
+  run_tooling > "$TMP_ROOT/rebuild-$corruption.out" 2>&1 || {
+    cat "$TMP_ROOT/rebuild-$corruption.out" >&2
+    exit 1
+  }
+  grep -Fq 'rebuilding from an empty directory' "$TMP_ROOT/rebuild-$corruption.out"
+  [ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq "$((before_tools + 2))" ]
+  [ ! -e "$MANAGED_ROOT/python-venv" ]
+  [ ! -e "$MANAGED_ROOT/keep-if-healthy" ]
+  grep -Fqx "old shared environment: $corruption" "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/environment/python-venv/bin/old-tool
+  grep -Fqx 'external Python' "$TMP_HOME/custom-venv/bin/python"
+  grep -Fqx 'external Headroom' "$TMP_HOME/.local/bin/headroom"
+  grep -Fqx '{"fixture_token":"keep-codex"}' "$TMP_HOME/.codex/auth.json"
+  grep -Fqx '{"fixture_token":"keep-claude"}' "$TMP_HOME/.claude/.credentials.json"
+done
+
+# A failed fresh build must restore the complete old environment instead of
+# leaving a half-installed replacement at the active path.
+for failure in provision verification; do
+  printf '%s\n' '#!/bin/sh' 'echo "uv 0.0.1"' > "$MANAGED_ROOT/uv-bin/uv"
+  printf 'old environment before failed rebuild\n' > "$MANAGED_ROOT/restore-me"
+  cp -Rp "$MANAGED_ROOT" "$TMP_ROOT/before-failed-$failure"
+  if TOOLING_TEST_UV_FAIL="$([ "$failure" = provision ] && echo 1 || echo 0)" \
+      TOOLING_TEST_PIP_FAIL="$([ "$failure" = verification ] && echo 1 || echo 0)" \
+      run_tooling > "$TMP_ROOT/rebuild-$failure-failure.out" 2>&1; then
+    echo 'a failed fresh build was incorrectly accepted' >&2
+    exit 1
+  fi
+  grep -Fq 'rebuilding from an empty directory' "$TMP_ROOT/rebuild-$failure-failure.out"
+  grep -Fq 'Rollback complete.' "$TMP_ROOT/rebuild-$failure-failure.out"
+  diff -r "$TMP_ROOT/before-failed-$failure" "$MANAGED_ROOT"
+  grep -Fqx '{"fixture_token":"keep-codex"}' "$TMP_HOME/.codex/auth.json"
+  grep -Fqx '{"fixture_token":"keep-claude"}' "$TMP_HOME/.claude/.credentials.json"
+done
 
 echo "Tooling installation tests passed."

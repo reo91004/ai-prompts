@@ -12,6 +12,20 @@ WRAPPER = Path(__file__).resolve().parents[1] / "headroom/auto-wrap.sh"
 
 
 class DispatchTests(unittest.TestCase):
+    def test_install_lock_blocks_legacy_wrap_fallback(self):
+        for shell in ("bash", "zsh"):
+            if not shutil.which(shell):
+                continue
+            with tempfile.TemporaryDirectory() as directory:
+                home = Path(directory)
+                (home / ".universal-research-agent-kit/.lock").mkdir(parents=True)
+                env = {**os.environ, "HOME": str(home)}
+                for tool in ("codex", "claude"):
+                    result = subprocess.run([shell, "-c", 'source "$1"; "$2" hello',
+                                             "test", str(WRAPPER), tool], env=env, capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("installer is running", result.stderr)
+
     def test_dispatch_argv_environment_and_exit_status(self):
         cases = [
             ("codex", [], "headroom"),

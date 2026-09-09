@@ -42,6 +42,27 @@ class RuntimeTests(unittest.TestCase):
         self.enterContext(patch.object(runtime.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)))
         runtime.CONFIG.write_text('model_provider = "openai"\nmodel = "user-model"\n[features]\nuser_flag = true\n')
 
+    def test_install_lock_blocks_new_sessions_but_allows_installer_lifecycle(self):
+        (runtime.KIT / ".lock").mkdir()
+        for running in (False, True):
+            with self.subTest(running=running):
+                self.running = running
+                with self.assertRaisesRegex(RuntimeError, "installer is running"):
+                    runtime.launch("codex", [])
+                self.assertEqual(self.calls, [])
+        self.running = False
+        runtime.install()
+        runtime.check(quiet=True)
+
+    def test_install_lock_is_rechecked_after_waiting_to_start(self):
+        def installer_starts(*args):
+            (runtime.KIT / ".lock").mkdir()
+        with patch.object(runtime.fcntl, "flock", side_effect=installer_starts):
+            with self.assertRaisesRegex(RuntimeError, "installer is running"):
+                runtime.ensure_running()
+        self.assertEqual(self.calls, [])
+        self.assertFalse(self.running)
+
     def headroom(self, *args, capture=False):
         self.calls.append(args)
         action = args[1]

@@ -60,6 +60,73 @@ kit_require_regular_or_absent() {
   fi
 }
 
+kit_tooling_idle() (
+  # Isolate shell tracing so `bash -x install.sh` cannot log other processes'
+  # complete command lines, while preserving the caller's tracing preference.
+  set +x
+  local snapshot pid command executable name argument remaining busy seen=0
+  local root="$HOME/.universal-research-agent-kit/tooling" physical_home physical_root
+  local local_headroom="$HOME/.local/bin/headroom" physical_headroom
+  physical_home="$(cd "$HOME" && pwd -P)" || return 1
+  physical_root="$physical_home/.universal-research-agent-kit/tooling"
+  physical_headroom="$physical_home/.local/bin/headroom"
+  # Keep command lines in memory: they can contain credentials. A failed
+  # process inspection is not permission to replace a potentially active venv.
+  if ! snapshot="$(ps -ww -u "$(id -u)" -o pid= -o args= 2>/dev/null)" || [ -z "$snapshot" ]; then
+    echo "Cannot inspect running processes; managed environments were not cleared for modification." >&2
+    return 1
+  fi
+  while read -r pid command; do
+    [ -n "$command" ] || continue
+    case "$pid" in *[!0-9]*|'') echo "Invalid process inspection; installation was not cleared to modify environments." >&2; return 1 ;; esac
+    seen=1
+    busy=0
+    case "$command" in
+      "$root/"*|"$physical_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1 ;;
+    esac
+    executable="${command%%[[:space:]]*}"
+    name="${executable##*/}"
+    case "$name" in
+      headroom) busy=1 ;;
+      python|python[0-9]*|Python|Python[0-9]*|pypy|pypy[0-9]*|sh|bash|dash|zsh)
+        # ps does not preserve argv boundaries. Recognize the interpreter's
+        # module/script position, never words inside Python/shell -c source.
+        remaining="${command#"$executable"}"
+        while :; do
+          remaining="${remaining#"${remaining%%[![:space:]]*}"}"
+          [ -n "$remaining" ] || break
+          case "$remaining" in
+            "$root/"*|"$physical_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1; break ;;
+          esac
+          argument="${remaining%%[[:space:]]*}"
+          remaining="${remaining#"$argument"}"
+          case "$argument" in
+            -c|--command|-c?*) break ;;
+            -m|-?*m)
+              remaining="${remaining#"${remaining%%[![:space:]]*}"}"
+              case "${remaining%%[[:space:]]*}" in headroom|headroom.*) busy=1 ;; esac
+              break ;;
+            -mheadroom|-mheadroom.*) busy=1; break ;;
+            -W|-X)
+              remaining="${remaining#"${remaining%%[![:space:]]*}"}"
+              remaining="${remaining#"${remaining%%[[:space:]]*}"}" ;;
+            --) ;;
+            -*) ;;
+            *)
+              case "$argument" in headroom|*/headroom|"$root/"*|"$HOME/.config/headroom/runtime.py") busy=1 ;; esac
+              break ;;
+          esac
+        done
+        ;;
+    esac
+    if [ "$busy" -eq 1 ]; then
+      echo "Headroom or a managed tool environment is in use (PID $pid). Finish its sessions and stop it yourself before installing; no process was stopped." >&2
+      return 1
+    fi
+  done <<< "$snapshot"
+  [ "$seen" -eq 1 ] || { echo "Empty process inspection; installation was not cleared to modify environments." >&2; return 1; }
+)
+
 kit_init_state() {
   kit_validate_home
   umask 077
@@ -278,8 +345,23 @@ kit_rollback_run() {
 
   [ -f "$KIT_JOURNAL" ] || return 0
   tab="$(printf '\t')"
+  # Do not restore/delete a venv that another process started using during
+  # this run. Preserve the complete journal for explicit recovery instead.
+  while IFS="$tab" read -r action source destination; do
+    case "$source" in
+      "$KIT_STATE_ROOT/tooling"|"$KIT_STATE_ROOT/tooling/"*)
+        if ! kit_tooling_idle; then
+          echo "Rollback left the managed environment and journal at $KIT_BACKUP_DIR intact because safe restoration could not be established." >&2
+          return 1
+        fi
+        break ;;
+    esac
+  done < "$KIT_JOURNAL"
   # Newest-first replay so later changes are undone before earlier ones.
   while IFS="$tab" read -r action source destination; do
+    case "$source" in
+      "$KIT_STATE_ROOT/tooling"|"$KIT_STATE_ROOT/tooling/"*) kit_tooling_idle || return 1 ;;
+    esac
     case "$action" in
       restore)
         kit_restore_entry "$source" "$destination" || failed=1
@@ -1281,6 +1363,8 @@ TOOL_ROOT="$KIT_STATE_ROOT/tooling"
 TOOL_BIN_DIR="$TOOL_ROOT/bin"
 TOOL_UV_DIR="$TOOL_ROOT/uv-tools"
 TOOL_ROOT_PREPARED=0
+KIT_UV_BIN="$TOOL_ROOT/uv-bin/uv"
+KIT_UV_READY=0
 
 validate_tool_path() {
   local path="$1"
@@ -1298,7 +1382,13 @@ validate_tool_path "$TOOL_UV_DIR"
 prepare_managed_tool_root() {
   [ "$TOOL_ROOT_PREPARED" -eq 0 ] || return 0
 
+  kit_tooling_idle || kit_die "Installation stopped before changing managed tooling."
   kit_backup_path "$TOOL_ROOT" "tooling/environment"
+  if [ -d "$TOOL_ROOT" ]; then
+    kit_tooling_idle || kit_die "Installation stopped before clearing the old managed environment."
+    echo "Managed tooling failed validation; rebuilding from an empty directory. Backup: $KIT_BACKUP_DIR/tooling/environment"
+    rm -rf -- "$TOOL_ROOT"
+  fi
   kit_require_real_dir "$TOOL_ROOT"
   kit_require_real_dir "$TOOL_BIN_DIR"
   kit_require_real_dir "$TOOL_UV_DIR"
@@ -1306,9 +1396,8 @@ prepare_managed_tool_root() {
 }
 
 ensure_uv() {
-  [ -n "${KIT_UV_BIN:-}" ] && return 0
+  [ "$KIT_UV_READY" -eq 0 ] || return 0
   prepare_managed_tool_root
-  KIT_UV_BIN="$TOOL_ROOT/uv-bin/uv"
   if [ ! -x "$KIT_UV_BIN" ]; then
     kit_require_real_dir "$TOOL_ROOT/uv-bin"
     if command -v uv >/dev/null 2>&1 && tool_version_matches uv "$KIT_UV_VERSION"; then
@@ -1325,8 +1414,26 @@ ensure_uv() {
   export UV_TOOL_DIR="$TOOL_UV_DIR"
   export UV_TOOL_BIN_DIR="$TOOL_BIN_DIR"
   export UV_PYTHON_DOWNLOADS=automatic
+  kit_tooling_idle || kit_die "Installation stopped before provisioning managed Python."
   "$KIT_UV_BIN" --no-config python install --managed-python --no-bin "$KIT_PYTHON_VERSION" ||
     kit_die "Failed to provision kit Python $KIT_PYTHON_VERSION."
+  KIT_UV_READY=1
+}
+
+tool_environment_ready() {
+  local command_name="$1"
+  local expected_version="$2"
+  local distribution="$3"
+  local command_path="$TOOL_BIN_DIR/$1"
+  local python_path="$TOOL_UV_DIR/$distribution/bin/python"
+
+  [ -x "$command_path" ] && [ -x "$python_path" ] || return 1
+  tool_version_matches "$command_path" "$expected_version" || return 1
+  "$python_path" -I -B "$ROOT/headroom/runtime.py" environment "$distribution" "$expected_version" || return 1
+  "$KIT_UV_BIN" --no-config pip check --python "$python_path" || return 1
+  if [ "$command_name" = headroom ]; then
+    "$python_path" -I -B "$ROOT/headroom/runtime.py" dependencies "$expected_version" || return 1
+  fi
 }
 
 ensure_tool() {
@@ -1335,38 +1442,15 @@ ensure_tool() {
   local expected_version="$3"
   local install_state_var="$4"
   local distribution="$5"
-  local command_path="$TOOL_BIN_DIR/$1"
-  local python_path="$TOOL_UV_DIR/$5/bin/python"
-  local ready=0
-
-  if [ -x "$command_path" ] && [ -x "$python_path" ] &&
-      tool_version_matches "$command_path" "$expected_version" &&
-      "$python_path" -I -B "$ROOT/headroom/runtime.py" environment "$distribution" "$expected_version"; then
-    if [ "$command_name" != headroom ] ||
-        "$python_path" -I -B "$ROOT/headroom/runtime.py" dependencies "$expected_version"; then
-      ready=1
-    fi
-  fi
-  if [ "$ready" -eq 1 ]; then
-    printf -v "$install_state_var" '%s' present
-    return
-  fi
 
   ensure_uv
+  kit_tooling_idle || kit_die "Installation stopped before replacing $command_name."
   echo "Installing/repairing $command_name in its kit-managed Python environment."
   "$KIT_UV_BIN" --no-config tool install --managed-python --python "$KIT_PYTHON_VERSION" \
     --reinstall "$package" || kit_die "Failed to install $command_name with uv."
   hash -r 2>/dev/null || true
-  [ -x "$command_path" ] && [ -x "$python_path" ] ||
-    kit_die "Managed $command_name command or interpreter is missing."
-  tool_version_matches "$command_path" "$expected_version" ||
-    kit_die "$command_path does not report version $expected_version after installation."
-  "$python_path" -I -B "$ROOT/headroom/runtime.py" environment "$distribution" "$expected_version" ||
+  tool_environment_ready "$command_name" "$expected_version" "$distribution" ||
     kit_die "Managed Python environment verification failed for $command_name."
-  if [ "$command_name" = headroom ]; then
-    "$python_path" -I -B "$ROOT/headroom/runtime.py" dependencies "$expected_version" ||
-      kit_die "Headroom proxy/MCP dependency verification failed in $python_path."
-  fi
   printf -v "$install_state_var" '%s' installed
 }
 
@@ -1379,11 +1463,18 @@ hash -r 2>/dev/null || true
 
 GRAPHIFY_STATE=""
 HEADROOM_STATE=""
-ensure_tool graphify "$GRAPHIFY_PACKAGE" "$GRAPHIFY_VERSION" GRAPHIFY_STATE graphifyy
+if [ -x "$KIT_UV_BIN" ] && tool_version_matches "$KIT_UV_BIN" "$KIT_UV_VERSION" &&
+    tool_environment_ready graphify "$GRAPHIFY_VERSION" graphifyy &&
+    tool_environment_ready headroom "$HEADROOM_VERSION" headroom-ai; then
+  GRAPHIFY_STATE=present
+  HEADROOM_STATE=present
+else
+  ensure_tool graphify "$GRAPHIFY_PACKAGE" "$GRAPHIFY_VERSION" GRAPHIFY_STATE graphifyy
+  ensure_tool headroom "$HEADROOM_PACKAGE" "$HEADROOM_VERSION" HEADROOM_STATE headroom-ai
+fi
 GRAPHIFY_BIN="$(command -v graphify 2>/dev/null || true)"
 [ -n "$GRAPHIFY_BIN" ] || kit_die "Graphify installation completed but its command is not on PATH: $TOOL_BIN_DIR"
 
-ensure_tool headroom "$HEADROOM_PACKAGE" "$HEADROOM_VERSION" HEADROOM_STATE headroom-ai
 HEADROOM_BIN="$(command -v headroom 2>/dev/null || true)"
 [ -n "$HEADROOM_BIN" ] || kit_die "Headroom installation completed but its command is not on PATH: $TOOL_BIN_DIR"
 KIT_HEADROOM_PYTHON="$TOOL_UV_DIR/headroom-ai/bin/python"
@@ -2258,6 +2349,7 @@ Usage: sh install.sh [--integrations ponytail|none] [--verify | --cleanup-backup
 Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify and Headroom.
 Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
+Invalid managed tooling is backed up, cleared and rebuilt automatically; active environments block installation.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
   --verify             Check source and installed files without installing or changing HOME.
   --enable-codex-remote-control  Opt this host into managed Codex Remote Control (pair separately).
@@ -2301,8 +2393,14 @@ HELP
   if [ "$ENABLE_CODEX_REMOTE" -eq 1 ] && [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = 1 ]; then
     kit_die "Remote Control host setup requires the persistent Headroom tooling step."
   fi
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+    kit_tooling_idle || kit_die "Installation stopped before changing this host."
+  fi
   kit_init_state
   kit_enable_rollback
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+    kit_tooling_idle || kit_die "Installation stopped after acquiring its lock."
+  fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
     bootstrap_cli
   fi
