@@ -263,23 +263,28 @@ codex_remote_capability() {
     "$binary" remote-control start --help >/dev/null
 }
 
+codex_startup_command() {
+  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" \
+    -I -B "$ROOT/scripts/codex_startup.py" "$@"
+}
+
+backup_codex_startup() {
+  local startup_path
+  startup_path="$(codex_startup_command check "$1")" || return 1
+  KIT_REMOTE_BACKUP_INDEX=$((${KIT_REMOTE_BACKUP_INDEX:-0} + 1))
+  kit_backup_path "$startup_path" "remote-control/startup-$KIT_REMOTE_BACKUP_INDEX"
+}
+
 enable_codex_remote() {
   local binary
   kit_require_regular_or_absent "$KIT_STATE_ROOT/codex-remote-control.state"
   install_standalone_codex
   codex_remote_capability || kit_die "Installed Codex does not support the required managed Remote Control commands."
   binary="$(managed_codex)"
-  # Parse in memory: never put environment IDs or pairing output in kit logs/state.
-  "$binary" remote-control start --json | "$KIT_HEADROOM_PYTHON" -I -B -c '
-import json, sys
-data = json.load(sys.stdin)
-status = data.get("status")
-if status not in ("connected", "connecting"):
-    sys.exit("Codex did not report connected/connecting Remote Control.")
-print("Codex Remote Control: " + status)
-if status == "connecting":
-    print("Daemon started; relay connection is pending. Check authentication/network before pairing.")
-'
+  backup_codex_startup "$binary" || return 1
+  # The helper keeps native JSON (including environment IDs) out of kit state.
+  "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/scripts/codex_remote.py" enable "$binary" || return 1
+  codex_startup_command install "$binary" || return 1
   printf '%s\n' 'enabled=1' > "$KIT_STATE_ROOT/codex-remote-control.state"
   echo "Pair separately on this host: codex remote-control pair"
 }
@@ -290,24 +295,18 @@ verify_codex_remote() {
   codex_remote_capability || return 1
   local binary
   binary="$(managed_codex)"
-  "$binary" app-server daemon version | \
-    "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B -c '
-import json, pathlib, sys
-data = json.load(sys.stdin)
-if data.get("status") != "running":
-    sys.exit("Codex managed daemon is not running; run codex remote-control start.")
-settings = pathlib.Path.home() / ".codex/app-server-daemon/settings.json"
-if not settings.is_file() or not json.loads(settings.read_text()).get("remoteControlEnabled"):
-    sys.exit("Codex daemon remote-control preference is disabled.")
-print("Codex remote host: daemon running, Remote Control enabled (pairing/relay not verified).")
-'
+  "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B \
+    "$ROOT/scripts/codex_remote.py" verify "$binary" || return 1
+  codex_startup_command verify "$binary"
 }
 
 disable_codex_remote() {
   local binary
   binary="$(managed_codex)" || kit_die "No managed Codex installation; no remote host was changed."
-  "$binary" app-server daemon disable-remote-control >/dev/null || kit_die "Could not disable Codex Remote Control."
   kit_require_regular_or_absent "$KIT_STATE_ROOT/codex-remote-control.state"
+  backup_codex_startup "$binary" || return 1
+  codex_startup_command remove "$binary" || return 1
+  "$binary" app-server daemon disable-remote-control >/dev/null || kit_die "Could not disable Codex Remote Control."
   printf '%s\n' 'enabled=0' > "$KIT_STATE_ROOT/codex-remote-control.state"
   echo "Codex Remote Control disabled on this host. Local Codex/Headroom remain available."
 }
@@ -317,7 +316,15 @@ show_codex_remote() {
       grep -Fqx 'enabled=1' "$HOME/.universal-research-agent-kit/codex-remote-control.state"; then
     verify_codex_remote
   else
-    echo "This kit has not enabled Codex Remote Control on this host."
-    echo "Enable when wanted: sh install.sh --enable-codex-remote-control"
+    echo "No completed Remote Control setup is recorded, or the kit setting is disabled."
+    echo "The native daemon may still be enabled after a partial setup failure."
+    echo "Complete/retry setup: sh install.sh --enable-codex-remote-control"
+    local binary python
+    python="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
+    if binary="$(managed_codex)" && [ -x "$python" ]; then
+      "$python" -I -B "$ROOT/scripts/codex_remote.py" verify "$binary" || return 1
+      codex_startup_command verify "$binary" || return 1
+    fi
+    return 1
   fi
 }

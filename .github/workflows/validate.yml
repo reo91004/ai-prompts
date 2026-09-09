@@ -60,7 +60,10 @@ jobs:
       - name: Test complete default installation with mock CLIs
         run: bash tests/test_default_install.sh
       - name: Test CLI bootstrap and explicit Remote Control
-        run: bash tests/test_cli_bootstrap.sh
+        run: |
+          bash tests/test_cli_bootstrap.sh
+          python3 tests/test_codex_remote.py
+          python3 tests/test_codex_startup.py
       - name: Test session dispatch and persistent runtime ownership
         run: |
           python3 tests/test_install_busy_guard.py

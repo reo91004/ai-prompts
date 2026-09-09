@@ -20,7 +20,7 @@ for action in ([], ['--disable-codex-remote-control'], ['--remote-control-status
         assert result.returncode and 'Custom CODEX_HOME' in result.stderr, result.stderr
         assert not list(home.iterdir()) and not list(custom.iterdir()), action
 PY
-for name in sh bash dirname basename mkdir mktemp date cp mv rm rmdir awk tar shasum sha256sum uname chmod ln grep cat id sed cmp readlink; do
+for name in sh bash dirname basename mkdir mktemp date cp mv rm rmdir awk tar gzip shasum sha256sum uname chmod ln grep cat id sed cmp readlink; do
   binary="$(command -v "$name" || true)"
   [ -z "$binary" ] || ln -s "$binary" "$WORK/bin/$name"
 done
@@ -58,12 +58,21 @@ case "$*" in
   --version) echo 'codex 0.146.1' ;;
   *--help) : ;;
   'remote-control start --json')
+    case "${REMOTE_TEST_FAILURE:-}" in
+      unmanaged) echo 'Error: app server is running but is not managed by codex app-server daemon' >&2; exit 42 ;;
+      invalid_json) echo 'invalid-json DO_NOT_PERSIST'; exit 0 ;;
+    esac
     mkdir -p "$HOME/.codex/app-server-daemon"
     echo '{"remoteControlEnabled":true}' > "$HOME/.codex/app-server-daemon/settings.json"
     echo 'remote-start' >> "$BOOTSTRAP_CALLS"
     printf '{"status":"%s","environmentId":"DO_NOT_PERSIST"}\n' "${REMOTE_TEST_STATUS:-connected}"
     ;;
-  'app-server daemon version') echo '{"status":"running"}' ;;
+  'app-server daemon version')
+    case "${REMOTE_TEST_VERSION_FAILURE:-}" in
+      failed) echo 'Error: daemon inspection failed' >&2; exit 43 ;;
+      invalid_json) echo 'invalid-json DO_NOT_PERSIST'; exit 0 ;;
+    esac
+    printf '{"status":"running","backend":"%s"}\n' "${REMOTE_TEST_BACKEND:-pid}" ;;
   'app-server daemon disable-remote-control')
     echo '{"remoteControlEnabled":false}' > "$HOME/.codex/app-server-daemon/settings.json"
     echo 'remote-disabled' >> "$BOOTSTRAP_CALLS"
@@ -164,6 +173,38 @@ printf '%s\n' '#!/bin/sh' 'echo codex 0.100.0' 'exit 1' > "$HOME/.codex/packages
 bootstrap_cli
 verify_native_clis
 ! grep -Fq remote-start "$BOOTSTRAP_CALLS"
+printf '%s\n' '{"profile":"research-agent-kit"}' > "$KIT_STATE_ROOT/headroom.json"
+cat > "$WORK/bin/startup-manager" <<'MOCK'
+#!/bin/sh
+printf 'startup %s %s\n' "${0##*/}" "$*" >> "$BOOTSTRAP_CALLS"
+case "${0##*/} $*" in
+  'systemctl --user show codex-remote-control.service '*)
+    unit="$HOME/.config/systemd/user/codex-remote-control.service"
+    if [ -f "$unit" ]; then
+      printf 'LoadState=loaded\nFragmentPath=%s\nDropInPaths=\n' "$unit"
+    else
+      printf 'LoadState=not-found\nFragmentPath=\nDropInPaths=\n'
+      exit 1
+    fi ;;
+  'systemctl --user is-enabled headroom-'*) echo enabled ;;
+  'systemctl --user is-enabled codex-remote-control.service')
+    [ -f "$HOME/startup-enabled" ] || exit 1
+    echo enabled ;;
+  'systemctl --user enable codex-remote-control.service')
+    [ "${STARTUP_TEST_FAILURE:-}" != enable ] || exit 44
+    : > "$HOME/startup-enabled" ;;
+  'systemctl --user disable codex-remote-control.service') rm -f "$HOME/startup-enabled" ;;
+  'systemctl --user daemon-reload') : ;;
+  'loginctl show-user '*)
+    if [ -f "$HOME/linger-enabled" ]; then echo yes; else echo no; fi ;;
+  'loginctl --no-ask-password enable-linger '*) : > "$HOME/linger-enabled" ;;
+  'launchctl print-disabled '*) printf 'disabled services = {\n}\n' ;;
+  'launchctl enable '*) [ "${STARTUP_TEST_FAILURE:-}" != enable ] || exit 44 ;;
+  *) echo "Unexpected startup command: ${0##*/} $*" >&2; exit 99 ;;
+esac
+MOCK
+chmod +x "$WORK/bin/startup-manager"
+for manager in systemctl loginctl launchctl; do ln -s startup-manager "$WORK/bin/$manager"; done
 enable_codex_remote > "$WORK/enable.log"
 grep -Fq 'Remote Control: connected' "$WORK/enable.log"
 ! grep -RFq DO_NOT_PERSIST "$KIT_STATE_ROOT" "$WORK/enable.log"
@@ -172,8 +213,44 @@ ln -s "$TEST_PYTHON" "$KIT_STATE_ROOT/tooling/uv-tools/headroom-ai/bin/python"
 verify_codex_remote > "$WORK/verify.log"
 disable_codex_remote
 grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
+for failure in unmanaged invalid_json; do
+  if (REMOTE_TEST_FAILURE="$failure" enable_codex_remote) > "$WORK/failed-enable.log" 2>&1; then exit 1; fi
+  grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
+  ! grep -Eq 'Traceback|JSONDecodeError|DO_NOT_PERSIST' "$WORK/failed-enable.log"
+  grep -Fqx fixture-auth "$HOME/.codex/auth.json"
+done
+if (STARTUP_TEST_FAILURE=enable enable_codex_remote) > "$WORK/failed-startup.log" 2>&1; then exit 1; fi
+grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
+! grep -Eq 'Traceback|DO_NOT_PERSIST' "$WORK/failed-startup.log"
+if show_codex_remote > "$WORK/partial-status.log" 2>&1; then exit 1; fi
+grep -Fq 'No completed Remote Control setup is recorded' "$WORK/partial-status.log"
+grep -Fq 'managed daemon running, Remote Control enabled' "$WORK/partial-status.log"
+! grep -Fq 'This kit has not enabled' "$WORK/partial-status.log"
 REMOTE_TEST_STATUS=connecting enable_codex_remote > "$WORK/pending.log"
 grep -Fq 'relay connection is pending' "$WORK/pending.log"
 ! grep -Fq DO_NOT_PERSIST "$WORK/pending.log"
+# Activation must not write enabled=1 until managed ownership is confirmed.
+disable_codex_remote
+if (REMOTE_TEST_BACKEND=unmanaged enable_codex_remote) > "$WORK/unmanaged-version.log" 2>&1; then exit 1; fi
+grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
+enable_codex_remote > "$WORK/re-enable.log"
+for failure in failed invalid_json; do
+  if (REMOTE_TEST_VERSION_FAILURE="$failure" verify_codex_remote) > "$WORK/failed-version.log" 2>&1; then exit 1; fi
+  ! grep -Eq 'Traceback|JSONDecodeError|DO_NOT_PERSIST' "$WORK/failed-version.log"
+  grep -Fqx enabled=1 "$KIT_STATE_ROOT/codex-remote-control.state"
+done
+# Unknown startup files are refused before the native activation command.
+startup_path="$(codex_startup_command check "$(managed_codex)")"
+disable_codex_remote > "$WORK/disabled.log"
+[ ! -e "$startup_path" ]
+if show_codex_remote > "$WORK/disabled-status.log" 2>&1; then exit 1; fi
+grep -Fq 'remote-control preference is disabled' "$WORK/disabled-status.log"
+printf '%s\n' 'user-custom-startup' > "$startup_path"
+starts="$(grep -c '^remote-start$' "$BOOTSTRAP_CALLS")"
+if (enable_codex_remote) > "$WORK/custom-startup.log" 2>&1; then exit 1; fi
+[ "$(grep -c '^remote-start$' "$BOOTSTRAP_CALLS")" -eq "$starts" ]
+grep -Fqx user-custom-startup "$startup_path"
+grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
+! grep -Eq 'startup .*--now|startup .* (stop|restart|bootout|kickstart)' "$BOOTSTRAP_CALLS"
 kit_release_lock
 echo 'CLI bootstrap and explicit Remote Control tests passed.'

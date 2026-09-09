@@ -2387,9 +2387,9 @@ Standard existing headroom-default deployments are backed up and adopted in plac
 Invalid managed tooling is backed up, cleared and rebuilt automatically; unrelated active jobs block replacement.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
   --verify             Check source and installed files without installing or changing HOME.
-  --enable-codex-remote-control  Opt this host into managed Codex Remote Control (pair separately).
-  --disable-codex-remote-control Disable Remote Control on this host; preserve local tools.
-  --remote-control-status       Read-only remote host status.
+  --enable-codex-remote-control  Enable managed Remote Control and boot/login startup (pair separately).
+  --disable-codex-remote-control Disable Remote Control and its startup entry; preserve local tools and linger.
+  --remote-control-status       Read-only daemon and automatic startup status.
   --headroom-status    Check the kit service, readiness, interpreter and Codex routing.
   --remove-headroom    Remove only the kit persistent service/provider; restore prior root settings.
   --cleanup-backups    Delete backup snapshots only; refuse while an install holds the lock.

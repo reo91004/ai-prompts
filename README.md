@@ -41,6 +41,8 @@ Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니�
 
 각 컴퓨터에서 이 저장소를 받아 `sh install.sh`를 실행하고 새 터미널을 엽니다. 이후에는 평소처럼 `codex`와 `claude`를 사용합니다. Codex Desktop은 설치 후 재시작하여 새 provider를 읽게 합니다.
 
+CLI 로그인은 `codex login --device-auth`를 기본으로 사용합니다. 터미널에 표시된 링크를 브라우저에서 열고 일회용 코드를 입력하세요. 기기 코드 로그인이 비활성화되어 있으면 개인 계정의 ChatGPT 보안 설정 또는 워크스페이스 관리자 권한 설정에서 활성화해야 합니다. [공식 기기 코드 로그인 안내](https://learn.chatgpt.com/docs/auth#preferred-device-code-authentication-beta)
+
 새 컴퓨터에서 Codex에 처음 로그인하거나 인증 방식을 바꾼 뒤에는 `sh install.sh`를 한 번 더 실행하고 Desktop/daemon을 재시작합니다. 재설치가 kit provider의 OAuth flag만 현재 인증 방식에 맞게 갱신합니다. 일반 세션 실행은 전역 설정을 바꾸지 않습니다.
 
 | 실행 위치와 명령 | 처리 |
@@ -61,16 +63,23 @@ Git에는 지침·스킬·설치 로직만 공유합니다. `~/.codex`, `~/.clau
 
 ### Codex Remote Control 호스트 켜기·확인·끄기
 
-원격으로 작업을 실행할 **Ubuntu 또는 Mac 호스트에서** 아래 명령을 실행합니다. Mac에서 Ubuntu를 제어하려면 이 명령은 Ubuntu의 SSH 터미널에서 실행합니다.
+Mac 앱에서 Ubuntu 프로젝트를 SSH로 열려면 기본 설치와 호스트 로그인을 완료하고, 앱의 **설정 → 연결 → SSH**에서 서버와 프로젝트 폴더를 선택합니다. 이 경로에는 아래 Remote Control 활성화·pairing이 필요하지 않습니다. [공식 SSH 연결 안내](https://learn.chatgpt.com/ko-KR/docs/remote-connections#ssh-호스트에-연결)
+
+별도로 CLI Remote Control을 사용할 때만 **제어받을 Ubuntu 또는 Mac 호스트에서** 아래 명령을 실행합니다. 설치 후에는 새 SSH 셸을 열거나 `source "$HOME/.config/headroom/auto-wrap.sh"`로 함수를 갱신하세요. 이미 열린 셸의 옛 함수는 파일 갱신만으로 바뀌지 않으며, 새 함수는 로그인·pairing을 `headroom wrap`으로 실행하지 않습니다.
 
 ```bash
 sh install.sh                                # 최초 설치
-codex login                                  # 그 호스트에서 로그인; 이미 로그인했다면 생략
-sh install.sh --enable-codex-remote-control   # 원격 호스트로 명시적으로 선택
+source "$HOME/.config/headroom/auto-wrap.sh"  # 현재 셸의 옛 함수를 갱신
+codex login --device-auth                    # 그 호스트에서 기기 코드 로그인; 이미 로그인했다면 생략
+sh install.sh --enable-codex-remote-control   # 원격 제어 활성화 + 자동 시작 등록
 codex remote-control pair                    # 표시된 pairing을 Mac Codex App에서 완료
 sh install.sh --remote-control-status
 sh install.sh --headroom-status
 ```
+
+`app server is running but is not managed by codex app-server daemon`은 기존 App Server가 관리 daemon 소유가 아니라는 뜻입니다. `--enable-codex-remote-control`은 이 오류가 나면 제어 소켓의 실제 PID·사용자·실행파일·실행 인자를 확인하고, 정상 종료 동작을 확인한 **실행 버전 0.153.4**에만 `SIGHUP`을 한 번 보냅니다. 최대 30초 동안 종료를 기다린 뒤 managed 시작을 한 번 재시도합니다. 이 복구 경로는 강제 종료하지 않습니다. 기존 실행의 일회성 `-c` 옵션은 새 daemon으로 복사하지 않으며 새 daemon은 호스트에 저장된 설정을 사용합니다. 0.153.4는 실행 중 turn의 완료를 기다리지만 대기 중 새 요청을 계속 받으므로 모든 대기 요청의 보존까지 보장하지는 않습니다. [해당 버전의 종료 처리](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/lib.rs#L199)
+
+기존 작업이 끝나지 않으면 설치기는 종료 요청만 남기고 실패하며 서버가 나중에 종료될 수 있습니다. 서버가 새 PID로 재생성되면 추가 종료를 반복하지 않습니다. Mac 앱에서 **해당 호스트의 SSH 연결을 해제**하고 `sh install.sh --enable-codex-remote-control`을 다시 실행하세요. 확인되지 않은 버전·실행 방식은 기존 세션에서 작업을 마치고 서버를 종료해야 합니다. 서버 내부에서 실행 중인 설치기는 자체 작업의 종료를 기다리지 않도록 외부 터미널 실행을 안내합니다. 활성화가 성공하면 `codex remote-control pair`로 연결합니다.
 
 `codex` 명령 하나로 일반 작업과 원격 관리 모두 실행합니다. 일반 명령과 원격 관리 모두 kit launcher가 공식 standalone을 선택합니다. npm 설치만으로는 관리 daemon bootstrap 요건을 충족하지 않습니다. Claude Code의 native 설치는 공식 권장 방식이며, Remote Control에 native만 허용된다는 의미는 아닙니다. [Claude 설치 안내](https://code.claude.com/docs/en/setup) 설치기의 `connected`와 `connecting`은 구분됩니다. `connecting`은 daemon이 시작됐지만 relay 연결을 기다리는 상태이며 pairing 성공을 뜻하지 않습니다. 상태 검사는 daemon 실행과 설정을 확인하며 실계정의 relay 연결·pairing까지 검증하지는 않습니다. [Codex daemon 원본](https://github.com/openai/codex/blob/main/codex-rs/app-server-daemon/README.md)
 
@@ -78,17 +87,21 @@ sh install.sh --headroom-status
 codex app-server daemon version             # daemon 상태
 codex app-server daemon restart             # 설정 변경 후 명시적으로 재시작
 codex remote-control start                  # relay 연결 재시도
-sh install.sh --disable-codex-remote-control # 해당 호스트의 원격 제어 끄기
+sh install.sh --disable-codex-remote-control # 원격 제어 끄기 + 자동 시작 해제
 ```
 
-Ubuntu에서 SSH 종료 후나 재부팅 후에도 사용자 서비스가 실행되려면 linger가 필요할 수 있습니다. 설치기가 이를 확인해 안내합니다. 권한이 있는 호스트에서는 아래 설정을 한 번 적용하고, 거부되면 관리자에게 요청합니다.
+`--enable-codex-remote-control`은 기본 설치·갱신을 수행한 뒤 Remote Control을 활성화하고 자동 시작을 등록합니다. 기본 설치만 실행하면 새 호스트의 Remote Control은 켜지지 않습니다. 이미 활성화한 호스트는 재설치 때 등록도 갱신합니다. 자동 시작 명령은 저장된 Remote Control 설정을 따르며, 현재 daemon을 다시 시작하지 않습니다. 표준 수동 systemd 서비스는 인식하고 갱신하지만, 내용이 바뀐 서비스나 추가 설정은 덮어쓰지 않습니다.
+
+Ubuntu에서는 `codex-remote-control.service`를 사용자 systemd에 등록하고 기존 Headroom 서비스 뒤에 시작하도록 설정합니다. 로그인하지 않아도 부팅 때 시작할 수 있도록 현재 사용자의 linger 활성화를 시도합니다. 권한이 없으면 실패를 알리며 자동으로 sudo를 실행하지 않습니다. 아래 명령 후 활성화 옵션을 다시 실행하세요.
 
 ```bash
-loginctl enable-linger "$(id -un)"
-loginctl show-user "$(id -un)" -p Linger
+sudo loginctl enable-linger "$(id -un)"
+sh install.sh --enable-codex-remote-control
 ```
 
-macOS의 사용자 LaunchAgent는 로그인 세션에 속합니다. 로그인 전·로그아웃 후·절전 중에도 원격 작업이 계속된다고 보장하지 않습니다. SSH 접속만 있고 GUI 사용자 서비스 domain이 없는 Mac은 기본 서비스 전제에 맞지 않습니다.
+linger는 해당 사용자의 다른 활성화된 서비스에도 적용됩니다. `--disable-codex-remote-control`은 Codex 자동 시작 등록만 제거하고, Headroom과 기존 linger 설정은 유지합니다. macOS는 `com.research-agent-kit.codex-remote-control` LaunchAgent를 등록하여 **사용자가 GUI에 로그인한 뒤** 시작합니다. 로그인 전 부팅 시점의 실행은 지원하지 않습니다.
+
+자동 시작은 native daemon 시작 명령을 부팅·로그인 때 한 번 실행하는 방식이며, 실행 중 장애를 계속 감시하는 서비스는 아닙니다. `--remote-control-status`는 실제 managed daemon 상태와 자동 시작 등록을 함께 확인합니다. 등록 확인만으로 실제 재부팅·relay 재연결·pairing 성공을 판정하지는 않습니다.
 
 ### Claude Remote Control
 
@@ -220,6 +233,7 @@ bash tests/test_integration_migration.sh
 bash tests/test_tooling_install.sh
 bash tests/test_default_install.sh
 bash tests/test_cli_bootstrap.sh
+python3 tests/test_codex_startup.py
 python3 tests/test_install_busy_guard.py
 python3 tests/test_headroom_maintenance.py
 python3 tests/test_headroom_dispatch.py
