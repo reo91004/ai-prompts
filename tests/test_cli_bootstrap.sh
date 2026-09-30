@@ -20,7 +20,7 @@ for action in ([], ['--disable-codex-remote-control'], ['--remote-control-status
         assert result.returncode and 'Custom CODEX_HOME' in result.stderr, result.stderr
         assert not list(home.iterdir()) and not list(custom.iterdir()), action
 PY
-for name in sh bash dirname basename mkdir mktemp date cp mv rm rmdir awk tar gzip shasum sha256sum uname chmod ln grep cat id sed cmp readlink; do
+for name in sh bash dirname basename mkdir mktemp date cp mv rm rmdir awk tar gzip shasum sha256sum uname chmod ln grep cat id sed cmp readlink jq; do
   binary="$(command -v "$name" || true)"
   [ -z "$binary" ] || ln -s "$binary" "$WORK/bin/$name"
 done

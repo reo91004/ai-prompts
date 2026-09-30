@@ -52,7 +52,9 @@ jobs:
             *) exit 1 ;;
           esac
       - name: Test isolated repeat installation
-        run: bash tests/test_install_regression.sh
+        run: |
+          bash tests/test_install_regression.sh
+          python3 tests/test_statusline.py
       - name: Test integration migration with mock CLIs
         run: bash tests/test_integration_migration.sh
       - name: Test tooling installation with mock CLIs

@@ -23,6 +23,7 @@ esac
 exec "$KIT_TEST_PYTHON" "$@"
 EOF
 chmod +x "$MOCK_BIN/python3"
+ln -s "$(command -v jq)" "$MOCK_BIN/jq"
 printf '%s\n' '#!/bin/sh' 'echo "Unexpected test network download" >&2; exit 22' > "$MOCK_BIN/curl"
 chmod +x "$MOCK_BIN/curl"
 printf '%s\n' '# user-owned zshrc content' > "$TMP_HOME/.zshrc"

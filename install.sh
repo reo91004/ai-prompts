@@ -578,6 +578,42 @@ kit_commit_manifest() {
   mv "$checksum_temp" "$checksum_file"
 }
 
+kit_statusline_run() {
+  local candidate action="$1"
+  shift
+  for candidate in \
+    "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" \
+    "$(command -v python3 2>/dev/null || true)"; do
+    [ -x "$candidate" ] || continue
+    if "$candidate" -I -B -c 'import tomllib' >/dev/null 2>&1; then
+      "$candidate" -I -B "$ROOT/scripts/statusline.py" "$action" "$ROOT" "$@"
+      return $?
+    fi
+  done
+  echo "Statusline installation/verification requires Python 3.11+ (provided by the normal tooling installation)." >&2
+  return 1
+}
+
+install_statusline() {
+  command -v jq >/dev/null 2>&1 || kit_die "Claude statusline requires jq. Install jq (brew install jq or sudo apt install jq) and rerun --with-statusline."
+  kit_require_real_dir "$HOME/.claude"
+  kit_require_regular_or_absent "$HOME/.claude/settings.json"
+  kit_require_regular_or_absent "$HOME/.claude/statusline.sh"
+  # Prepare both merges before replacing either user configuration.
+  kit_statusline_run prepare "$KIT_BACKUP_DIR" || kit_die "Statusline configuration merge failed."
+  kit_backup_path "$HOME/.codex/config.toml" "statusline/codex-config.toml"
+  kit_backup_path "$HOME/.claude/settings.json" "statusline/claude-settings.json"
+  kit_backup_path "$HOME/.claude/statusline.sh" "statusline/statusline.sh"
+  kit_require_regular_or_absent "$KIT_STATE_ROOT/statusline.state"
+  kit_backup_path "$KIT_STATE_ROOT/statusline.state" "statusline/state"
+  kit_replace_file "$KIT_BACKUP_DIR/statusline-codex.next" "$HOME/.codex/config.toml"
+  kit_replace_file "$KIT_BACKUP_DIR/statusline-claude.next" "$HOME/.claude/settings.json"
+  kit_replace_file "$ROOT/claude-code/statusline.sh" "$HOME/.claude/statusline.sh"
+  chmod 755 "$HOME/.claude/statusline.sh"
+  printf 'enabled=1\n' > "$KIT_BACKUP_DIR/statusline.state.next"
+  kit_replace_file "$KIT_BACKUP_DIR/statusline.state.next" "$KIT_STATE_ROOT/statusline.state"
+}
+
 install_core() {
   local platform source_dir target prompt destination suffix group source name manifest
   kit_require_real_dir "$HOME/.codex"
@@ -589,6 +625,11 @@ kit_require_regular_or_absent "$config"
 config_input="$config"
 [ -f "$config_input" ] || config_input=/dev/null
 config_next="$KIT_BACKUP_DIR/codex-config.next"
+if [ -f "$config" ]; then
+  cp -p "$config" "$config_next"
+else
+  (umask 077; : > "$config_next")
+fi
 if ! awk '
   function finish_section() {
     if (target && !key_seen) print "experimental_mode = true"
@@ -638,7 +679,7 @@ if ! awk '
 ' "$config_input" > "$config_next"; then
   kit_die "Cannot safely update $config. Use [features.context_management] with a boolean experimental_mode; quoted/dotted/inline feature settings and multiline values in this table are unsupported; multiline strings and escaped table headers or related keys are unsupported."
 fi
-kit_backup_path "$config" "codex/config.toml"
+  kit_backup_path "$config" "codex/config.toml"
 kit_replace_file "$config_next" "$config"
 
 
@@ -1943,6 +1984,21 @@ check_file "$HOME/.codex/AGENTS.md"
 check_dir "$HOME/.codex/agents"
 check_dir "$HOME/.agents/skills"
 
+if [ "${WITH_STATUSLINE:-1}" -eq 0 ]; then
+  echo "Scoped verification: statuslines explicitly skipped by --without-statusline."
+  scoped=1
+else
+  check_file "$HOME/.universal-research-agent-kit/statusline.state"
+  check_file "$HOME/.claude/settings.json"
+  check_file "$HOME/.claude/statusline.sh"
+  if [ ! -f "$HOME/.universal-research-agent-kit/statusline.state" ] ||
+      ! grep -Fxq 'enabled=1' "$HOME/.universal-research-agent-kit/statusline.state" ||
+      ! command -v jq >/dev/null 2>&1 || ! kit_statusline_run check; then
+    echo "Statusline verification failed (configuration, executable script or jq)."
+    missing=1
+  fi
+fi
+
 for source in "$ROOT/claude-code/agents"/*.md; do
   check_same_file "$source" "$HOME/.claude/agents/${source##*/}"
 done
@@ -2361,6 +2417,7 @@ echo "Kit backup snapshots deleted."
 main() {
   PROFILE=ponytail
   ENABLE_CODEX_REMOTE=0
+  WITH_STATUSLINE=1
   KIT_STOP_HEADROOM=0
   action=install
   while [ "$#" -gt 0 ]; do
@@ -2369,6 +2426,8 @@ main() {
         [ "$#" -ge 2 ] || kit_die "--integrations requires none or ponytail"
         case "$2" in none|ponytail) PROFILE="$2" ;; *) kit_die "Unknown integration profile: $2" ;; esac
         shift 2 ;;
+      --with-statusline) WITH_STATUSLINE=1; shift ;;
+      --without-statusline) WITH_STATUSLINE=0; shift ;;
       --verify) [ "$action" = install ] || kit_die "Choose only one action"; action=verify; shift ;;
       --enable-codex-remote-control) ENABLE_CODEX_REMOTE=1; shift ;;
       --disable-codex-remote-control) [ "$action" = install ] || kit_die "Choose only one action"; action=remote_disable; shift ;;
@@ -2378,14 +2437,16 @@ main() {
       --cleanup-backups) [ "$action" = install ] || kit_die "Choose only one action"; action=cleanup; shift ;;
       -h|--help)
         cat <<'HELP'
-Usage: sh install.sh [--integrations ponytail|none] [--verify | --cleanup-backups]
-Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify and Headroom.
+Usage: sh install.sh [--integrations ponytail|none] [--without-statusline] [--verify | --cleanup-backups]
+Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify, Headroom and both statuslines.
 Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
 Kit-owned Headroom services/MCP servers are stopped normally before installation and the service starts afterward.
 Standard existing headroom-default deployments are backed up and adopted in place, retaining their profile and sessions.
 Invalid managed tooling is backed up, cleared and rebuilt automatically; unrelated active jobs block replacement.
   --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
+  --without-statusline Preserve existing statuslines and skip their verification.
+  --with-statusline    Install both bundled statuslines (default; requires jq).
   --verify             Check source and installed files without installing or changing HOME.
   --enable-codex-remote-control  Enable managed Remote Control and boot/login startup (pair separately).
   --disable-codex-remote-control Disable Remote Control and its startup entry; preserve local tools and linger.
@@ -2429,6 +2490,9 @@ HELP
     kit_die "Remote Control host setup requires the persistent Headroom tooling step."
   fi
   kit_validate_home
+  if [ "$WITH_STATUSLINE" -eq 1 ]; then
+    command -v jq >/dev/null 2>&1 || kit_die "Claude statusline requires jq. Install jq (brew install jq or sudo apt install jq), or use --without-statusline."
+  fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
     if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] ||
         [ -f "$HOME/.headroom/deploy/default/manifest.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
@@ -2493,6 +2557,7 @@ HELP
       grep -Fqx 'enabled=1' "$KIT_STATE_ROOT/codex-remote-control.state"; then
     ENABLE_CODEX_REMOTE=1
   fi
+  if [ "$WITH_STATUSLINE" -eq 1 ]; then install_statusline; fi
   if [ "$ENABLE_CODEX_REMOTE" -eq 1 ] || [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" = 1 ]; then KIT_VERIFY_REMOTE=0; fi
   verify_install
   # Package manager removals cannot be rolled back by the file journal. Keep

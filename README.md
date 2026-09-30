@@ -19,12 +19,17 @@ Codex와 Claude Code에서 같은 연구 원칙과 스킬을 사용하는 개인
 
 ```bash
 sh install.sh                       # 기본 설치 또는 갱신
+sh install.sh --without-statusline  # 기존 statusline 유지
 sh install.sh --verify              # 설치 상태 확인만 수행
 sh install.sh --cleanup-backups     # 키트 설치 백업만 명시적으로 정리
 sh install.sh --help
 ```
 
-기본 설치는 두 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
+기본 설치는 두 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom, Codex·Claude Code statusline을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
+
+Statusline은 이 패키지에 담은 현재 Mac의 설정으로 **기본 설치·재설치 때 덮어씁니다.** Codex는 `tui.status_line`만 병합하고, Claude Code는 `statusLine` 설정과 `~/.claude/statusline.sh`를 설치합니다. 그 밖의 설정과 인증 정보는 복사하지 않습니다. 변경 전 설정·스크립트는 기존 설치 백업에 보존하며 실패하면 journal로 복구합니다. 기존 statusline을 유지하려면 `--without-statusline`을 지정하세요. 이 옵션은 statusline 검증도 생략합니다.
+
+Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, Ubuntu는 `sudo apt install jq`로 먼저 설치하세요. 없으면 기본 설치는 호스트를 변경하기 전에 중단합니다. Codex에는 모델/추론·fast mode·프로젝트·Git 브랜치·권한·승인 모드·남은 컨텍스트·5시간/주간 한도가 표시됩니다. Claude에는 모델·디렉터리/브랜치·컨텍스트 사용량·effort·Ponytail 모드가 표시됩니다. Claude의 effort는 입력에 있을 때, Ponytail 모드는 해당 plugin의 플래그 파일이 있을 때 표시됩니다. 표시 항목의 지원·입력 데이터는 각 CLI 버전에 따릅니다. 도구 설치를 생략하는 격리 검사에서 statusline을 설치·검증하려면 Python 3.11 이상이 필요합니다.
 
 - Graphify는 `graphifyy==0.9.39`, Headroom은 `headroom-ai[all]==0.34.0`을 사용합니다. uv 0.12.10과 Python 3.13을 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. `[all]`에는 proxy 의존성이 포함되며, 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
 - Ponytail은 설치 시 확인한 원격 HEAD의 소스를 사용하고 실제 plugin 버전과 등록 상태를 확인합니다. 사용자 소유 marketplace는 보존하면서 Ponytail의 설치·활성 상태를 별도로 확인합니다. 누락된 plugin은 설치하고, Claude의 비활성 plugin은 활성화합니다. Codex의 비활성 plugin은 설정에서 활성화해야 한다는 오류로 중단합니다.
@@ -188,6 +193,8 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 | `codex/agents/*.toml` | `~/.codex/agents/` |
 | `claude-code/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 | `claude-code/agents/*.md` | `~/.claude/agents/` |
+| `codex/statusline.toml` | `~/.codex/config.toml`의 `tui.status_line` |
+| `claude-code/statusline.settings.json`, `claude-code/statusline.sh` | `~/.claude/settings.json`의 `statusLine`, `~/.claude/statusline.sh` |
 | `skills/*` | `~/.agents/skills/`, `~/.claude/skills/` |
 | Graphify CLI가 제공하는 스킬 | `~/.codex/skills/graphify/`, `~/.claude/skills/graphify/` |
 | `headroom/auto-wrap.sh`, `headroom/runtime.py` | `~/.config/headroom/` |
@@ -229,6 +236,7 @@ bash scripts/validate_harness.sh
 bash tests/test_codex_agent_runner.sh
 bash tests/test_resource_detector.sh
 bash tests/test_install_regression.sh
+python3 tests/test_statusline.py
 bash tests/test_integration_migration.sh
 bash tests/test_tooling_install.sh
 bash tests/test_default_install.sh

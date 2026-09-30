@@ -1,0 +1,2 @@
+[tui]
+status_line = ["model-with-reasoning", "fast-mode", "project-name", "git-branch", "permissions", "approval-mode", "context-remaining", "five-hour-limit", "weekly-limit"]

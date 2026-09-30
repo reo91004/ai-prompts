@@ -6,6 +6,7 @@ export KIT_TEST_MOCK_RUNTIME="$ROOT/tests/mock_runtime.py"
 KIT_TEST_FIXTURES_ONLY=1 source "$ROOT/tests/test_integration_migration.sh"
 unset UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING
 export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="$WORK/claude"
+JQ_BIN="$(command -v jq)"
 export PATH="$MOCK_BIN:/usr/bin:/bin"
 export TOOLING_TEST_CALLS="$WORK/tooling-calls.log" UV_TOOL_BIN_DIR="$HOME/.universal-research-agent-kit/tooling/bin"
 mkdir -p "$HOME"
@@ -17,6 +18,7 @@ esac
 exec "$KIT_TEST_PYTHON" "$@"
 EOF
 chmod +x "$MOCK_BIN/python3"
+ln -s "$JQ_BIN" "$MOCK_BIN/jq"
 cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
