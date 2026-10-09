@@ -1060,7 +1060,7 @@ JSON
   mv "$temp" "$PONYTAIL_MARKETPLACE"
 }
 
-# Both required hosts have converged before superseded revision directories are pruned.
+# Runs after verification: the rollback journal does not restore removed revisions.
 prune_old_ponytail_revisions() {
   local root entry name
 
@@ -1416,8 +1416,6 @@ fi
 
 ensure_codex_sequential_thinking
 ensure_claude_sequential_thinking
-
-prune_old_ponytail_revisions
 
 kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
 echo "Recorded integrations state (profile: $PROFILE)."
@@ -2581,6 +2579,7 @@ HELP
   # the verified replacement installed if a manager reports a cleanup failure.
   trap 'kit_release_lock' EXIT
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
+    prune_old_ponytail_revisions
     cleanup_legacy_clis
   fi
   if [ "$ENABLE_CODEX_REMOTE" -eq 1 ]; then

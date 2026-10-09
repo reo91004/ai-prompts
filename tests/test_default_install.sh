@@ -172,6 +172,12 @@ ln -s "$HOME/.local/share/claude/versions/2.1.0" "$HOME/.local/bin/claude"
 echo 'Full default install from empty HOME'
 sh "$ROOT/install.sh"
 assert_defaults
+# A failed install keeps superseded Ponytail revisions; a verified install removes them.
+for root in marketplaces sources; do mkdir -p "$HOME/.universal-research-agent-kit/$root/ponytail-old"; done
+expect_failure env TOOLING_TEST_GRAPHIFY_FAIL=codex bash "$ROOT/install.sh"
+for root in marketplaces sources; do [ -d "$HOME/.universal-research-agent-kit/$root/ponytail-old" ]; done
+bash "$ROOT/install.sh"
+for root in marketplaces sources; do [ ! -e "$HOME/.universal-research-agent-kit/$root/ponytail-old" ]; done
 # Kit-owned plugins require an on-disk manifest with a nonempty version.
 kit_manifests=("$HOME"/.universal-research-agent-kit/marketplaces/ponytail-*/ponytail/.claude-plugin/plugin.json)
 mv "${kit_manifests[0]}" "$WORK/kit-plugin.json"
