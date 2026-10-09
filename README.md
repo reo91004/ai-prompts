@@ -31,16 +31,22 @@ Statusline은 이 패키지에 담은 현재 Mac의 설정으로 **기본 설치
 
 Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, Ubuntu는 `sudo apt install jq`로 먼저 설치하세요. 없으면 기본 설치는 호스트를 변경하기 전에 중단합니다. Codex에는 모델/추론·fast mode·프로젝트·Git 브랜치·권한·승인 모드·남은 컨텍스트·5시간/주간 한도가 표시됩니다. Claude에는 모델·디렉터리/브랜치·컨텍스트 사용량·effort·Ponytail 모드가 표시됩니다. Claude의 effort는 입력에 있을 때, Ponytail 모드는 해당 plugin의 플래그 파일이 있을 때 표시됩니다. 표시 항목의 지원·입력 데이터는 각 CLI 버전에 따릅니다. 도구 설치를 생략하는 격리 검사에서 statusline을 설치·검증하려면 Python 3.11 이상이 필요합니다.
 
-- Graphify는 `graphifyy==0.9.39`, Headroom은 `headroom-ai[all]==0.34.0`을 사용합니다. uv 0.12.10과 Python 3.13을 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. `[all]`에는 proxy 의존성이 포함되며, 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
+- Graphify(`graphifyy`), Headroom(`headroom-ai[all]`), uv는 설치할 때마다 PyPI의 최신 릴리스를 사용하고, Python 3.13과 함께 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. `[all]`에는 proxy 의존성이 포함되며, 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
 - Ponytail은 설치 시 확인한 원격 HEAD의 소스를 사용하고 실제 plugin 버전과 등록 상태를 확인합니다. 사용자 소유 marketplace는 보존하면서 Ponytail의 설치·활성 상태를 별도로 확인합니다. 누락된 plugin은 설치하고, Claude의 비활성 plugin은 활성화합니다. Codex의 비활성 plugin은 설정에서 활성화해야 한다는 오류로 중단합니다.
 - Sequential Thinking은 키트 이름인 Codex `sequential_thinking`, Claude `sequential-thinking`으로 `@modelcontextprotocol/server-sequential-thinking@latest`를 등록합니다. 다른 이름의 사용자 MCP는 변경하지 않습니다.
 - Codex의 `features.context_management.experimental_mode = true` 설정을 병합합니다. 이외의 모델·추론 설정은 유지합니다. 지원하지 않는 TOML 형태는 원본 교체 전에 오류로 중단합니다.
 - Headroom은 호스트의 `127.0.0.1:8787`에서 상시 실행하며 Codex의 전역 provider와 두 CLI의 셸 분기를 구성합니다. 세션마다 설정 파일을 임시로 바꾸지 않습니다. 아래 사용 표를 참고하세요.
 - Graphify의 전역 안내는 유용한 기존 그래프나 명시적인 Graphify 요청에 적용합니다. 단순 코드 질문을 위해 그래프 구축을 요구하지 않습니다.
 
-Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 20 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node 24.13.0 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
+Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 20 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
 
 처음에는 Git, Bash, curl 또는 wget, 인터넷 연결, 사용자 서비스 관리자가 필요합니다. 로그인·계정 이용 권한·조직 정책·pairing은 각 호스트에서 본인이 완료해야 합니다. 키트는 인증 정보를 복사하지 않습니다. `CLAUDE_CONFIG_DIR`과 기본 `~/.codex` 이외의 `CODEX_HOME`은 지원하지 않으며 설치 전에 거부합니다. Python minor 버전과 최상위 패키지는 고정하지만 운영체제별 wheel·전이 의존성까지 완전히 동일하다는 뜻은 아닙니다.
+
+### 도구 버전 갱신
+
+모든 도구는 설치할 때 최신 버전을 사용합니다. Graphify·Headroom·uv는 PyPI, 키트가 설치하는 대체용 Node.js는 공식 최신 LTS를 확인하고, 설치한 버전은 `~/.universal-research-agent-kit/tooling.state`에 기록합니다. `--verify`는 기록된 버전으로 설치 상태를 확인합니다.
+
+이미 설치한 컴퓨터는 Claude Code·Codex 세션을 모두 닫고 `sh install.sh`를 다시 실행하면 갱신됩니다. 설치기가 Headroom 서비스와 MCP를 정상 종료하고, 최신 버전과 다른 관리 도구 환경을 백업한 뒤 다시 만듭니다. 키트가 설치한 Node.js도 최신 LTS와 다르면 같은 방식으로 교체합니다. 키트 소유 서비스의 실행 설정(환경변수·proxy 인수)과 runner는 설치된 Headroom이 생성하는 값으로 다시 만든 뒤 서비스를 시작해 검증합니다. 새 릴리스 때문에 설치나 검증이 실패하면 journal로 이전 상태를 복구하고 원래 서비스를 재개합니다.
 
 ### Mac 로컬 작업과 여러 컴퓨터
 
@@ -129,7 +135,7 @@ curl -fsS http://127.0.0.1:8787/health
 
 정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile`이 키트 소유 기록과 같은지 함께 확인합니다. 새 설치의 profile은 `research-agent-kit`이며, 기존 표준 설치를 인계한 호스트는 `default`를 유지합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 다른 서비스가 8787 포트를 사용하거나 사용자 설정이 표준 설치와 다르면 충돌 위치를 안내합니다.
 
-예전 `headroom-default`도 `sh install.sh` 하나로 인계합니다. 로컬 8787 포트의 표준 Codex persistent-service인지 manifest·runner·OS 서비스 정의로 확인한 뒤 정상 종료하고, 배포·서비스 정의·Codex 설정·소유 기록을 백업합니다. 관리 Python과 의존성을 검사·복구한 뒤 표준 provider 블록을 검증하고 키트 소유로 등록합니다. 기존 서비스 이름과 manifest, provider 설정을 유지하면서 runner를 관리 Python으로 갱신하므로 별도 제거 스크립트나 Headroom의 `install remove` 명령이 필요하지 않습니다. 인증 방식이 바뀐 경우 기존 키트 설치와 동일하게 provider의 인증 플래그만 갱신하며, 이 인계 과정에서 인증 파일이나 세션 DB를 초기화하거나 세션 분류를 바꾸지 않습니다. 실패하면 파일 복구 후 원래 실행 중이던 서비스를 재개합니다. 사용자 지정 환경변수·proxy 옵션·provider 블록은 자동 인계하지 않습니다.
+예전 `headroom-default`도 `sh install.sh` 하나로 인계합니다. 로컬 8787 포트의 표준 Codex persistent-service인지 manifest·runner·OS 서비스 정의로 확인한 뒤 정상 종료하고, 배포·서비스 정의·Codex 설정·소유 기록을 백업합니다. 관리 Python과 의존성을 검사·복구한 뒤 표준 provider 블록을 검증하고 키트 소유로 등록합니다. 기존 서비스 이름과 provider 설정을 유지하고, 실행 설정과 runner만 설치된 Headroom 기준으로 다시 만들므로 별도 제거 스크립트나 Headroom의 `install remove` 명령이 필요하지 않습니다. 인증 방식이 바뀐 경우 기존 키트 설치와 동일하게 provider의 인증 플래그만 갱신하며, 이 인계 과정에서 인증 파일이나 세션 DB를 초기화하거나 세션 분류를 바꾸지 않습니다. 실패하면 파일 복구 후 원래 실행 중이던 서비스를 재개합니다. 사용자 지정 환경변수·proxy 옵션·provider 블록은 자동 인계하지 않습니다.
 
 기존 Headroom MCP의 실행 경로·인수가 키트 설정과 같고 `HEADROOM_PROXY_URL`이 기본 주소 `http://127.0.0.1:8787`이거나 생략되어 있으면 설정을 그대로 재사용합니다. 주소의 명시 여부 때문에 재설치가 중단되지 않으며, 다른 주소·명령·추가 환경변수는 강제로 덮어쓰지 않습니다.
 
@@ -267,4 +273,4 @@ CI는 macOS·Ubuntu의 구조 검사, detector/runner, 격리 설치와 mock 통
 ~/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python -B tests/test_headroom_upstream_lifecycle.py
 ```
 
-위 검사의 `--codex`에는 shell function 이름이 아닌 실제 CLI 실행 파일을 지정합니다. 생략하면 Headroom의 HTTP/WebSocket 전송만 검사합니다. 합성 응답을 이용한 전송 검사이며 실제 계정 추론·압축 품질/절감률·Claude CLI·Codex의 실제 WebSocket 연결·OS 서비스 및 재부팅·pairing의 증거는 아닙니다.
+위 검사의 `--codex`에는 shell function 이름이 아닌 실제 CLI 실행 파일을 지정합니다. 생략하면 Headroom의 HTTP/WebSocket 전송만 검사합니다. 합성 응답을 이용한 전송 검사이며 실제 계정 추론·압축 품질/절감률·Claude CLI·Codex의 실제 WebSocket 연결·OS 서비스 및 재부팅·pairing의 증거는 아닙니다. lifecycle 검사는 Headroom 0.34.0이 만든 배포(`tests/fixtures/headroom-0.34.0`)를 현재 버전으로 갱신하는 경로도 OS 호출을 가로챈 상태로 확인합니다.

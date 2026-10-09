@@ -24,8 +24,7 @@ exec "$KIT_TEST_PYTHON" "$@"
 EOF
 chmod +x "$MOCK_BIN/python3"
 ln -s "$(command -v jq)" "$MOCK_BIN/jq"
-printf '%s\n' '#!/bin/sh' 'echo "Unexpected test network download" >&2; exit 22' > "$MOCK_BIN/curl"
-chmod +x "$MOCK_BIN/curl"
+cp "$ROOT/tests/mock_latest_curl.sh" "$MOCK_BIN/curl"
 printf '%s\n' '# user-owned zshrc content' > "$TMP_HOME/.zshrc"
 printf '%s\n' '# user-owned bashrc content' > "$TMP_HOME/.bashrc"
 mkdir -p "$TMP_HOME/.claude"
@@ -35,12 +34,12 @@ cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'uv %s\n' "$*" >> "$TOOLING_TEST_CALLS"
-[ "${1:-}" != "--version" ] || { echo "uv 0.12.10"; exit 0; }
+[ "${1:-}" != "--version" ] || { echo "uv 0.12.24"; exit 0; }
 [ "${TOOLING_TEST_UV_FAIL:-0}" != "1" ] || exit 42
 MOCK_TOOL_BIN="${XDG_BIN_HOME:-$UV_TOOL_BIN_DIR}"
 mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
-  --version) echo 'uv 0.12.10' ;;
+  --version) echo 'uv 0.12.24' ;;
   *'python install'*) : ;;
   '--no-config pip check --python '*)
     [ "${TOOLING_TEST_PIP_FAIL:-0}" != 1 ] || exit 44
@@ -50,10 +49,14 @@ case "$*" in
     printf '%s\n' "$UV_TOOL_BIN_DIR"
     ;;
   *graphifyy*)
+    # Like real Graphify 0.9.82, every invocation (even --version) restamps installed skills.
     printf '%s\n' \
       '#!/usr/bin/env bash' \
       'set -euo pipefail' \
-      'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "graphify 0.9.39"; exit 0; fi' \
+      'for skill in "$HOME/.claude/skills/graphify" "$HOME/.codex/skills/graphify" "$HOME/.config/opencode/skills/graphify" "$HOME/.gemini/config/skills/graphify"; do' \
+      '  [ ! -f "$skill/SKILL.md" ] || printf "%s\\n" "0.9.82" > "$skill/.graphify_version"' \
+      'done' \
+      'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "graphify 0.9.82"; exit 0; fi' \
       'printf "graphify %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' \
       '[ "${TOOLING_TEST_GRAPHIFY_FAIL:-}" != "${3:-}" ] || exit 42' \
       'case "${3:-}" in' \
@@ -61,17 +64,17 @@ case "$*" in
       '    mkdir -p "$HOME/.claude/skills/graphify"' \
       '    mkdir -p "$HOME/.claude/skills/graphify/references"' \
       '    printf "%s\\n" "# graphify" > "$HOME/.claude/skills/graphify/SKILL.md"' \
-      '    printf "%s\\n" "0.9.39" > "$HOME/.claude/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.claude/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.claude/skills/graphify/references/README.md"' \
-      '    printf "%s\\n" "# graphify" "- **graphify** (\`~/.claude/skills/graphify/SKILL.md\`) - any input to knowledge graph. Trigger: \`/graphify\`" "When the user types \`/graphify\`, use the installed graphify skill or instructions before doing anything else." >> "$HOME/.claude/CLAUDE.md"' \
-      '    if [ -f "$HOME/.config/opencode/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.39" > "$HOME/.config/opencode/skills/graphify/.graphify_version"; fi' \
-      '    if [ -f "$HOME/.gemini/config/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.39" > "$HOME/.gemini/config/skills/graphify/.graphify_version"; fi' \
+      '    printf "%s\\n" "" "# graphify" "- **graphify** (\`~/.claude/skills/graphify/SKILL.md\`) - any input to knowledge graph. Trigger: \`/graphify\`" "When the user types \`/graphify\`, use the installed graphify skill or instructions before doing anything else." >> "$HOME/.claude/CLAUDE.md"' \
+      '    if [ -f "$HOME/.config/opencode/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.82" > "$HOME/.config/opencode/skills/graphify/.graphify_version"; fi' \
+      '    if [ -f "$HOME/.gemini/config/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.82" > "$HOME/.gemini/config/skills/graphify/.graphify_version"; fi' \
       '    ;;' \
       '  codex)' \
       '    mkdir -p "$HOME/.codex/skills/graphify"' \
       '    mkdir -p "$HOME/.codex/skills/graphify/references"' \
       '    printf "%s\\n" "# graphify" > "$HOME/.codex/skills/graphify/SKILL.md"' \
-      '    printf "%s\\n" "0.9.39" > "$HOME/.codex/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.codex/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.codex/skills/graphify/references/README.md"' \
       '    ;;' \
       '  *) exit 1 ;;' \
@@ -82,7 +85,7 @@ case "$*" in
     chmod +x "$UV_TOOL_DIR/graphifyy/bin/python"
     ;;
   *headroom-ai*)
-    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
+    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.40.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
     mkdir -p "$UV_TOOL_DIR/headroom-ai/bin"
     printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/headroom-ai/bin/python"
@@ -110,16 +113,16 @@ run_tooling() {
 UV_TOOL_BIN_DIR="$TMP_ROOT/tool-bin"
 run_tooling
 
-grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall graphifyy==0.9.39' "$CALLS"
-grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[all]==0.34.0' "$CALLS"
+grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall graphifyy==0.9.82' "$CALLS"
+grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[all]==0.40.0' "$CALLS"
 grep -Fqx 'graphify install --platform claude' "$CALLS"
 grep -Fqx 'graphify install --platform codex' "$CALLS"
 grep -Fqx 'status=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'graphify=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom_wrapper=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'graphify_version=0.9.39' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'headroom_version=0.34.0' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'graphify_version=0.9.82' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'headroom_version=0.40.0' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx "tool_bin_dir=$TMP_HOME/.universal-research-agent-kit/tooling/bin" "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 [ -f "$TMP_HOME/.claude/skills/graphify/SKILL.md" ]
 [ -f "$TMP_HOME/.codex/skills/graphify/SKILL.md" ]
@@ -159,13 +162,17 @@ grep -Fqx 'runtime launch codex shadowed' "$CALLS"
 ! grep -Fq "shadow headroom" "$CALLS"
 ! grep -Fq 'shadow headroom' "$CALLS"
 
-HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" zsh -fc '
-  source "$HOME/.zshrc"
-  claude zsh-prompt
-  codex zsh-prompt
-'
-grep -Fqx 'runtime launch claude zsh-prompt' "$CALLS"
-grep -Fqx 'runtime launch codex zsh-prompt' "$CALLS"
+if command -v zsh >/dev/null 2>&1; then
+  HOME="$TMP_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" TOOLING_TEST_CALLS="$CALLS" zsh -fc '
+    source "$HOME/.zshrc"
+    claude zsh-prompt
+    codex zsh-prompt
+  '
+  grep -Fqx 'runtime launch claude zsh-prompt' "$CALLS"
+  grep -Fqx 'runtime launch codex zsh-prompt' "$CALLS"
+else
+  echo "zsh is not installed; skipped the zsh launcher check (the macOS CI job runs it)."
+fi
 
 run_tooling
 [ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq 2 ]
@@ -177,8 +184,8 @@ run_tooling
 BAD_VERSION_HOME="$TMP_ROOT/bad-version-home"
 BAD_VERSION_BIN="$TMP_ROOT/bad-version-bin"
 mkdir -p "$BAD_VERSION_HOME" "$BAD_VERSION_BIN"
-printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "graphify 0.9.390"' > "$BAD_VERSION_BIN/graphify"
-printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom, version 10.34.0-dev"' > "$BAD_VERSION_BIN/headroom"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "graphify 0.9.820"' > "$BAD_VERSION_BIN/graphify"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "headroom, version 10.40.0-dev"' > "$BAD_VERSION_BIN/headroom"
 chmod +x "$BAD_VERSION_BIN/graphify" "$BAD_VERSION_BIN/headroom"
 HOME="$BAD_VERSION_HOME" PATH="$BAD_VERSION_BIN:$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
@@ -205,7 +212,7 @@ HOME="$SHADOW_HOME" PATH="$SHADOW_LOCAL_BIN:$MOCK_BIN:$SHADOW_TOOL_BIN:$UV_TOOL_
     exit 1
   }
 grep -Fqx 'graphify=installed' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'graphify_version=0.9.39' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'graphify_version=0.9.82' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom=installed' "$SHADOW_HOME/.universal-research-agent-kit/tooling.state"
 
 FULL_HOME="$TMP_ROOT/full-home"
@@ -218,8 +225,8 @@ HOME="$FULL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
     exit 1
   }
 grep -Fqx 'status=installed' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'graphify_version=0.9.39' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
-grep -Fqx 'headroom_version=0.34.0' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'graphify_version=0.9.82' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
+grep -Fqx 'headroom_version=0.40.0' "$FULL_HOME/.universal-research-agent-kit/tooling.state"
 [ -f "$FULL_HOME/.claude/skills/graphify/SKILL.md" ]
 [ -f "$FULL_HOME/.codex/skills/graphify/SKILL.md" ]
 [ -f "$FULL_HOME/.config/headroom/auto-wrap.sh" ]

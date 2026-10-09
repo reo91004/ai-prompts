@@ -35,6 +35,9 @@ class RuntimeTests(unittest.TestCase):
         self.running = False
         self.enterContext(patch.object(runtime, "headroom", self.headroom))
         self.enterContext(patch.object(runtime, "start_service", self.start_service))
+        # Real upstream defaults upgrades are covered by test_headroom_upstream_lifecycle.py.
+        self.enterContext(patch.object(runtime, "apply_upstream_defaults"))
+        self.enterContext(patch.object(runtime, "installed_version", return_value="9.9.9"))
         self.enterContext(patch.object(runtime, "remove_service", self.remove_service))
         self.enterContext(patch.object(runtime, "restore_thread_routing"))
         self.enterContext(patch.object(runtime, "codex_oauth", return_value=False))
@@ -181,7 +184,7 @@ class RuntimeTests(unittest.TestCase):
     def probe(self, endpoint):
         if not self.running:
             return None
-        return {"version": runtime.VERSION, "deployment": {"profile": runtime.PROFILE, "preset": "persistent-service"}}
+        return {"version": "9.9.9", "deployment": {"profile": runtime.PROFILE, "preset": "persistent-service"}}
 
     def install(self):
         runtime.install()
@@ -323,10 +326,10 @@ class RuntimeTests(unittest.TestCase):
         self.assertFalse(runtime.STATE.exists())
 
     def test_same_version_missing_proxy_import_is_not_accepted(self):
-        with patch.object(runtime.importlib.metadata, "version", return_value=runtime.VERSION), \
+        with patch.object(runtime.importlib.metadata, "version", return_value="9.9.9"), \
                 patch.object(runtime.importlib, "import_module", side_effect=ImportError("No module named fastapi")):
             with self.assertRaisesRegex(ImportError, "fastapi"):
-                runtime.dependencies(runtime.VERSION)
+                runtime.dependencies("9.9.9")
 
     def test_session_routing_preserves_home_settings_and_arguments(self):
         self.install()

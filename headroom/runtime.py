@@ -2,7 +2,7 @@
 """Host-local Headroom lifecycle and process-local agent routing.
 
 Run with the kit's Headroom interpreter. OS services and provider blocks are
-created by Headroom 0.34.0; this adapter checks ownership and limits provider
+created by the installed Headroom; this adapter checks ownership and limits provider
 removal to its owned block while preserving the prior root provider settings.
 """
 
@@ -27,7 +27,6 @@ import urllib.request
 PROFILE = "research-agent-kit"
 PORT = 8787
 BASE_URL = f"http://127.0.0.1:{PORT}"
-VERSION = "0.34.0"
 HOME = Path.home()
 KIT = HOME / ".universal-research-agent-kit"
 STATE = KIT / "headroom.json"
@@ -79,6 +78,10 @@ def dependencies(version):
         importlib.import_module(module)
     environment("headroom-ai", version)
     print(f"Headroom {version}: proxy/MCP imports OK ({sys.executable})")
+
+
+def installed_version():
+    return importlib.metadata.version("headroom-ai")
 
 
 def environment(distribution, version):
@@ -152,18 +155,41 @@ def repair_runner():
         if port_open():
             fail("The kit service is running with a stale runner. Stop the kit service with its user service manager, then rerun install.sh; no settings were changed.")
     from headroom.install.state import load_manifest
+    render_runner(load_manifest(PROFILE))
+    manifest()
+
+
+def render_runner(deployment):
     from headroom.install.supervisors import render_runner_scripts
     # An empty PATH makes upstream resolve its current Python module command,
     # avoiding an obsolete or user-provided headroom executable on PATH.
     previous_path = os.environ.get("PATH")
     try:
         os.environ["PATH"] = ""
-        render_runner_scripts(load_manifest(PROFILE))
+        render_runner_scripts(deployment)
     finally:
         if previous_path is None:
             os.environ.pop("PATH", None)
         else:
             os.environ["PATH"] = previous_path
+
+
+def apply_upstream_defaults():
+    """Regenerate the owned deployment's env and proxy args with the installed Headroom."""
+    from headroom.install import planner
+    from headroom.install.state import load_manifest, save_manifest
+    deployment = load_manifest(PROFILE)
+    planned = planner.build_manifest(
+        profile=PROFILE, preset="persistent-service", runtime_kind="python", scope="provider",
+        provider_mode="manual", targets=["codex"], port=PORT, backend="anthropic", anyllm_provider=None,
+        region=None, proxy_mode="cache", memory_enabled=False, telemetry_enabled=False, image=deployment.image)
+    if (deployment.base_env, deployment.proxy_args) == (planned.base_env, planned.proxy_args):
+        return
+    if port_open():
+        fail("The kit service is running with settings from another Headroom version. Stop the kit service with its user service manager, then rerun install.sh; no settings were changed.")
+    deployment.base_env, deployment.proxy_args = planned.base_env, planned.proxy_args
+    save_manifest(deployment)
+    render_runner(deployment)
     manifest()
 
 
@@ -406,7 +432,7 @@ def adopt_default(record):
     # Upstream does not store pre-install provider values. Do not infer them
     # from old backups or rewrite/retag existing Codex sessions during adoption.
     write_json(STATE, {"profile": PROFILE, "port": PORT, "previous_provider": previous,
-                       "python": sys.executable, "version": VERSION, "adopted_default": True})
+                       "python": sys.executable, "version": installed_version(), "adopted_default": True})
     print("Adopted the existing default Headroom service; provider configuration and sessions preserved.")
 
 
@@ -434,7 +460,7 @@ def install_mcp(agent):
             print("Reusing the existing kit Headroom MCP for " + agent + "; configuration preserved.")
             return
         break
-    # Headroom 0.34 compares env dictionaries literally and omits its default
+    # Headroom compares env dictionaries literally and omits its default
     # URL even with --proxy-url. Keep its normal conflict handling for all
     # other entries; never force-replace a user's MCP configuration.
     headroom("mcp", "install", "--agent", agent)
@@ -532,8 +558,8 @@ def check(quiet=False):
             and deployment.get("profile") == PROFILE
             and deployment.get("preset") == "persistent-service"):
         fail("Headroom service is not running and ready with the kit profile. A healthy unrelated listener is not success.\n" + status)
-    if health.get("version") != VERSION:
-        fail("The running Headroom version differs from the pinned environment.")
+    if health.get("version") != installed_version():
+        fail("The running Headroom version differs from the installed environment.")
     check_provider()
     if not quiet:
         print(status.rstrip())
@@ -571,6 +597,7 @@ def install():
     preflight()
     if STATE.exists():
         repair_runner()
+        apply_upstream_defaults()
         sync_codex_auth()
         if not port_open():
             start_service()
@@ -585,7 +612,7 @@ def install():
     saved = {key: config[key] for key in ("model_provider", "openai_base_url") if key in config}
     # Record ownership before apply so an interrupted activation is recoverable.
     write_json(STATE, {"profile": PROFILE, "port": PORT, "previous_provider": saved,
-                       "python": sys.executable, "version": VERSION})
+                       "python": sys.executable, "version": installed_version()})
     try:
         headroom("install", "apply", "--profile", PROFILE, "--preset", "persistent-service",
                  "--runtime", "python", "--scope", "provider", "--providers", "manual",

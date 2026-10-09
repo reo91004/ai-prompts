@@ -19,16 +19,17 @@ exec "$KIT_TEST_PYTHON" "$@"
 EOF
 chmod +x "$MOCK_BIN/python3"
 ln -s "$JQ_BIN" "$MOCK_BIN/jq"
+cp "$ROOT/tests/mock_latest_curl.sh" "$MOCK_BIN/curl"
 cat > "$MOCK_BIN/uv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'uv %s\n' "$*" >> "$TOOLING_TEST_CALLS"
-[ "${1:-}" != "--version" ] || { echo "uv 0.12.10"; exit 0; }
+[ "${1:-}" != "--version" ] || { echo "uv 0.12.24"; exit 0; }
 [ "${TOOLING_TEST_UV_FAIL:-0}" != "1" ] || exit 42
 MOCK_TOOL_BIN="${XDG_BIN_HOME:-$UV_TOOL_BIN_DIR}"
 mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
-  --version) echo 'uv 0.12.10' ;;
+  --version) echo 'uv 0.12.24' ;;
   *'python install'*) : ;;
   '--no-config pip check --python '*) : ;;
   'tool dir --bin')
@@ -38,7 +39,7 @@ case "$*" in
     printf '%s\n' \
       '#!/usr/bin/env bash' \
       'set -euo pipefail' \
-      'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "graphify 0.9.39"; exit 0; fi' \
+      'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "graphify 0.9.82"; exit 0; fi' \
       'printf "graphify %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' \
       '[ "${TOOLING_TEST_GRAPHIFY_FAIL:-}" != "${3:-}" ] || exit 42' \
       'case "${3:-}" in' \
@@ -46,17 +47,17 @@ case "$*" in
       '    mkdir -p "$HOME/.claude/skills/graphify"' \
       '    mkdir -p "$HOME/.claude/skills/graphify/references"' \
       '    printf "%s\\n" "# graphify" > "$HOME/.claude/skills/graphify/SKILL.md"' \
-      '    printf "%s\\n" "0.9.39" > "$HOME/.claude/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.claude/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.claude/skills/graphify/references/README.md"' \
-      '    printf "%s\\n" "# graphify" "- **graphify** (\`~/.claude/skills/graphify/SKILL.md\`) - any input to knowledge graph. Trigger: \`/graphify\`" "When the user types \`/graphify\`, use the installed graphify skill or instructions before doing anything else." >> "$HOME/.claude/CLAUDE.md"' \
-      '    if [ -f "$HOME/.config/opencode/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.39" > "$HOME/.config/opencode/skills/graphify/.graphify_version"; fi' \
-      '    if [ -f "$HOME/.gemini/config/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.39" > "$HOME/.gemini/config/skills/graphify/.graphify_version"; fi' \
+      '    printf "%s\\n" "" "# graphify" "- **graphify** (\`~/.claude/skills/graphify/SKILL.md\`) - any input to knowledge graph. Trigger: \`/graphify\`" "When the user types \`/graphify\`, use the installed graphify skill or instructions before doing anything else." >> "$HOME/.claude/CLAUDE.md"' \
+      '    if [ -f "$HOME/.config/opencode/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.82" > "$HOME/.config/opencode/skills/graphify/.graphify_version"; fi' \
+      '    if [ -f "$HOME/.gemini/config/skills/graphify/SKILL.md" ]; then printf "%s\\n" "0.9.82" > "$HOME/.gemini/config/skills/graphify/.graphify_version"; fi' \
       '    ;;' \
       '  codex)' \
       '    mkdir -p "$HOME/.codex/skills/graphify"' \
       '    mkdir -p "$HOME/.codex/skills/graphify/references"' \
       '    printf "%s\\n" "# graphify" > "$HOME/.codex/skills/graphify/SKILL.md"' \
-      '    printf "%s\\n" "0.9.39" > "$HOME/.codex/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.codex/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.codex/skills/graphify/references/README.md"' \
       '    ;;' \
       '  *) exit 1 ;;' \
@@ -67,7 +68,7 @@ case "$*" in
     chmod +x "$UV_TOOL_DIR/graphifyy/bin/python"
     ;;
   *headroom-ai*)
-    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.34.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
+    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.40.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
     mkdir -p "$UV_TOOL_DIR/headroom-ai/bin"
     printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/headroom-ai/bin/python"
@@ -165,6 +166,7 @@ mv "$MOCK_BIN/claude" "$MOCK_BIN/claude-hidden"
 expect_failure bash "$ROOT/install.sh"
 grep -Fq 'Download failed: https://claude.ai/install.sh' "$WORK/expected-failure.log"
 [ ! -e "$HOME/.codex/AGENTS.md" ]
+cp "$ROOT/tests/mock_latest_curl.sh" "$MOCK_BIN/curl"
 mv "$MOCK_BIN/claude-hidden" "$MOCK_BIN/claude"
 ln -s "$HOME/.local/share/claude/versions/2.1.0" "$HOME/.local/bin/claude"
 echo 'Full default install from empty HOME'

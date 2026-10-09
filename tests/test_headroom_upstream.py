@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Opt-in Headroom 0.34.0 loopback integration smoke with synthetic providers.
+"""Opt-in Headroom loopback integration smoke with synthetic providers.
 
 Run with the installed headroom-ai Python; optionally pass --codex /path/to/codex.
 No user configuration or credentials are read. Logs remain in .agent_tmp.
@@ -119,7 +119,6 @@ async def websocket_check(base):
 
 
 def smoke(codex):
-    assert importlib.metadata.version("headroom-ai") == "0.34.0"
     root = Path(__file__).resolve().parents[1]
     (root / ".agent_tmp").mkdir(exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix="headroom-upstream-", dir=root / ".agent_tmp"))
@@ -161,7 +160,7 @@ def smoke(codex):
             processes.append(process)
             wait_ready(url, process)
         health = request(base + "/health")
-        assert health["ready"] and health["version"] == "0.34.0", health
+        assert health["ready"] and health["version"] == importlib.metadata.version("headroom-ai"), health
         assert not health["checks"]["memory"]["enabled"], health
         (artifacts / "health.json").write_text(json.dumps(health, indent=2))
         def send(provider):

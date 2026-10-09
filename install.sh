@@ -3,14 +3,7 @@
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GRAPHIFY_VERSION=0.9.39
-HEADROOM_VERSION=0.34.0
-EXPECTED_GRAPHIFY_VERSION="$GRAPHIFY_VERSION"
-EXPECTED_HEADROOM_VERSION="$HEADROOM_VERSION"
 KIT_PYTHON_VERSION=3.13
-KIT_UV_VERSION=0.12.10
-GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
-HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
 source "$ROOT/scripts/bootstrap_cli.sh"
 
 
@@ -29,6 +22,23 @@ download_file() {
   else
     kit_die "curl or wget is required to download the managed runtimes."
   fi
+}
+
+# Installs always use the newest releases; tooling.state records what was installed.
+latest_pypi_version() {
+  local json="$KIT_BACKUP_DIR/pypi-$1.json" version
+  download_file "https://pypi.org/pypi/$1/json" "$json"
+  version="$(grep -o '"version":"[^"]*"' "$json" | sed -n '1s/^"version":"\(.*\)"$/\1/p')"
+  [ -n "$version" ] || kit_die "Cannot read the latest $1 release from PyPI."
+  printf '%s\n' "$version"
+}
+
+latest_node_lts() {
+  local index="$KIT_BACKUP_DIR/node-index.json" version
+  download_file "https://nodejs.org/dist/index.json" "$index"
+  version="$(grep -m1 '"lts":"' "$index" | grep -o '"version":"v[^"]*"' | sed 's/^"version":"v\(.*\)"$/\1/')"
+  [ -n "$version" ] || kit_die "Cannot read the latest Node.js LTS release."
+  printf '%s\n' "$version"
 }
 
 kit_validate_home() {
@@ -1429,8 +1439,71 @@ EOF
 }
 
 
+# Graphify rewrites every installed skill whenever it runs, even for --version,
+# so these paths are backed up before the first invocation.
+backup_graphify_skills() {
+[ "${GRAPHIFY_SKILLS_BACKED_UP:-0}" -eq 0 ] || return 0
+GRAPHIFY_CLAUDE_PROMPT="$HOME/.claude/CLAUDE.md"
+GRAPHIFY_CLAUDE_SKILL="$HOME/.claude/skills/graphify"
+GRAPHIFY_CODEX_SKILL="$HOME/.codex/skills/graphify"
+for graphify_parent in "$HOME/.claude" "$HOME/.claude/skills" "$HOME/.codex" "$HOME/.codex/skills"; do
+  [ ! -L "$graphify_parent" ] || kit_die "Refusing a symlinked Graphify parent: $graphify_parent"
+  if [ -e "$graphify_parent" ] && [ ! -d "$graphify_parent" ]; then
+    kit_die "Graphify parent is not a directory: $graphify_parent"
+  fi
+done
+kit_require_regular_or_absent "$GRAPHIFY_CLAUDE_PROMPT"
+for graphify_skill in "$GRAPHIFY_CLAUDE_SKILL" "$GRAPHIFY_CODEX_SKILL"; do
+  [ ! -L "$graphify_skill" ] || kit_die "Refusing a symlinked Graphify skill: $graphify_skill"
+  if [ -e "$graphify_skill" ] && [ ! -d "$graphify_skill" ]; then
+    kit_die "Graphify skill path is not a directory: $graphify_skill"
+  fi
+done
+kit_backup_path "$GRAPHIFY_CLAUDE_PROMPT" "tooling/graphify-claude-prompt"
+kit_backup_path "$GRAPHIFY_CLAUDE_SKILL" "tooling/graphify-claude-skill"
+kit_backup_path "$GRAPHIFY_CODEX_SKILL" "tooling/graphify-codex-skill"
+
+GRAPHIFY_EXISTING_INDEX=0
+for graphify_existing_skill in \
+  "$HOME/.config/opencode/skills/graphify" \
+  "$HOME/.config/kilo/skills/graphify" \
+  "$HOME/.aider/graphify" \
+  "$HOME/.copilot/skills/graphify" \
+  "$HOME/.openclaw/skills/graphify" \
+  "$HOME/.factory/skills/graphify" \
+  "$HOME/.trae/skills/graphify" \
+  "$HOME/.trae-cn/skills/graphify" \
+  "$HOME/.hermes/skills/graphify" \
+  "$HOME/.gemini/config/skills/graphify" \
+  "$HOME/.kiro/skills/graphify" \
+  "$HOME/.pi/agent/skills/graphify" \
+  "$HOME/.codebuddy/skills/graphify" \
+  "$HOME/.agents/skills/graphify" \
+  "$HOME/.config/agents/skills/graphify" \
+  "$HOME/.config/devin/skills/graphify" \
+  "$HOME/.kimi/skills/graphify"; do
+  [ "$graphify_existing_skill" = "$GRAPHIFY_CLAUDE_SKILL" ] && continue
+  [ "$graphify_existing_skill" = "$GRAPHIFY_CODEX_SKILL" ] && continue
+  [ ! -L "$graphify_existing_skill" ] || kit_die "Refusing a symlinked Graphify skill: $graphify_existing_skill"
+  if [ -e "$graphify_existing_skill" ] && [ ! -d "$graphify_existing_skill" ]; then
+    kit_die "Graphify skill path is not a directory: $graphify_existing_skill"
+  fi
+  if [ -e "$graphify_existing_skill" ]; then
+    kit_backup_path "$graphify_existing_skill" "tooling/graphify-existing-$GRAPHIFY_EXISTING_INDEX"
+    GRAPHIFY_EXISTING_INDEX=$((GRAPHIFY_EXISTING_INDEX + 1))
+  fi
+done
+GRAPHIFY_SKILLS_BACKED_UP=1
+}
+
 prepare_tooling() {
 [ "${KIT_TOOLING_PREPARED:-0}" -eq 0 ] || return 0
+backup_graphify_skills
+GRAPHIFY_VERSION="$(latest_pypi_version graphifyy)"
+HEADROOM_VERSION="$(latest_pypi_version headroom-ai)"
+KIT_UV_VERSION="$(latest_pypi_version uv)"
+GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
+HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
 TOOL_ROOT="$KIT_STATE_ROOT/tooling"
 TOOL_BIN_DIR="$TOOL_ROOT/bin"
 TOOL_UV_DIR="$TOOL_ROOT/uv-tools"
@@ -1566,25 +1639,7 @@ kit_replace_file "$ROOT/headroom/runtime.py" "$HOME/.config/headroom/runtime.py"
 KIT_HEADROOM_PYTHON="$TOOL_UV_DIR/headroom-ai/bin/python"
 
 
-GRAPHIFY_CLAUDE_PROMPT="$HOME/.claude/CLAUDE.md"
-GRAPHIFY_CLAUDE_SKILL="$HOME/.claude/skills/graphify"
-GRAPHIFY_CODEX_SKILL="$HOME/.codex/skills/graphify"
-for graphify_parent in "$HOME/.claude" "$HOME/.claude/skills" "$HOME/.codex" "$HOME/.codex/skills"; do
-  [ ! -L "$graphify_parent" ] || kit_die "Refusing a symlinked Graphify parent: $graphify_parent"
-  if [ -e "$graphify_parent" ] && [ ! -d "$graphify_parent" ]; then
-    kit_die "Graphify parent is not a directory: $graphify_parent"
-  fi
-done
-kit_require_regular_or_absent "$GRAPHIFY_CLAUDE_PROMPT"
-for graphify_skill in "$GRAPHIFY_CLAUDE_SKILL" "$GRAPHIFY_CODEX_SKILL"; do
-  [ ! -L "$graphify_skill" ] || kit_die "Refusing a symlinked Graphify skill: $graphify_skill"
-  if [ -e "$graphify_skill" ] && [ ! -d "$graphify_skill" ]; then
-    kit_die "Graphify skill path is not a directory: $graphify_skill"
-  fi
-done
-kit_backup_path "$GRAPHIFY_CLAUDE_PROMPT" "tooling/graphify-claude-prompt"
-kit_backup_path "$GRAPHIFY_CLAUDE_SKILL" "tooling/graphify-claude-skill"
-kit_backup_path "$GRAPHIFY_CODEX_SKILL" "tooling/graphify-codex-skill"
+backup_graphify_skills
 
 CODEX_AGENTS="$HOME/.codex/AGENTS.md"
 CODEX_GRAPHIFY_BLOCK="$KIT_BACKUP_DIR/graphify-codex-agents-block"
@@ -1599,37 +1654,6 @@ The global Graphify skill is installed at `~/.codex/skills/graphify/SKILL.md`.
 EOF
 kit_replace_managed_block "$CODEX_AGENTS" "$CODEX_GRAPHIFY_BLOCK" "tooling/graphify-codex-agents" '# BEGIN UNIVERSAL RESEARCH AGENT KIT GRAPHIFY' '# END UNIVERSAL RESEARCH AGENT KIT GRAPHIFY'
 
-# Graphify updates all existing platform version stamps; include them in rollback.
-GRAPHIFY_EXISTING_INDEX=0
-for graphify_existing_skill in \
-  "$HOME/.config/opencode/skills/graphify" \
-  "$HOME/.config/kilo/skills/graphify" \
-  "$HOME/.aider/graphify" \
-  "$HOME/.copilot/skills/graphify" \
-  "$HOME/.openclaw/skills/graphify" \
-  "$HOME/.factory/skills/graphify" \
-  "$HOME/.trae/skills/graphify" \
-  "$HOME/.trae-cn/skills/graphify" \
-  "$HOME/.hermes/skills/graphify" \
-  "$HOME/.gemini/config/skills/graphify" \
-  "$HOME/.kiro/skills/graphify" \
-  "$HOME/.pi/agent/skills/graphify" \
-  "$HOME/.codebuddy/skills/graphify" \
-  "$HOME/.agents/skills/graphify" \
-  "$HOME/.config/agents/skills/graphify" \
-  "$HOME/.config/devin/skills/graphify" \
-  "$HOME/.kimi/skills/graphify"; do
-  [ "$graphify_existing_skill" = "$GRAPHIFY_CLAUDE_SKILL" ] && continue
-  [ "$graphify_existing_skill" = "$GRAPHIFY_CODEX_SKILL" ] && continue
-  [ ! -L "$graphify_existing_skill" ] || kit_die "Refusing a symlinked Graphify skill: $graphify_existing_skill"
-  if [ -e "$graphify_existing_skill" ] && [ ! -d "$graphify_existing_skill" ]; then
-    kit_die "Graphify skill path is not a directory: $graphify_existing_skill"
-  fi
-  if [ -e "$graphify_existing_skill" ]; then
-    kit_backup_path "$graphify_existing_skill" "tooling/graphify-existing-$GRAPHIFY_EXISTING_INDEX"
-    GRAPHIFY_EXISTING_INDEX=$((GRAPHIFY_EXISTING_INDEX + 1))
-  fi
-done
 
 SHELL_BLOCK="$KIT_BACKUP_DIR/headroom-shell-block"
 cat > "$SHELL_BLOCK" <<'EOF'
@@ -1848,8 +1872,9 @@ check_claude_prompt() {
     return
   fi
 
+  # The kit text comes first; Graphify owns what it appends after it.
   normalized="$(mktemp "${TMPDIR:-/tmp}/claude-prompt.XXXXXX")"
-  awk '$0 == "# graphify" { exit } { print }' "$installed" > "$normalized"
+  head -c "$(($(wc -c < "$source")))" "$installed" > "$normalized"
   if cmp -s "$source" "$normalized"; then
     echo "OK content with Graphify section: $installed"
   else
@@ -2060,7 +2085,7 @@ check_graphify_skill_layout() {
   check_regular_file "$skill_root/SKILL.md"
   check_nonempty_file "$skill_root/SKILL.md"
   check_contains_fixed "$skill_root/SKILL.md" "graphify"
-  check_exact_file "$skill_root/.graphify_version" "$EXPECTED_GRAPHIFY_VERSION"
+  check_exact_file "$skill_root/.graphify_version" "$graphify_version"
   check_nonempty_dir "$skill_root/references"
 }
 
@@ -2092,14 +2117,6 @@ else
       graphify_version="$(read_tooling_state graphify_version)"
       headroom_version="$(read_tooling_state headroom_version)"
       tool_bin_dir="$(read_tooling_state tool_bin_dir)"
-      [ "$graphify_version" = "$EXPECTED_GRAPHIFY_VERSION" ] || {
-        echo "Unexpected Graphify state version: $graphify_version"
-        missing=1
-      }
-      [ "$headroom_version" = "$EXPECTED_HEADROOM_VERSION" ] || {
-        echo "Unexpected Headroom state version: $headroom_version"
-        missing=1
-      }
       [ "$tool_bin_dir" = "$HOME/.universal-research-agent-kit/tooling/bin" ] || {
         echo "Unexpected tooling bin directory: $tool_bin_dir"
         missing=1
@@ -2109,14 +2126,14 @@ else
       check_tool_version graphify "$graphify_version"
       check_tool_version headroom "$headroom_version"
       "$HOME/.universal-research-agent-kit/tooling/uv-tools/graphifyy/bin/python" -I -B \
-        "$ROOT/headroom/runtime.py" environment graphifyy "$EXPECTED_GRAPHIFY_VERSION" || missing=1
+        "$ROOT/headroom/runtime.py" environment graphifyy "$graphify_version" || missing=1
       check_graphify_skill_layout "$HOME/.claude/skills/graphify"
       check_graphify_skill_layout "$HOME/.codex/skills/graphify"
       check_same_file "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
       check_same_file "$ROOT/headroom/runtime.py" "$HOME/.config/headroom/runtime.py"
       runtime_python="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
       if [ -x "$runtime_python" ]; then
-        "$runtime_python" -I -B "$ROOT/headroom/runtime.py" dependencies "$EXPECTED_HEADROOM_VERSION" || missing=1
+        "$runtime_python" -I -B "$ROOT/headroom/runtime.py" dependencies "$headroom_version" || missing=1
         "$runtime_python" -I -B "$ROOT/headroom/runtime.py" check || missing=1
       else
         echo "Missing kit Headroom interpreter: $runtime_python"; missing=1

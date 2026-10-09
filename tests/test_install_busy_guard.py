@@ -24,6 +24,7 @@ class BusyInstallTests(unittest.TestCase):
         self.spaced_mcp = "/usr/bin/python3 " + str(self.home / ".local/bin/headroom") + " mcp serve"
         self.bin = self.work / "bin"
         self.bin.mkdir()
+        shutil.copy(ROOT / "tests/mock_latest_curl.sh", self.bin / "curl")
         self.snapshots = self.work / "snapshots.json"
         self.counter = self.work / "ps-count"
         self.events = self.work / "events"
@@ -262,7 +263,7 @@ exit 42
         uv = self.bin / "uv"
         self.executable(uv, '''#!/bin/sh
 case "$*" in
-  --version) echo 'uv 0.12.10' ;;
+  --version) echo 'uv 0.12.24' ;;
   *'python install'*) echo python-provision >> "$GUARD_EVENTS" ;;
   *) echo unexpected-package-write >> "$GUARD_EVENTS"; exit 99 ;;
 esac

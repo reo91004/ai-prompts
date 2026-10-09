@@ -25,7 +25,7 @@ for name in sh bash dirname basename mkdir mktemp date cp mv rm rmdir awk tar gz
   [ -z "$binary" ] || ln -s "$binary" "$WORK/bin/$name"
 done
 for name in node npm npx; do
-  printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo 24.13.0; else exec "$TEST_NODE" "$@"; fi' > "$WORK/node/bin/$name"
+  printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo 24.21.0; else exec "$TEST_NODE" "$@"; fi' > "$WORK/node/bin/$name"
   chmod +x "$WORK/node/bin/$name"
 done
 tar -czf "$WORK/node.tar.gz" -C "$WORK" node
@@ -38,13 +38,18 @@ printf '%s\n' '#!/bin/sh' 'echo v12.0.0' > "$WORK/bin/node"
 chmod +x "$WORK/bin/node"
 
 download_file() {
+  # The latest-LTS lookup runs on every bootstrap; only real downloads are recorded.
+  if [ "$1" = https://nodejs.org/dist/index.json ]; then
+    printf '%s\n' '[' '{"version":"v25.1.0","lts":false},' '{"version":"v24.21.0","lts":"Krypton"},' > "$2"
+    return
+  fi
   printf '%s\n' "$1" >> "$BOOTSTRAP_CALLS"
   case "$1" in
     *nodejs.org*tar.gz) cp "$WORK/node.tar.gz" "$2" ;;
     *nodejs.org*SHASUMS256.txt)
       if command -v shasum >/dev/null; then digest="$(shasum -a 256 "$WORK/node.tar.gz")"; else digest="$(sha256sum "$WORK/node.tar.gz")"; fi
       for platform in darwin linux; do
-        for arch in arm64 x64; do printf '%s  node-v24.13.0-%s-%s.tar.gz\n' "${digest%% *}" "$platform" "$arch"; done
+        for arch in arm64 x64; do printf '%s  node-v24.21.0-%s-%s.tar.gz\n' "${digest%% *}" "$platform" "$arch"; done
       done > "$2"
       ;;
     https://chatgpt.com/codex/install.sh)
@@ -110,6 +115,15 @@ ln -s "$WORK/missing-codex" "$KIT_STATE_ROOT/cli/bin/codex"
 ln -s "$WORK/missing-claude" "$KIT_STATE_ROOT/cli/bin/claude"
 bootstrap_cli
 verify_native_clis
+[ "$before" = "$(cat "$BOOTSTRAP_CALLS")" ]
+# A kit Node too old for the CLIs is replaced cleanly with the latest LTS.
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo v18.0.0; else exec "$TEST_NODE" "$@"; fi' > "$KIT_STATE_ROOT/cli/node/bin/node"
+: > "$KIT_STATE_ROOT/cli/node/stale-file"
+bootstrap_cli
+[ "$(grep -c 'nodejs.org.*tar.gz$' "$BOOTSTRAP_CALLS")" -eq 2 ]
+[ "$("$KIT_STATE_ROOT/cli/node/bin/node" --version)" = 24.21.0 ] && [ ! -e "$KIT_STATE_ROOT/cli/node/stale-file" ]
+before="$(cat "$BOOTSTRAP_CALLS")"
+bootstrap_cli
 [ "$before" = "$(cat "$BOOTSTRAP_CALLS")" ]
 
 # Package-manager fixtures own only this temporary HOME. They assert that the

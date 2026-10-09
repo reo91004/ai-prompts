@@ -198,14 +198,17 @@ verify_native_clis() {
 }
 
 bootstrap_cli() {
-  local cli_root="$KIT_STATE_ROOT/cli" node_version=24.13.0
+  local cli_root="$KIT_STATE_ROOT/cli" node_version
   local platform architecture archive expected actual node_bin npx_bin
   PATH="$cli_root/bin:$HOME/.local/bin:$PATH"
   export PATH
+  # Any usable Node.js (20+) is reused; otherwise the kit copy is replaced with the latest LTS.
   if ! node_bin="$(find_usable_cli node)" || ! npx_bin="$(find_usable_cli npx)"; then
+    node_version="$(latest_node_lts)"
     kit_require_real_dir "$cli_root"
     kit_require_real_dir "$cli_root/bin"
     kit_backup_path "$cli_root/node" "bootstrap/node"
+    rm -rf -- "$cli_root/node"
     kit_require_real_dir "$cli_root/node"
     case "$(uname -s)" in Darwin) platform=darwin ;; Linux) platform=linux ;; *) kit_die "CLI bootstrap supports macOS and Linux." ;; esac
     case "$(uname -m)" in arm64|aarch64) architecture=arm64 ;; x86_64|amd64) architecture=x64 ;; *) kit_die "Unsupported CPU architecture: $(uname -m)" ;; esac

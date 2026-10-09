@@ -1,0 +1,74 @@
+{
+    "profile": "research-agent-kit",
+    "preset": "persistent-service",
+    "runtime_kind": "python",
+    "supervisor_kind": "service",
+    "scope": "provider",
+    "provider_mode": "manual",
+    "targets": [
+        "codex"
+    ],
+    "port": 8787,
+    "host": "127.0.0.1",
+    "backend": "anthropic",
+    "anyllm_provider": null,
+    "region": null,
+    "proxy_mode": "cache",
+    "memory_enabled": false,
+    "memory_db_path": "@HOME@/.headroom/memory.db",
+    "telemetry_enabled": false,
+    "image": "ghcr.io/headroomlabs-ai/headroom:latest",
+    "service_name": "headroom-research-agent-kit",
+    "container_name": "headroom-research-agent-kit",
+    "health_url": "http://127.0.0.1:8787/readyz",
+    "base_env": {
+        "HEADROOM_PORT": "8787",
+        "HEADROOM_HOST": "127.0.0.1",
+        "HEADROOM_MODE": "cache",
+        "HEADROOM_BACKEND": "anthropic",
+        "HEADROOM_TELEMETRY": "off"
+    },
+    "tool_envs": {
+        "codex": {
+            "OPENAI_BASE_URL": "http://127.0.0.1:8787/v1"
+        }
+    },
+    "proxy_args": [
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8787",
+        "--mode",
+        "cache",
+        "--backend",
+        "anthropic",
+        "--no-telemetry"
+    ],
+    "mutations": [
+        {
+            "target": "codex",
+            "kind": "toml-block",
+            "path": "@HOME@/.codex/config.toml",
+            "data": {}
+        }
+    ],
+    "artifacts": [
+        {
+            "kind": "script",
+            "path": "@HOME@/.headroom/deploy/research-agent-kit/run-headroom.sh",
+            "metadata": {}
+        },
+        {
+            "kind": "script",
+            "path": "@HOME@/.headroom/deploy/research-agent-kit/ensure-headroom.sh",
+            "metadata": {}
+        },
+        {
+            "kind": "service-unit",
+            "path": "@HOME@/.config/systemd/user/headroom-research-agent-kit.service",
+            "metadata": {}
+        }
+    ],
+    "created_at": "2026-09-10T06:35:11.711812Z",
+    "updated_at": "2026-09-10T06:35:15.297680Z"
+}
