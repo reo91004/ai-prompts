@@ -19,3 +19,5 @@ Read only the applicable profile:
 - [First-trigger recovery](references/first_trigger_recovery.md): external scope + MCU GPIO setups with a first-arm miss. Its fixed warm-up/reset/retry rules apply to that diagnosed setup, not every instrument.
 
 Return the run ID, preflight outcome, provenance and raw-artifact paths, attempt record, deviations/failures, and the supported claim scope. General hardware-free analysis does not activate this physical-capture workflow.
+
+Apply the relevant [shared research principles](../research-domain-router/references/research_principles.md) to substantive interpretation. Physical safety, attempt records, raw capture integrity, and project acquisition limits remain required; a new explanatory hypothesis does not authorize another physical attempt.

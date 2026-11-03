@@ -109,8 +109,20 @@ for skill in "$ROOT/skills"/*; do
   name="$(sed -n 's/^name: //p' "$skill/SKILL.md" | head -n 1)"
   [ "$name" = "${skill##*/}" ] || fail "skill name mismatch: $skill"
 done
-[ "$skill_count" -eq 15 ] || fail "shared skill count must be 15"
-for command in install.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh; do
+[ "$skill_count" -gt 0 ] || fail "shared skills are empty"
+for required in research-repo-protocol paper-writing side-channel-analysis; do
+  [ -s "$ROOT/skills/$required/SKILL.md" ] || fail "missing required skill: $required"
+done
+[ ! -e "$ROOT/skills/research-repo-design" ] || fail "retired research-repo-design skill remains"
+[ -f "$ROOT/opencode/AGENTS.md" ] || fail "missing OpenCode global instructions"
+[ "$(count_files "$ROOT/opencode/agents" '*.md')" -eq 2 ] || fail "OpenCode agent count must be 2"
+for platform in codex/AGENTS.md claude-code/CLAUDE.md opencode/AGENTS.md; do
+  core="$(awk '/^## Simple is best/{copy=1} /^## (Codex settings|Claude Code settings|OpenCode settings)/{copy=0} copy' "$ROOT/$platform")"
+  if [ -z "${reference_core:-}" ]; then reference_core="$core"; else
+    [ "$reference_core" = "$core" ] || fail "global research principles differ: $platform"
+  fi
+done
+for command in install.sh codex-remote.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh; do
   [ -x "$ROOT/$command" ] || fail "missing executable: $command"
   bash -n "$ROOT/$command" || fail "shell syntax: $command"
 done

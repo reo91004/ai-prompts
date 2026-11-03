@@ -16,3 +16,5 @@ Read only the reference needed now:
 - [Resource detector](references/resource_detector.md): local concurrent compute or signs of resource pressure. Run `scripts/detect_resources.sh` before launching that compute and use a fresh result; a read-only remote agent alone does not justify local resource probes.
 
 Use one writer per shared checkout; parallel writers need isolated worktrees, disjoint ownership, and a merge plan. Allow at most one heavy local command at a time. A new resource recommendation applies to new work; do not cancel healthy work because it decreased. Low swap or a failed detector alone is not proof of pressure. A failed step blocks its dependents and cannot be reported as success.
+
+For consequential research decisions, apply section 11 of the [shared research principles](../research-domain-router/references/research_principles.md). Preserve a requested model assignment and verify the execution; a child's self-description alone is not runtime evidence. Record the parent's material prediction before independent review and retain adoption/rejection reasons in existing task records.

@@ -12,3 +12,5 @@ Preserve numbers, units, denominators, citations, attribution, and uncertainty w
 For unexpectedly weak results, use the sibling skill’s [result analysis guidance](../adversarial-review/references/result_analysis.md): investigate causes and remedies before claiming a general limit. Separate observed facts, causal hypotheses, and proposed experiments. Never imply an unrun analysis was completed.
 
 Use the templates only when their structure helps. Small README changes or brief status updates do not need a full research report or separate report-writer agent. Reuse the run's existing evidence and work ledger instead of duplicating them.
+
+For substantive interpretation, use the relevant [shared research principles](../research-domain-router/references/research_principles.md). Manuscripts and rebuttals use `paper-writing`. Apply the installed `humanizer` skill when revising prose for delivery, preserving facts, technical terms, source attribution, and the project's record structure.

@@ -13,3 +13,5 @@ For research claims, use [the evidence contract](references/evidence_contract.md
 - Distinguish code failure, insufficient evidence, and a supported negative result. A completed experiment may establish that a method did not work under the tested conditions.
 - Recognize research-sufficient results within their supported scope. Optional broader experiments are not required fixes.
 - For an unexpectedly weak result, check plausible errors, alternative explanations, and remedies using the result-analysis guidance in `adversarial-review`; do not relabel failure as success.
+
+For material research conclusions, apply the relevant [shared research principles](../research-domain-router/references/research_principles.md). Match the evidence to the actual target and claim, including theoretical claims; an LLM integration is required only for a claim that depends on that integration. State the strongest supported finding and the next decisive check without premature pessimism.

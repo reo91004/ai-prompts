@@ -9,13 +9,16 @@
 
 ## Evidence and judgment
 
+- Apply the shared `research-domain-router/references/research_principles.md` principles for substantive research design and interpretation across SCA, hardware, software, theory, and AI/ML. Select evidence for the actual target and claim; a particular project's model integration is not a universal research requirement.
 - Bind research results to their inputs, seed, configuration, relevant environment/code versions, raw outputs, and reported metrics or figures. Distinguish synthetic, simulated, and measured evidence and state the actual claim scope.
 - Preserve numbers, units, citations, meaning, and uncertainty when writing or editing. Material evidence limits belong in the delivered artifact as well as the conversation.
 - Review critically and fairly. State what is supported first, then concrete errors or uncertainty. Distinguish implementation failure, insufficient evidence, and a supported negative result; optional broader experiments do not invalidate a scoped contribution.
-- For an unexpectedly weak result, investigate plausible causes across code, data, metrics, baselines, uncertainty, operating conditions, and method assumptions. Prioritize checks that could change the conclusion; preserve the original result, label exploratory follow-up, and never cherry-pick seeds, metrics, subsets, or reruns for a favorable verdict.
+- For an unexpectedly good or weak result, investigate plausible causes across code, data, metrics, baselines, uncertainty, operating conditions, and method assumptions. Prioritize checks that could change the conclusion; preserve the original result, label exploratory follow-up, and never cherry-pick seeds, metrics, subsets, or reruns for a favorable verdict.
 
 ## Scope and completion
 
+- Use `research-repo-protocol` for substantive experiment specifications, repository structure, execution, judgment, and handover. Reuse the project's authoritative records and hierarchy; small edits need no new experiment card.
+- Use `paper-writing` for manuscripts and rebuttals, and the installed `humanizer` for prose editing. Preserve facts, equations, citations, technical terms, and author-owned final-edit regions.
 - Follow the current user request and platform instructions; reply in Korean unless requested otherwise. Project instructions define local commands, equipment settings, and experiment limits. Load only the skills and references needed for the current task.
 - Read enough relevant evidence to understand the change. A small edit does not require a repository map, a plan, or a review chain. Existing useful graphs can help navigation; creating one requires a graph-building task.
 - Complete the authorized work through implementation, applicable execution, inspection, and correction of failures caused by the change. Respect read-only requests and genuine approval boundaries; do not ask again for routine steps already authorized.
