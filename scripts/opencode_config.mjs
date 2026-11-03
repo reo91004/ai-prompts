@@ -196,7 +196,11 @@ export async function main(args) {
   let desiredCli = parseConfig(parser, readFileSync(join(options["--templates"], "cli.json"), "utf8"));
   if (options["--extra-cli-template"]) desiredCli = mergeObjects(desiredCli, parseConfig(parser, readFileSync(options["--extra-cli-template"], "utf8")));
   let desiredServer = parseConfig(parser, readFileSync(join(options["--templates"], "opencode.jsonc"), "utf8"));
-  if (options["--extra-template"]) desiredServer = mergeObjects(desiredServer, parseConfig(parser, readFileSync(options["--extra-template"], "utf8")));
+  if (options["--extra-template"]) {
+    const extra = parseConfig(parser, readFileSync(options["--extra-template"], "utf8"));
+    const plugins = [...pluginArray(desiredServer.plugins), ...pluginArray(extra.plugins)];
+    desiredServer = { ...mergeObjects(desiredServer, extra), plugins };
+  }
   desiredServer.plugins = [join(configDir, "research-agent-kit/context"), ...pluginArray(desiredServer.plugins)];
   const result = { status: "configured", overrides: [], prepared: {} };
   const nextState = { version: 1, configDir, files: {} };

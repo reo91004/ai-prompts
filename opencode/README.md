@@ -21,6 +21,18 @@ Native build/plan agents remain available. context-explorer and research-reviewe
 
 The context plugin sets chat-model context/input metadata to 1,000,000 tokens without replacing provider/model IDs, variants, output limits, or credentials. `compaction.auto=true` and `buffer="20%"` give an 800,000-token compaction ceiling. This is a harness policy; it does not expand a provider's actual supported context.
 
+## LaTeX
+
+The installer registers `opencode-latex@0.2.0` in `opencode.jsonc`; OpenCode downloads the package and loads its TUI companion on startup. The server plugin asks the model to use simple Unicode inline math and fenced `latex` blocks for longer formulas. Existing `\[...\]` expressions in conversation history are not converted.
+
+````markdown
+```latex
+\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}
+```
+````
+
+Kitty/SIXEL terminals support graphical output; other terminals use Unicode cells. `/latex-render-mode` selects the output mode. Installation and the command dialog were checked in OpenCode 2.2.5; graphical formula output in a supported terminal has not been visually verified.
+
 ## Headroom And Long Work
 
 Headroom's official V2 plugin is read from the installed Python wheel and uses the kit's persistent proxy. Retrieval and the local Headroom MCP are configured through that same deployment. Configuration checks verify directory entrypoints, proxy and MCP paths. OpenAI chat/responses, Anthropic Messages, and the `claude-agent` subprocess are distinct request routes; report only the routes actually tested.

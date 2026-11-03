@@ -124,10 +124,12 @@ test("prepare stages files; check reports effective customizations without mutat
     const configDir = join(directory, "config");
     const outputDir = join(directory, "prepared");
     const statePath = join(directory, "ownership.json");
+    const extraPath = join(directory, "headroom.json");
     mkdirSync(configDir);
+    writeFileSync(extraPath, JSON.stringify({ plugins: [{ package: "/kit/headroom", options: { proxyUrl: "http://127.0.0.1:8787" } }] }));
     const original = '{\n// original\n"providers":{"custom":{"models":{"one":{}}}},"plugins":["user-base"]\n}';
     writeFileSync(join(configDir, "opencode.json"), original);
-    const args = ["--config-dir", configDir, "--state", statePath, "--templates", join(root, "opencode"), "--parser", parserPath];
+    const args = ["--config-dir", configDir, "--state", statePath, "--templates", join(root, "opencode"), "--parser", parserPath, "--extra-template", extraPath];
     const run = (action, extra = []) => JSON.parse(execFileSync(process.execPath, [join(root, "scripts/opencode_config.mjs"), action, ...args, ...extra], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
     const prepared = run("prepare", ["--output-dir", outputDir]);
     assert.equal(prepared.status, "configured");
@@ -147,9 +149,11 @@ test("prepare stages files; check reports effective customizations without mutat
     assert.deepEqual(readdirSync(configDir).map((name) => [name, readFileSync(join(configDir, name), "utf8")]), before);
     const effective = run("effective");
     assert.ok(effective.providers.custom.models.one);
-    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context")]);
+    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context"), "opencode-latex@0.2.0",
+      { package: "/kit/headroom", options: { proxyUrl: "http://127.0.0.1:8787" } }]);
     assert.equal(effective.compaction.buffer, "20%");
-    assert.throws(() => run("prepare", ["--output-dir", outputDir, "--extra-template", join(directory, "missing.json")]), /ENOENT/);
+    writeFileSync(extraPath, "invalid");
+    assert.throws(() => run("prepare", ["--output-dir", outputDir]), /Invalid JSONC/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

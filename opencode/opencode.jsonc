@@ -3,6 +3,7 @@
   "update": "notify",
   "share": "disabled",
   "skills": [],
+  "plugins": ["opencode-latex@0.2.0"],
   "compaction": {
     "auto": true,
     "buffer": "20%"

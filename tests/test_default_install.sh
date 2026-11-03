@@ -206,6 +206,7 @@ assert_defaults() {
   "$KIT_TEST_PYTHON" -I -B "$ROOT/scripts/context_defaults.py" check "$ROOT/codex/context.toml" "$HOME/.codex/config.toml"
   [ -s "$HOME/.config/opencode/cli.json" ] && [ -s "$HOME/.config/opencode/opencode.jsonc" ]
   [ -s "$HOME/.config/opencode/research-agent-kit/context/index.js" ]
+  node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER);if(!p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins.includes("opencode-latex@0.2.0"))process.exit(1)' "$HOME/.config/opencode/opencode.jsonc"
   [ -s "$HOME/.claude/skills/graphify/SKILL.md" ] && [ -s "$HOME/.codex/skills/graphify/SKILL.md" ]
   [ -x "$UV_TOOL_BIN_DIR/graphify" ] && [ -x "$UV_TOOL_BIN_DIR/headroom" ]
   cmp "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
