@@ -13,6 +13,9 @@ TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tooling-install.XXXXXX")"
 TMP_HOME="$TMP_ROOT/home"
 MOCK_BIN="$TMP_ROOT/mock-bin"
 CALLS="$TMP_ROOT/calls.log"
+source "$ROOT/tests/fixtures/crucible_engine.sh"
+export CRUCIBLE_ROOT="$TMP_ROOT/crucible-fixture"
+make_crucible_fixture "$CRUCIBLE_ROOT"
 trap 'rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 mkdir -p "$TMP_HOME" "$MOCK_BIN"

@@ -645,6 +645,30 @@ install_statusline() {
   kit_replace_file "$KIT_BACKUP_DIR/statusline.state.next" "$KIT_STATE_ROOT/statusline.state"
 }
 
+prepare_crucible() {
+  local locator="$ROOT/skills/crucible/scripts/engine.py" source status target stage connection_file
+  if source="$("$KIT_HEADROOM_PYTHON" -I -B "$locator" find)"; then
+    printf 'Reusing Crucible: %s\n' "$source"
+  else
+    status=$?
+    [ "$status" -eq 1 ] || kit_die "Crucible discovery failed; existing checkouts were preserved."
+    target="$HOME/Crucible"
+    [ ! -e "$target" ] && [ ! -L "$target" ] || kit_die "Crucible destination already exists: $target"
+    stage="$KIT_BACKUP_DIR/crucible-source"
+    git clone --depth 1 https://github.com/reo91004/Crucible.git "$stage" || kit_die "Crucible download failed."
+    "$KIT_HEADROOM_PYTHON" -I -B "$locator" connect "$stage" "$KIT_BACKUP_DIR/crucible-stage.json" || kit_die "Downloaded Crucible is invalid."
+    mkdir "$target" || kit_die "Crucible destination appeared during installation; preserved it."
+    kit_journal_entry absent "$target"
+    cp -Rp "$stage/." "$target/" || kit_die "Crucible installation failed."
+    source="$target"
+  fi
+  connection_file="$KIT_STATE_ROOT/crucible.json"
+  kit_require_regular_or_absent "$connection_file"
+  kit_backup_path "$connection_file" "crucible/connection.json"
+  "$KIT_HEADROOM_PYTHON" -I -B "$locator" connect "$source" "$KIT_BACKUP_DIR/crucible.next.json" || kit_die "Crucible connection failed."
+  kit_replace_file "$KIT_BACKUP_DIR/crucible.next.json" "$connection_file"
+}
+
 prepare_shared_skills() {
   local source name
   KIT_SHARED_SKILLS="$KIT_BACKUP_DIR/shared-skills.next"
@@ -2351,6 +2375,7 @@ else
   tooling_status="$(read_tooling_state status)"
   case "$tooling_status" in
     installed)
+  "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B "$ROOT/skills/crucible/scripts/engine.py" check || missing=1
       graphify_state="$(read_tooling_state graphify)"
       headroom_state="$(read_tooling_state headroom)"
       wrapper_state="$(read_tooling_state headroom_wrapper)"
@@ -2805,6 +2830,7 @@ HELP
   fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
     prepare_tooling
+  prepare_crucible
     kit_require_regular_or_absent "$HOME/.codex/config.toml"
     kit_backup_path "$HOME/.codex/config.toml" "legacy/config.toml"
     "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" migrate-legacy || kit_die "Legacy Headroom migration failed."

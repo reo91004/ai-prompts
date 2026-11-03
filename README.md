@@ -197,7 +197,7 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 ## Crucible 연구 루프
 
-장기 실험 실행·평가·조건부 다중 모델 검토는 별도 저장소 `~/reo/crucible`의 엔진이 맡습니다. 이 키트는 [Crucible 공통 스킬](skills/crucible/SKILL.md)과 실행 launcher를 배포하며 연구 프로젝트의 상태·결과는 복사하지 않습니다. 다른 엔진 경로는 `CRUCIBLE_ROOT`로 지정합니다.
+장기 실험 실행·평가·조건부 다중 모델 검토는 별도 [Crucible 엔진](https://github.com/reo91004/Crucible)이 맡습니다. 기본 `sh install.sh`는 홈 아래의 기존 엔진을 찾아 재사용하고, 없으면 `~/Crucible`에 내려받아 연결한 뒤 공통 스킬을 설치합니다. 경로는 자동으로 기록하므로 직접 지정할 필요가 없습니다. 기존 저장소는 갱신·덮어쓰기하지 않습니다. 여러 복사본이 있으면 `CRUCIBLE_ROOT`로 선택하며, tooling 생략 모드에서는 엔진 설치도 생략합니다.
 
 엔진의 `bin/crucible init --project <새 디렉터리>`로 합성 예제를 시작할 수 있습니다. 실제 연구에는 프로젝트별 실험·평가 설정을 작성합니다. OpenCode에서는 엔진의 `link-opencode --project <프로젝트>`로 프로젝트 전용 도구를 연결하며, Claude Code에서는 같은 스킬과 CLI를 사용합니다. 키트 설치기가 외부 엔진이나 진행 중인 실험을 자동 갱신하지는 않습니다.
 

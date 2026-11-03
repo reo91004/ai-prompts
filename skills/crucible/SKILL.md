@@ -5,7 +5,7 @@ description: Run an explicitly requested bounded research loop with automatic co
 
 # Crucible Research Loop
 
-Crucible is a separate engine, normally at `~/reo/crucible`; set `CRUCIBLE_ROOT` for another checkout or install its CLI. This skill works from OpenCode, Claude Code, and Codex. The engine owns execution and state; the host owns the user's research scope.
+Crucible is a separate engine. The default ai-prompts installer finds an existing checkout under HOME or downloads it to `~/Crucible`, then records the connection. The launcher reuses that path and can rediscover moved checkouts under HOME. `CRUCIBLE_ROOT` and an installed CLI on PATH remain explicit overrides. Cache, virtual-environment and kit-backup directories are excluded from search; multiple matches require an explicit choice. This skill works from OpenCode, Claude Code, and Codex. The engine owns execution and state; the host owns the research scope.
 
 Use this skill's `scripts/crucible.sh --project <research-project> <command>`. Read the engine README before preparing a real project's `.crucible/config.json`. `init` creates a synthetic teaching example; use a fresh directory for it. A real project needs declared experiment argv, typed parameter bounds, inputs, required artifacts, its evaluator, budgets, and explicit model IDs from the available catalog. Reuse existing research cards and raw results.
 

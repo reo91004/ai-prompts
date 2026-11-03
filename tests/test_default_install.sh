@@ -16,6 +16,9 @@ export KIT_TEST_JSONC_PARSER="${KIT_TEST_JSONC_PARSER:-$ROOT/scripts/opencode-co
 }
 KIT_TEST_FIXTURES_ONLY=1 source "$ROOT/tests/test_integration_migration.sh"
 export KIT_TEST_FIXTURES_ONLY=1
+source "$ROOT/tests/fixtures/crucible_engine.sh"
+export CRUCIBLE_ROOT="$WORK/crucible-fixture"
+make_crucible_fixture "$CRUCIBLE_ROOT"
 unset UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING
 export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="$WORK/claude"
 JQ_BIN="$(command -v jq)"

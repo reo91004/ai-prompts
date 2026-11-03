@@ -47,7 +47,7 @@ The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](p
 
 ## Crucible Research Loop
 
-The shared [Crucible skill](../skills/crucible/SKILL.md) connects OpenCode to the separate [Crucible engine](https://github.com/reo91004/Crucible), normally checked out at `~/reo/crucible`. Experiments, state and evidence remain in each research project; the kit distributes only the skill and launcher. Set `CRUCIBLE_ROOT` if the engine checkout is elsewhere.
+The shared [Crucible skill](../skills/crucible/SKILL.md) connects OpenCode to the separate [Crucible engine](https://github.com/reo91004/Crucible). Default installation reuses a checkout discovered under HOME or downloads it to `~/Crucible`, records its path, and installs the skill. Existing source checkouts are preserved. `CRUCIBLE_ROOT` and an installed CLI remain optional overrides; tooling-skip mode also skips engine setup.
 
 Run the engine's `link-opencode --project <project>` to add its project-local V2 bridge, then reopen that project's session. The native `crucible` tool starts background execution, inspects state and explicitly delivers durable events. Linking does not alter global providers, permissions or other running projects. The engine README documents its configuration and actual validation scope.
 
