@@ -1,0 +1,13 @@
+# Use total input/output usage for the 800k boundary inside a 1M window.
+model_context_window = 1000000
+model_auto_compact_token_limit = 800000
+model_auto_compact_token_limit_scope = "total"
+model_post_turn_compact_threshold_percent = 0
+
+[features.context_management]
+experimental_mode = true
+
+# An explicit empty prompt disables fallback note-taking's extra token buffer.
+# The updater preserves token_budget=false and all other token-budget settings.
+[features.token_budget]
+auto_compact_fallback_prompt = ""
