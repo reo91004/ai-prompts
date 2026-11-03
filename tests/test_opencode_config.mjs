@@ -63,6 +63,26 @@ test("a customized kit plugin survives reinstall and removal", () => {
   assert.equal(reconcile(parser, second.text, {}, second.state).text, custom);
 });
 
+test("versioned CLI plugins upgrade in place and restore the original package", () => {
+  const source = '{"plugins":["user-first","opencode-btw-plus@0.1.0","user-last"]}';
+  const first = reconcile(parser, source, { plugins: ["-opencode.btw", "opencode-btw-plus@0.1.3"] });
+  assert.deepEqual(parseConfig(parser, first.text).plugins, ["user-first", "-opencode.btw", "opencode-btw-plus@0.1.3", "user-last"]);
+  const next = reconcile(parser, first.text, { plugins: ["-opencode.btw", "opencode-btw-plus@0.1.4"] }, first.state);
+  assert.deepEqual(parseConfig(parser, next.text).plugins, ["user-first", "-opencode.btw", "opencode-btw-plus@0.1.4", "user-last"]);
+  assert.deepEqual(parseConfig(parser, reconcile(parser, next.text, {}, next.state).text).plugins,
+    ["user-first", "opencode-btw-plus@0.1.0", "user-last"]);
+});
+
+test("a user-selected package version and repeated enable directives survive", () => {
+  const first = reconcile(parser, "{}", { plugins: ["-opencode.btw", "opencode-btw-plus@0.1.3"] });
+  const source = '{"plugins":["user","-user","user","-opencode.btw","opencode-btw-plus@0.2.0"]}';
+  const next = reconcile(parser, source, { plugins: ["-opencode.btw", "opencode-btw-plus@0.1.4"] }, first.state);
+  assert.equal(next.text, source);
+  assert.deepEqual(next.overrides, ["plugins:opencode-btw-plus"]);
+  const removed = reconcile(parser, next.text, {}, next.state);
+  assert.deepEqual(parseConfig(parser, removed.text).plugins, ["user", "-user", "user", "opencode-btw-plus@0.2.0"]);
+});
+
 test("reject malformed and duplicate configuration before editing", () => {
   for (const source of ['{"broken":', '{"same":1,"same":2}', '{"a":{"same":1,"same":2}}', "[]"]) {
     assert.throws(() => reconcile(parser, source, { valid: true }), /JSONC/);
@@ -147,4 +167,35 @@ test("context plugin changes chat context/input only and disposes its registrati
   assert.equal(models[0].limit.context * (1 - Number.parseFloat(buffer) / 100), 800000);
   await cleanup();
   assert.equal(disposed, true);
+});
+
+test("extra CLI template installs ordered plugins and checks only CLI plugin scope", () => {
+  const directory = mkdtempSync(join(tmpdir(), "research-opencode-cli-"));
+  try {
+    const configDir = join(directory, "config");
+    const outputDir = join(directory, "prepared");
+    const statePath = join(directory, "ownership.json");
+    const extraPath = join(directory, "cli-extra.json");
+    mkdirSync(configDir);
+    writeFileSync(join(configDir, "cli.json"), '{\n// user CLI plugin\n"plugins":["user-cli"]\n}');
+    writeFileSync(join(configDir, "opencode.json"), '{"plugins":["opencode-btw-plus@0.1.3"]}');
+    writeFileSync(extraPath, JSON.stringify({ plugins: ["-opencode.btw", "opencode-btw-plus@0.1.3"] }));
+    const args = ["--config-dir", configDir, "--state", statePath, "--templates", join(root, "opencode"), "--parser", parserPath, "--extra-cli-template", extraPath];
+    const run = (action, extra = []) => JSON.parse(execFileSync(process.execPath,
+      [join(root, "scripts/opencode_config.mjs"), action, ...args, ...extra], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
+    const prepared = run("prepare", ["--output-dir", outputDir]);
+    const staged = readFileSync(prepared.prepared["cli.json"], "utf8");
+    assert.match(staged, /\/\/ user CLI plugin/);
+    assert.deepEqual(parseConfig(parser, staged).plugins, ["user-cli", "-opencode.btw", "opencode-btw-plus@0.1.3"]);
+    for (const name of ["cli.json", "opencode.jsonc"]) cpSync(prepared.prepared[name], join(configDir, name));
+    cpSync(prepared.prepared.state, statePath);
+    assert.equal(run("check").status, "configured");
+    const cli = parseConfig(parser, staged);
+    cli.plugins.pop();
+    writeFileSync(join(configDir, "cli.json"), JSON.stringify(cli));
+    assert.deepEqual(run("check").overrides, ["cli.json:plugins:opencode-btw-plus"]);
+    assert.throws(() => run("prepare", ["--output-dir", outputDir, "--extra-cli-template", extraPath]), /Invalid argument/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

@@ -49,18 +49,14 @@ function edit(parser, text, path, snapshot) {
 function packageID(entry) {
   const id = typeof entry === "string" ? entry : entry?.package;
   if (typeof id !== "string" || !id) throw new Error("Plugin entries must have a package string");
-  return id;
+  const npm = /^((?:@[a-z0-9._-]+\/)?[a-z0-9._-]+)(?:@[^/]+)?$/i.exec(id);
+  return npm?.[1] ?? id;
 }
 
 function pluginArray(value) {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new Error("plugins must be an array");
-  const ids = new Set();
-  for (const entry of value) {
-    const id = packageID(entry);
-    if (ids.has(id)) throw new Error(`Duplicate plugin package: ${id}`);
-    ids.add(id);
-  }
+  for (const entry of value) packageID(entry);
   return clone(value);
 }
 
@@ -116,7 +112,7 @@ export function reconcile(parser, text, desired, previous = { keys: {}, plugins:
   let nextPlugins = [...currentPlugins];
   const requestedPlugins = new Map(plugins.map((entry) => [packageID(entry), entry]));
   for (const id of new Set([...Object.keys(previous.plugins), ...requestedPlugins.keys()])) {
-    const index = nextPlugins.findIndex((entry) => packageID(entry) === id);
+    const index = nextPlugins.findLastIndex((entry) => packageID(entry) === id);
     const current = index < 0 ? { exists: false } : { exists: true, value: nextPlugins[index] };
     const prior = previous.plugins[id];
     if (prior && !isDeepStrictEqual(current, prior.installed)) {
@@ -126,7 +122,13 @@ export function reconcile(parser, text, desired, previous = { keys: {}, plugins:
     }
     const wanted = requestedPlugins.has(id) ? { exists: true, value: requestedPlugins.get(id) } : prior.original;
     if (index >= 0) nextPlugins.splice(index, 1);
-    if (wanted.exists) nextPlugins.splice(index < 0 ? nextPlugins.length : index, 0, wanted.value);
+    if (wanted.exists) {
+      const order = [...requestedPlugins.keys()];
+      const later = order.slice(order.indexOf(id) + 1);
+      const before = nextPlugins.findIndex((entry) => later.includes(packageID(entry)));
+      const insertion = index >= 0 ? index : before >= 0 ? before : nextPlugins.length;
+      nextPlugins.splice(insertion, 0, wanted.value);
+    }
     if (requestedPlugins.has(id)) state.plugins[id] = { original: prior?.original ?? current, installed: wanted };
   }
   if (!isDeepStrictEqual(currentPlugins, nextPlugins)) {
@@ -167,10 +169,10 @@ function assertState(state, configDir) {
 
 export async function main(args) {
   const [action, ...rest] = args;
-  if (!["prepare", "check", "remove", "effective"].includes(action)) throw new Error("Usage: opencode_config.mjs prepare|check|remove|effective --config-dir PATH --parser PATH [--state PATH --templates PATH --extra-template PATH --output-dir PATH]");
+  if (!["prepare", "check", "remove", "effective"].includes(action)) throw new Error("Usage: opencode_config.mjs prepare|check|remove|effective --config-dir PATH --parser PATH [--state PATH --templates PATH --extra-template PATH --extra-cli-template PATH --output-dir PATH]");
   const options = {};
   for (let i = 0; i < rest.length; i += 2) {
-    if (!["--config-dir", "--state", "--templates", "--parser", "--output-dir", "--extra-template"].includes(rest[i]) || !rest[i + 1] || own(options, rest[i])) throw new Error(`Invalid argument: ${rest[i]}`);
+    if (!["--config-dir", "--state", "--templates", "--parser", "--output-dir", "--extra-template", "--extra-cli-template"].includes(rest[i]) || !rest[i + 1] || own(options, rest[i])) throw new Error(`Invalid argument: ${rest[i]}`);
     options[rest[i]] = resolve(rest[i + 1]);
   }
   for (const key of ["--config-dir", "--parser", ...(action === "effective" ? [] : ["--state", "--templates"])]) if (!options[key]) throw new Error(`Missing ${key}`);
@@ -191,7 +193,8 @@ export async function main(args) {
   assertState(state, configDir);
   if (action === "check" && !existsSync(statePath)) throw new Error("OpenCode configuration has not been installed");
 
-  const desiredCli = parseConfig(parser, readFileSync(join(options["--templates"], "cli.json"), "utf8"));
+  let desiredCli = parseConfig(parser, readFileSync(join(options["--templates"], "cli.json"), "utf8"));
+  if (options["--extra-cli-template"]) desiredCli = mergeObjects(desiredCli, parseConfig(parser, readFileSync(options["--extra-cli-template"], "utf8")));
   let desiredServer = parseConfig(parser, readFileSync(join(options["--templates"], "opencode.jsonc"), "utf8"));
   if (options["--extra-template"]) desiredServer = mergeObjects(desiredServer, parseConfig(parser, readFileSync(options["--extra-template"], "utf8")));
   desiredServer.plugins = [join(configDir, "research-agent-kit/context"), ...pluginArray(desiredServer.plugins)];
@@ -206,7 +209,7 @@ export async function main(args) {
       for (const [path, value] of leaves(desired).filter(([path]) => path[0] !== "plugins")) {
         if (!isDeepStrictEqual(lookup(effective, path), { exists: true, value })) result.overrides.push(`${filename}:${path.join(".")}`);
       }
-      const effectivePlugins = [...pluginArray(base.plugins), ...pluginArray(current.data.plugins)];
+      const effectivePlugins = [...(filename === "opencode.jsonc" ? pluginArray(base.plugins) : []), ...pluginArray(current.data.plugins)];
       for (const expected of pluginArray(desired.plugins)) {
         const match = effectivePlugins.filter((entry) => packageID(entry) === packageID(expected)).at(-1);
         if (!isDeepStrictEqual(match, expected)) result.overrides.push(`${filename}:plugins:${packageID(expected)}`);
