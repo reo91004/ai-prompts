@@ -11,6 +11,10 @@ In Claude Code, prefer `Monitor` with a watcher that emits only terminal events.
 
 In Codex, direct background terminals require a later session wait or `write_stdin` to surface completion. The parent may continue independent work, then block on the isolated runner session at the dependency boundary. The `experiment_monitor` uses a shell-native blocking wait or the longest policy-allowed tool wait and returns only after a terminal event. A runner-session wait timeout causes another wait without re-analysis and is not failure. Scheduled polling is opt-in only when the user accepts cadence-based checks or the original session cannot remain alive.
 
+In OpenCode V2, prefer its native background-shell/job lifecycle for one long command. Preserve the job identity, durable log, checkpoint, and completion artifacts; use the supported wait/completion path at the dependency boundary. Verify exit status and artifacts after an event. An external event file does not establish that the active agent received a notification.
+
+Use an optional Monitor plugin for ongoing event streams after its installed-version server/TUI compatibility and event delivery are verified. Put observation, not the experiment itself, under a monitor whose stop/timeout cleans up its process tree. Observer timeout is not experiment failure. If event delivery is unavailable, use a supported blocking worker/job wait and record that limitation. Preserve ownership across compaction/handover and follow the recorded resume rule rather than launching duplicate work.
+
 ## Run scope and cancellation
 
 Before launch, bind the exact command, expected artifacts, progress probe, checkpoint/resume procedure, and graceful cancellation/cleanup to the task. The monitor executes that command; it does not design experiments or accept claims. It defaults to no retry unless one exact trigger, command, and attempt limit are declared.

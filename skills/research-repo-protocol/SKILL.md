@@ -11,6 +11,8 @@ Use the repository's existing conventions, environment, records, identifiers, an
 
 Identify the authoritative locations for the question and specification, raw evidence, code/configuration, judgment, discussion, events, current execution state, and next action. Link to them instead of copying facts between documents. A generated registry is a derived index. Read [directory roles](references/directory-roles.md) when unfamiliar with a structure; do not reorganize a repository to match an example.
 
+Identify the source of user instructions as part of that map. Preserve supplied wording where it matters, and distinguish the original instruction from its project-specific interpretation and the reusable principle.
+
 ## Carry one question through its lifecycle
 
 1. Reuse literature, reference implementations, completed experiments, and failure lessons.

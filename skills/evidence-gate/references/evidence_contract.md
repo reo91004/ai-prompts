@@ -11,6 +11,8 @@ Keep the existing field names `evidence_origin` (`synthetic` / `simulated` / `me
 
 The project selects domain checks that protect its actual claim. Hardware checks apply to physical runs; leakage, key-recovery, attack-budget, and trace-alignment evidence apply only to claims that require them.
 
+For analytical or theoretical work, retain the statement, assumptions, derivation or proof obligations, and supporting checked artifacts. Use the project's analytical record type rather than labeling a proof as a measurement or silently changing an existing experiment schema's enums. Seeds, sampling units, and physical acquisition fields apply when the claim actually uses them.
+
 Use `diagnostic` for debugging or calibration that does not support the reported claim, and `claim_bearing` for evidence used by that claim. Exploratory results may support explicitly scoped observations; selecting a hypothesis on those results does not make them independent confirmation. Preserve original results and distinguish follow-up analysis.
 
 Use existing logs and `.plans/ledger.json` when work needs cross-session recovery. Do not create duplicate packets, hash manifests, or approval records just to restate the evidence.

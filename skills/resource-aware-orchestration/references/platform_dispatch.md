@@ -7,6 +7,10 @@ For Claude Code, select the exact subagent type through the Agent tool or an exp
 
 In both runtimes, never state that a child ran as a specific role, model, or effort unless the runtime showed it. Saying "unverified" is correct; asserting the declaration as fact is not.
 
+For OpenCode V2, select the configured native agent through its actual selector. This kit provides context-explorer and research-reviewer subagents alongside native build/plan; other specialist counterparts are not configured. Resolve a requested provider/model/variant from the current catalog and confirm the effective assignment. Inherited-model review is an independent session, not a requested Astra or cross-model review. Respect effective tool permissions, including MCP and custom tools; edit/shell restrictions alone do not describe every action.
+
+OpenCode discovers shared skills from `~/.agents/skills` and uses its own global AGENTS.md. Apply the relevant domain skill directly instead of importing Codex-only dispatch commands.
+
 ## Cooperation
 
 Use an available connector or `scripts/run_codex_agent.sh` for a concrete Codex contribution from Claude. Batch related questions and reuse a useful review. Do not require collaboration at every phase. If the other agent is unavailable, say so once and continue authorized work without claiming it participated.
