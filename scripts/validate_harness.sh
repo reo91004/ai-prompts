@@ -110,7 +110,7 @@ for skill in "$ROOT/skills"/*; do
   [ "$name" = "${skill##*/}" ] || fail "skill name mismatch: $skill"
 done
 [ "$skill_count" -gt 0 ] || fail "shared skills are empty"
-for required in research-repo-protocol paper-writing side-channel-analysis; do
+for required in research-repo-protocol paper-writing side-channel-analysis crucible; do
   [ -s "$ROOT/skills/$required/SKILL.md" ] || fail "missing required skill: $required"
 done
 [ ! -e "$ROOT/skills/research-repo-design" ] || fail "retired research-repo-design skill remains"
@@ -122,7 +122,7 @@ for platform in codex/AGENTS.md claude-code/CLAUDE.md opencode/AGENTS.md; do
     [ "$reference_core" = "$core" ] || fail "global research principles differ: $platform"
   fi
 done
-for command in install.sh codex-remote.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh; do
+for command in install.sh codex-remote.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh skills/crucible/scripts/crucible.sh; do
   [ -x "$ROOT/$command" ] || fail "missing executable: $command"
   bash -n "$ROOT/$command" || fail "shell syntax: $command"
 done

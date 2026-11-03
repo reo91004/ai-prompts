@@ -27,6 +27,8 @@ jobs:
         run: bash tests/test_resource_detector.sh
       - name: Test explicit Codex agent dispatch
         run: bash tests/test_codex_agent_runner.sh
+      - name: Test Crucible skill launcher
+        run: bash tests/test_crucible_skill.sh
       - name: Exercise the live resource detector
         shell: bash
         run: |

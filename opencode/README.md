@@ -45,6 +45,14 @@ The CLI uses a local compatibility package built from `opencode-btw-plus@0.1.3`,
 
 The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](plugins/btw-plus-compat/README.md) supplies the syntax-style resource owner and theme 2.2.5. The patched package passed host-matched headless UI checks; full-app/real-model execution is a separate scope. Unknown source hashes or host versions fail before activation.
 
+## Crucible Research Loop
+
+The shared [Crucible skill](../skills/crucible/SKILL.md) connects OpenCode to the separate [Crucible engine](https://github.com/reo91004/Crucible), normally checked out at `~/reo/crucible`. Experiments, state and evidence remain in each research project; the kit distributes only the skill and launcher. Set `CRUCIBLE_ROOT` if the engine checkout is elsewhere.
+
+Run the engine's `link-opencode --project <project>` to add its project-local V2 bridge, then reopen that project's session. The native `crucible` tool starts background execution, inspects state and explicitly delivers durable events. Linking does not alter global providers, permissions or other running projects. The engine README documents its configuration and actual validation scope.
+
+After one-time experiment/evaluator/model/budget setup, `start` evaluates each result and automatically requests review for registered anomaly/regression/stagnation/theory-conflict events. To request discussion explicitly, use `/crucible-debate <question>` or the native tool with `action=debate`, `question`, and optional project-relative `evidence`. Manual cases preserve their own snapshots and bounded budgets; they do not start experiments or change an active loop's next decision. External jobs are not automatically discovered.
+
 ## Sources
 
 - [V2 configuration](https://opencode.ai/v2/docs/config), [CLI settings](https://opencode.ai/v2/docs/cli/config), [permissions](https://opencode.ai/v2/docs/permissions).

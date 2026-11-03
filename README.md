@@ -195,6 +195,12 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 [research-repo-protocol](skills/research-repo-protocol/SKILL.md)은 질문·사양·실행·근거·판정·인계를 연결하며 기존 설계 스킬도 통합했습니다. [계층 구조](skills/research-repo-protocol/references/directory-roles.md)와 [공통 연구 원칙](skills/research-domain-router/references/research_principles.md)을 작업에 맞게 참조합니다. [paper-writing](skills/paper-writing/SKILL.md)은 논문 집필을 맡고, 기본 설치·갱신하는 [Humanizer](https://github.com/blader/humanizer)를 문체 편집에 사용합니다. 수치·수식·인용·전문용어·주장 강도는 보존합니다.
 
+## Crucible 연구 루프
+
+장기 실험 실행·평가·조건부 다중 모델 검토는 별도 저장소 `~/reo/crucible`의 엔진이 맡습니다. 이 키트는 [Crucible 공통 스킬](skills/crucible/SKILL.md)과 실행 launcher를 배포하며 연구 프로젝트의 상태·결과는 복사하지 않습니다. 다른 엔진 경로는 `CRUCIBLE_ROOT`로 지정합니다.
+
+엔진의 `bin/crucible init --project <새 디렉터리>`로 합성 예제를 시작할 수 있습니다. 실제 연구에는 프로젝트별 실험·평가 설정을 작성합니다. OpenCode에서는 엔진의 `link-opencode --project <프로젝트>`로 프로젝트 전용 도구를 연결하며, Claude Code에서는 같은 스킬과 CLI를 사용합니다. 키트 설치기가 외부 엔진이나 진행 중인 실험을 자동 갱신하지는 않습니다.
+
 ## 일상 원격 제어
 
 전체 설치·갱신 이후의 일상 조작은 다음 명령으로 수행하며 전체 갱신을 다시 실행하지 않습니다.
