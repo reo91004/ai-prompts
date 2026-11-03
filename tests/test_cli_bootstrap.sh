@@ -205,12 +205,21 @@ cat > "$WORK/bin/brew" <<'MOCK'
 set -euo pipefail
 case "$*" in
   --prefix) echo "$HOME/brew" ;;
-  'list --cask --versions') [ -f "$HOME/brew-removed" ] || printf 'codex 0.1\nclaude-code 1.0\nother-tool 2.0\n' ;;
-  'list --formula --versions') : ;;
+  'list --cask --versions')
+    echo 'Error: Refusing to load cask fif7y/tap/dimble from untrusted tap fif7y/tap.' >&2
+    exit 1 ;;
+  'list --cask -1')
+    [ "${MOCK_BREW_LIST_FAILURE:-0}" -ne 1 ] || exit 42
+    [ -f "$HOME/brew-removed" ] || printf 'codex\nclaude-code\nother-tool\ncodex-helper\n' ;;
+  'list --formula -1')
+    [ -f "$HOME/brew-formula-removed" ] || printf 'codex\nother-formula\n' ;;
   'uninstall --cask codex'|'uninstall --cask claude-code')
     printf 'brew-remove %s\n' "$3" >> "$BOOTSTRAP_CALLS"
     [ "$3" != claude-code ] || : > "$HOME/brew-removed"
     ;;
+  'uninstall --formula codex')
+    printf 'brew-remove formula %s\n' "$3" >> "$BOOTSTRAP_CALLS"
+    : > "$HOME/brew-formula-removed" ;;
   *) exit 99 ;;
 esac
 MOCK
@@ -222,9 +231,15 @@ grep -Fqx fixture-auth "$HOME/.codex/auth.json"
 [ ! -e "$CLEANUP_PREFIX/lib/node_modules/@openai/codex" ]
 [ ! -e "$CLEANUP_PREFIX/lib/node_modules/@anthropic-ai/claude-code" ]
 [ "$(grep -c '^npm-remove' "$BOOTSTRAP_CALLS")" -eq 2 ]
-[ "$(grep -c '^brew-remove' "$BOOTSTRAP_CALLS")" -eq 2 ]
+[ "$(grep -c '^brew-remove' "$BOOTSTRAP_CALLS")" -eq 3 ]
 cleanup_legacy_clis
 [ "$(grep -c '^npm-remove' "$BOOTSTRAP_CALLS")" -eq 2 ]
+[ "$(grep -c '^brew-remove' "$BOOTSTRAP_CALLS")" -eq 3 ]
+
+# A failed name listing must still stop cleanup rather than hide inspection errors.
+if (MOCK_BREW_LIST_FAILURE=1 cleanup_legacy_clis) > "$WORK/failed-brew-list.log" 2>&1; then exit 1; fi
+grep -Fq 'Cannot inspect Homebrew cask packages' "$WORK/failed-brew-list.log"
+[ "$(grep -c '^brew-remove' "$BOOTSTRAP_CALLS")" -eq 3 ]
 
 # Failed native verification must prevent package removal.
 mv "$HOME/.codex/packages/standalone/current/bin/codex" "$WORK/native-codex"

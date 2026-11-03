@@ -292,7 +292,7 @@ cat > "$MOCK_BIN/brew" <<'MOCK'
 #!/bin/sh
 case "$*" in
   --prefix) echo "$HOME/empty-brew" ;;
-  'list --cask --versions'|'list --formula --versions') : ;;
+  'list --cask -1'|'list --formula -1') : ;;
   *) exit 99 ;;
 esac
 MOCK

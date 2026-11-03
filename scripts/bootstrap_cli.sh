@@ -266,9 +266,10 @@ cleanup_legacy_clis() {
     seen="$seen$prefix:"
     for kind in cask formula; do
       local installed
-      installed="$("$manager" list "--$kind" --versions)" || kit_die "Cannot inspect Homebrew $kind packages."
+      # Name-only listing avoids loading unrelated cask definitions and taps.
+      installed="$("$manager" list "--$kind" -1)" || kit_die "Cannot inspect Homebrew $kind packages."
       for name in codex claude-code; do
-        printf '%s\n' "$installed" | awk '{print $1}' | grep -Fqx "$name" || continue
+        printf '%s\n' "$installed" | grep -Fqx "$name" || continue
         echo "Removing legacy Homebrew $kind $name (native replacement verified)."
         "$manager" uninstall "--$kind" "$name" || kit_die "Native CLIs are installed, but Homebrew cleanup failed for $name."
       done
