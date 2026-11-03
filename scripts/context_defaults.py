@@ -43,13 +43,19 @@ def feature_table(features, name):
         features[name] = tomlkit.inline_table()
     elif isinstance(features[name], bool):
         replacement = tomlkit.inline_table()
-        replacement["enabled"] = features[name]
+        if name == "token_budget":
+            replacement["enabled"] = features[name]
         features[name] = replacement
     value = features[name]
     if not isinstance(value, MutableMapping):
         raise ValueError(f"features.{name} must be a boolean or table")
     if "enabled" in value and not isinstance(value["enabled"], bool):
         raise ValueError(f"features.{name}.enabled must be a boolean")
+    if name == "context_management" and "enabled" in value:
+        comment = value.item("enabled").trivia.comment
+        del value["enabled"]
+        if comment:
+            value.add(tomlkit.comment(comment.lstrip("# ")))
     return value
 
 
@@ -65,6 +71,8 @@ def check_config(text, defaults):
     context = features.get("context_management")
     if not isinstance(context, dict) or context.get("experimental_mode") is not True:
         raise ValueError("Codex experimental context management is not configured")
+    if "enabled" in context:
+        raise ValueError("Codex context_management does not support an enabled table key")
     budget = features.get("token_budget")
     if budget is not False and (not isinstance(budget, dict) or budget.get("auto_compact_fallback_prompt") != ""):
         raise ValueError("Codex token budget must be disabled or have an explicit empty fallback prompt")

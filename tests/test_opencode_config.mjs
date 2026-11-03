@@ -25,6 +25,15 @@ test("JSONC edits preserve comments, unrelated credentials and trailing commas",
   assert.deepEqual(repeated.state, result.state);
 });
 
+test("initial global skill directory reset is owned and reversible", () => {
+  const original = '{"skills":["/legacy/global-skills"],"providers":{"custom":{"settings":{"key":"keep"}}}}';
+  const installed = reconcile(parser, original, { skills: [] });
+  assert.deepEqual(parseConfig(parser, installed.text).skills, []);
+  assert.equal(parseConfig(parser, installed.text).providers.custom.settings.key, "keep");
+  const removed = reconcile(parser, installed.text, {}, installed.state);
+  assert.deepEqual(parseConfig(parser, removed.text), JSON.parse(original));
+});
+
 test("ownership preserves absent versus null and restores original values", () => {
   const first = reconcile(parser, '{"nullable":null,"existing":false}', { nullable: 1, newKey: 2, existing: true });
   assert.deepEqual(first.state.keys['["nullable"]'].original, { exists: true, value: null });

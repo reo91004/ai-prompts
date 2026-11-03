@@ -42,7 +42,8 @@ resolve_cli_versions() {
   KIT_CODEX_SOURCE=https://releases.openai.com/codex/channels/latest
   KIT_CLAUDE_SOURCE=https://downloads.claude.ai/claude-code-releases/latest
   KIT_OPENCODE_SOURCE=https://opencode.ai/update/api/latest/cli/npm
-  if ! download_file "$KIT_CODEX_SOURCE" "$KIT_BACKUP_DIR/codex-release.json"; then
+  if ! (download_file "$KIT_CODEX_SOURCE" "$KIT_BACKUP_DIR/codex-release.json") 2> "$KIT_BACKUP_DIR/codex-release-primary.log"; then
+    echo "Codex release host unavailable; checking the official GitHub release metadata."
     KIT_CODEX_SOURCE=https://api.github.com/repos/openai/codex/releases/latest
     download_file "$KIT_CODEX_SOURCE" "$KIT_BACKUP_DIR/codex-release.json" || kit_die "Could not resolve the latest Codex release."
   fi
@@ -306,8 +307,18 @@ bootstrap_cli() {
   PATH="$cli_root/bin:$HOME/.local/bin:$PATH"
   export PATH
   # Sequential Thinking 2 requires Node 24+; otherwise install the latest LTS.
+  local replace_node=0
   if ! node_bin="$(find_usable_cli node)" || ! npx_bin="$(find_usable_cli npx)"; then
-    node_version="$(latest_node_lts)"
+    replace_node=1
+  else
+    case "$node_bin" in
+      "$cli_root/bin/node"|"$cli_root/node/bin/node")
+        node_version="$(latest_node_lts)"
+        [ "$(cli_version "$node_bin")" = "$node_version" ] || replace_node=1 ;;
+    esac
+  fi
+  if [ "$replace_node" -eq 1 ]; then
+    [ -n "${node_version:-}" ] || node_version="$(latest_node_lts)"
     kit_require_real_dir "$cli_root"
     kit_require_real_dir "$cli_root/bin"
     kit_backup_path "$cli_root/node" "bootstrap/node"

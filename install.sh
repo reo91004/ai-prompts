@@ -5,6 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KIT_PYTHON_VERSION=3.13
 source "$ROOT/scripts/bootstrap_cli.sh"
+source "$ROOT/scripts/humanizer.sh"
+source "$ROOT/scripts/sequential_thinking.sh"
 
 
 kit_die() {
@@ -77,9 +79,11 @@ kit_tooling_idle() (
   local snapshot pid command executable name argument remaining busy seen=0
   local root="$HOME/.universal-research-agent-kit/tooling" physical_home physical_root
   local local_headroom="$HOME/.local/bin/headroom" physical_headroom
+  local node_root="$HOME/.universal-research-agent-kit/cli/node" physical_node_root
   physical_home="$(cd "$HOME" && pwd -P)" || return 1
   physical_root="$physical_home/.universal-research-agent-kit/tooling"
   physical_headroom="$physical_home/.local/bin/headroom"
+  physical_node_root="$physical_home/.universal-research-agent-kit/cli/node"
   # Keep command lines in memory: they can contain credentials. A failed
   # process inspection is not permission to replace a potentially active venv.
   if ! snapshot="$(ps -ww -u "$(id -u)" -o pid= -o args= 2>/dev/null)" || [ -z "$snapshot" ]; then
@@ -92,7 +96,7 @@ kit_tooling_idle() (
     seen=1
     busy=0
     case "$command" in
-      "$root/"*|"$physical_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1 ;;
+      "$root/"*|"$physical_root/"*|"$node_root/"*|"$physical_node_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1 ;;
     esac
     executable="${command%%[[:space:]]*}"
     name="${executable##*/}"
@@ -106,7 +110,7 @@ kit_tooling_idle() (
           remaining="${remaining#"${remaining%%[![:space:]]*}"}"
           [ -n "$remaining" ] || break
           case "$remaining" in
-            "$root/"*|"$physical_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1; break ;;
+            "$root/"*|"$physical_root/"*|"$node_root/"*|"$physical_node_root/"*|"$local_headroom"|"$local_headroom"[[:space:]]*|"$physical_headroom"|"$physical_headroom"[[:space:]]*) busy=1; break ;;
           esac
           argument="${remaining%%[[:space:]]*}"
           remaining="${remaining#"$argument"}"
@@ -223,6 +227,23 @@ kit_write_tooling_state() {
     printf 'headroom_version=%s\n' "$headroom_version"
     printf 'headroom_wrapper=%s\n' "$wrapper"
     printf 'tool_bin_dir=%s\n' "$tool_bin_dir"
+    printf 'codex_version=%s\n' "${KIT_CODEX_VERSION:--}"
+    printf 'claude_version=%s\n' "${KIT_CLAUDE_VERSION:--}"
+    printf 'opencode_version=%s\n' "${KIT_OPENCODE_VERSION:--}"
+    printf 'codex_source=%s\n' "${KIT_CODEX_SOURCE:--}"
+    printf 'claude_source=%s\n' "${KIT_CLAUDE_SOURCE:--}"
+    printf 'opencode_source=%s\n' "${KIT_OPENCODE_SOURCE:--}"
+    printf 'opencode_archive_sha256=%s\n' "${KIT_OPENCODE_ARCHIVE_SHA256:--}"
+    printf 'node_dir=%s\n' "${KIT_NODE_DIR:--}"
+    printf 'humanizer_source=%s\n' "${HUMANIZER_SOURCE:--}"
+    printf 'humanizer_revision=%s\n' "${HUMANIZER_REVISION:--}"
+    printf 'humanizer_content_sha256=%s\n' "${HUMANIZER_CONTENT_SHA256:--}"
+    printf 'humanizer_license=%s\n' "${HUMANIZER_LICENSE:--}"
+    printf 'sequential_thinking_version=%s\n' "${SEQUENTIAL_THINKING_VERSION:--}"
+    printf 'sequential_thinking_integrity=%s\n' "${SEQUENTIAL_THINKING_INTEGRITY:--}"
+    printf 'btw_version=%s\n' "${KIT_BTW_VERSION:--}"
+    printf 'btw_source=%s\n' "${KIT_BTW_SOURCE:--}"
+    printf 'btw_archive_sha256=%s\n' "${KIT_BTW_ARCHIVE_SHA256:--}"
   } > "$tmp"
   mv "$tmp" "$state_file"
 }
@@ -624,10 +645,153 @@ install_statusline() {
   kit_replace_file "$KIT_BACKUP_DIR/statusline.state.next" "$KIT_STATE_ROOT/statusline.state"
 }
 
+prepare_shared_skills() {
+  local source name
+  KIT_SHARED_SKILLS="$KIT_BACKUP_DIR/shared-skills.next"
+  kit_require_real_dir "$KIT_SHARED_SKILLS"
+  for source in "$ROOT/skills"/*; do
+    [ -d "$source" ] || continue
+    [ -s "$source/SKILL.md" ] || kit_die "Missing source skill: $source"
+    name="${source##*/}"
+    kit_safe_name "$name"
+    kit_replace_dir "$source" "$KIT_SHARED_SKILLS/$name"
+  done
+  if [ -n "${HUMANIZER_SKILL_SOURCE:-}" ]; then
+    kit_replace_dir "$HUMANIZER_SKILL_SOURCE" "$KIT_SHARED_SKILLS/humanizer"
+  fi
+}
+
+# Retire global user-skill paths while retaining CLI-managed builtins.
+reset_legacy_skill_root() {
+  local target="$1" preserve="${2:-}" label="$3" stage
+  [ -e "$target" ] || [ -L "$target" ] || return 0
+  stage="$KIT_BACKUP_DIR/$label.next"
+  kit_require_real_dir "$stage"
+  if [ -n "$preserve" ] && { [ -e "$target/$preserve" ] || [ -L "$target/$preserve" ]; }; then
+    cp -Rp "$target/$preserve" "$stage/$preserve"
+  fi
+  kit_backup_path "$target" "$label"
+  kit_replace_dir "$stage" "$target"
+}
+
+install_opencode_core() {
+  local source name manifest block
+  KIT_OPENCODE_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+  case "$KIT_OPENCODE_CONFIG_DIR" in /*) ;; *) kit_die "OpenCode config directory must be absolute" ;; esac
+  kit_require_real_dir "$KIT_OPENCODE_CONFIG_DIR"
+  kit_require_real_dir "$KIT_OPENCODE_CONFIG_DIR/agents"
+  block="$KIT_BACKUP_DIR/opencode-agents.block"
+  {
+    printf '%s\n' '# BEGIN UNIVERSAL RESEARCH AGENT KIT'
+    cat "$ROOT/opencode/AGENTS.md"
+    printf '%s\n' '# END UNIVERSAL RESEARCH AGENT KIT'
+  } > "$block"
+  kit_replace_managed_block "$KIT_OPENCODE_CONFIG_DIR/AGENTS.md" "$block" "opencode/AGENTS.md" \
+    '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
+  kit_backup_path "$KIT_OPENCODE_CONFIG_DIR/agents" "opencode/agents"
+  manifest="$KIT_BACKUP_DIR/opencode-agents.current"
+  kit_create_empty_file "$manifest"
+  for source in "$ROOT/opencode/agents"/*.md; do
+    [ -f "$source" ] || continue
+    printf '%s\n' "${source##*/}" >> "$manifest"
+  done
+  sort -o "$manifest" "$manifest"
+  kit_prune_manifest "$KIT_OPENCODE_CONFIG_DIR/agents" "$KIT_MANIFEST_ROOT/opencode-agents" "$manifest"
+  while IFS= read -r name; do
+    kit_replace_file "$ROOT/opencode/agents/$name" "$KIT_OPENCODE_CONFIG_DIR/agents/$name"
+  done < "$manifest"
+  kit_commit_manifest "$manifest" "$KIT_MANIFEST_ROOT/opencode-agents"
+  kit_require_real_dir "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit"
+  kit_backup_path "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context" "opencode/context"
+  kit_replace_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
+  reset_legacy_skill_root "$KIT_OPENCODE_CONFIG_DIR/skills" "" opencode-legacy-skills
+  reset_legacy_skill_root "$HOME/.opencode/skills" "" opencode-v1-legacy-skills
+}
+
+kit_context_run() {
+  local action="$1"
+  shift
+  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" -I -B "$ROOT/scripts/context_defaults.py" "$action" \
+    "$ROOT/codex/context.toml" "$HOME/.codex/config.toml" "$@"
+}
+
+opencode_config_run() {
+  local action="$1"
+  shift
+  local args=(--config-dir "${KIT_OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}" \
+    --state "$HOME/.universal-research-agent-kit/opencode-config.json" --templates "$ROOT/opencode" \
+    --parser "$HOME/.universal-research-agent-kit/tooling/opencode-config/node_modules/jsonc-parser/lib/umd/main.js")
+  [ -z "${KIT_HEADROOM_FRAGMENT:-}" ] || args+=(--extra-template "$KIT_HEADROOM_FRAGMENT")
+  [ -z "${KIT_OPENCODE_CLI_FRAGMENT:-}" ] || args+=(--extra-cli-template "$KIT_OPENCODE_CLI_FRAGMENT")
+  node "$ROOT/scripts/opencode_config.mjs" "$action" "${args[@]}" "$@"
+}
+
+prepare_btw_plugin() {
+  local metadata="$KIT_BACKUP_DIR/btw-latest.json" archive="$KIT_BACKUP_DIR/btw-upstream.tgz" url source stage
+  KIT_BTW_SOURCE=https://registry.npmjs.org/opencode-btw-plus/latest
+  download_file "$KIT_BTW_SOURCE" "$metadata"
+  KIT_BTW_VERSION="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(d.name!=="opencode-btw-plus"||!/^\d+\.\d+\.\d+$/.test(d.version)||!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(d.dist?.integrity||""))process.exit(1);console.log(d.version)' "$metadata")" || kit_die "Invalid BTW Plus release metadata."
+  url="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),u=new URL(d.dist.tarball);if(u.protocol!=="https:"||u.hostname!=="registry.npmjs.org")process.exit(1);console.log(u.href)' "$metadata")" || kit_die "Invalid BTW Plus package source."
+  download_file "$url" "$archive"
+  KIT_BTW_ARCHIVE_SHA256="$(node -e 'const fs=require("fs"),c=require("crypto"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8")),b=fs.readFileSync(process.argv[2]);if("sha512-"+c.createHash("sha512").update(b).digest("base64")!==m.dist.integrity)process.exit(1);console.log(c.createHash("sha256").update(b).digest("hex"))' "$metadata" "$archive")" || kit_die "BTW Plus archive integrity mismatch."
+  source="$(mktemp -d "$KIT_BACKUP_DIR/btw-source.XXXXXX")"
+  stage="$(mktemp -d "$KIT_BACKUP_DIR/btw-compatible.XXXXXX")"
+  tar -xzf "$archive" -C "$source"
+  node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" "$source/package" "$stage" "$KIT_OPENCODE_VERSION" ||
+    kit_die "This latest BTW Plus/OpenCode pair has not passed the bounded compatibility check."
+  npm ci --prefix "$stage" --ignore-scripts --no-audit --no-fund || kit_die "BTW Plus compatibility dependencies failed."
+  node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" --check "$stage" "$KIT_OPENCODE_VERSION" || kit_die "BTW Plus staged package verification failed."
+  KIT_BTW_DIRECTORY="$KIT_STATE_ROOT/tooling/opencode-btw-plus"
+  kit_backup_path "$KIT_BTW_DIRECTORY" "opencode/btw-plugin"
+  kit_replace_dir "$stage" "$KIT_BTW_DIRECTORY"
+  KIT_OPENCODE_CLI_FRAGMENT="$KIT_BACKUP_DIR/opencode-cli-plugins.json"
+  node -e 'require("fs").writeFileSync(process.argv[1],JSON.stringify({plugins:["-opencode.btw",process.argv[2]]})+"\n")' \
+    "$KIT_OPENCODE_CLI_FRAGMENT" "$KIT_BTW_DIRECTORY"
+}
+
+prepare_opencode_fragments() {
+  local output="$1" npx="${KIT_NPX:-$KIT_STATE_ROOT/cli/bin/kit-npx}"
+  KIT_HEADROOM_FRAGMENT="$output/opencode-headroom.json"
+  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" -I -B "$ROOT/headroom/runtime.py" opencode-config > "$KIT_HEADROOM_FRAGMENT" ||
+    kit_die "Cannot prepare the official Headroom OpenCode integration."
+  node -e 'const fs=require("fs"),f=process.argv[1],d=JSON.parse(fs.readFileSync(f,"utf8"));d.mcp.servers["sequential-thinking"]={type:"local",command:[process.argv[2],"-y",process.argv[3]],environment:{}};fs.writeFileSync(f,JSON.stringify(d)+"\n")' \
+    "$KIT_HEADROOM_FRAGMENT" "$npx" "$SEQUENTIAL_THINKING_PACKAGE"
+  KIT_OPENCODE_CLI_FRAGMENT="$output/opencode-cli-plugins.json"
+  node -e 'require("fs").writeFileSync(process.argv[1],JSON.stringify({plugins:["-opencode.btw",process.argv[2]]})+"\n")' "$KIT_OPENCODE_CLI_FRAGMENT" "$KIT_STATE_ROOT/tooling/opencode-btw-plus"
+}
+
+install_opencode_configuration() {
+  local dependencies="$KIT_STATE_ROOT/tooling/opencode-config" target name
+  kit_backup_path "$dependencies" "opencode/dependencies"
+  kit_require_real_dir "$dependencies"
+  cp "$ROOT/scripts/opencode-config/package.json" "$ROOT/scripts/opencode-config/package-lock.json" "$dependencies/"
+  npm ci --prefix "$dependencies" --ignore-scripts --no-audit --no-fund || kit_die "OpenCode configuration dependencies failed."
+  prepare_btw_plugin
+  prepare_opencode_fragments "$KIT_BACKUP_DIR"
+  opencode_config_run prepare --output-dir "$KIT_BACKUP_DIR" > "$KIT_BACKUP_DIR/opencode-prepare.json" ||
+    kit_die "OpenCode JSONC preparation failed."
+  for name in cli server state; do
+    case "$name" in
+      cli) target="$KIT_OPENCODE_CONFIG_DIR/cli.json" ;;
+      server) target="$KIT_OPENCODE_CONFIG_DIR/opencode.jsonc" ;;
+      state) target="$KIT_STATE_ROOT/opencode-config.json" ;;
+    esac
+    kit_require_regular_or_absent "$target"
+    kit_backup_path "$target" "opencode/config-$name"
+    kit_replace_file "$KIT_BACKUP_DIR/opencode-$name.next" "$target"
+  done
+  opencode_config_run check > "$KIT_BACKUP_DIR/opencode-check.json" || kit_die "OpenCode configuration verification failed."
+  node "$ROOT/scripts/opencode_config.mjs" effective --config-dir "$KIT_OPENCODE_CONFIG_DIR" \
+    --parser "$dependencies/node_modules/jsonc-parser/lib/umd/main.js" |
+    "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" check-opencode-config ||
+    kit_die "OpenCode Headroom configuration is not effective."
+}
+
 install_core() {
   local platform source_dir target prompt destination suffix group source name manifest
   kit_require_real_dir "$HOME/.codex"
   kit_require_real_dir "$HOME/.agents"
+  prepare_shared_skills
 # Keep the user config intact except for this feature; unsupported TOML forms
 # fail before replacement instead of risking a duplicate or misplaced key.
 config="$HOME/.codex/config.toml"
@@ -640,6 +804,9 @@ if [ -f "$config" ]; then
 else
   (umask 077; : > "$config_next")
 fi
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+  kit_context_run prepare "$config_next" || kit_die "Cannot safely apply Codex context defaults."
+else
 if ! awk '
   function finish_section() {
     if (target && !key_seen) print "experimental_mode = true"
@@ -689,6 +856,7 @@ if ! awk '
 ' "$config_input" > "$config_next"; then
   kit_die "Cannot safely update $config. Use [features.context_management] with a boolean experimental_mode; quoted/dotted/inline feature settings and multiline values in this table are unsupported; multiline strings and escaped table headers or related keys are unsupported."
 fi
+fi
   kit_backup_path "$config" "codex/config.toml"
 kit_replace_file "$config_next" "$config"
 
@@ -703,7 +871,6 @@ kit_replace_file "$config_next" "$config"
     fi
     kit_require_real_dir "$target"
     kit_require_real_dir "$target/agents"
-    kit_require_real_dir "$destination"
     kit_backup_path "$target/$prompt" "$platform/$prompt"
     kit_backup_path "$target/agents" "$platform/agents"
     kit_backup_path "$destination" "$platform/skills"
@@ -717,7 +884,7 @@ kit_replace_file "$config_next" "$config"
           printf '%s\n' "${source##*/}" >> "$manifest"
         done
       else
-        for source in "$ROOT/skills"/*; do
+        for source in "$KIT_SHARED_SKILLS"/*; do
           [ -d "$source" ] || continue
           printf '%s\n' "${source##*/}" >> "$manifest"
         done
@@ -730,14 +897,13 @@ kit_replace_file "$config_next" "$config"
           kit_replace_file "$source_dir/agents/$name" "$target/agents/$name"
         done < "$manifest"
       else
-        kit_prune_manifest "$destination" "$KIT_MANIFEST_ROOT/$platform-$group" "$manifest"
-        while IFS= read -r name; do
-          kit_replace_dir "$ROOT/skills/$name" "$destination/$name"
-        done < "$manifest"
+        kit_replace_dir "$KIT_SHARED_SKILLS" "$destination"
       fi
       kit_commit_manifest "$manifest" "$KIT_MANIFEST_ROOT/$platform-$group"
     done
   done
+  reset_legacy_skill_root "$HOME/.codex/skills" .system codex-legacy-user-skills
+  install_opencode_core
 }
 
 SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@latest"
@@ -815,9 +981,10 @@ repair_duplicate_headroom_mcp() {
 # install alone converges a registration frozen at an older version. A
 # registration under any other name is never inspected, replaced, or removed.
 mcp_package_matches() {
-  local description
+  local description pattern
   description="$(cat)"
-  printf '%s\n' "$description" | grep -Eq '(^|[^[:alnum:]_/@.-])@modelcontextprotocol/server-sequential-thinking@latest([^[:alnum:]_/@.-]|$)' &&
+  pattern="$(printf '%s' "$SEQUENTIAL_THINKING_PACKAGE" | sed 's/\./\\./g')"
+  printf '%s\n' "$description" | grep -Eq "(^|[^[:alnum:]_/@.-])$pattern([^[:alnum:]_/@.-]|$)" &&
     printf '%s\n' "$description" | grep -Fq "$HOME/.universal-research-agent-kit/cli/bin/kit-npx"
 }
 
@@ -1336,6 +1503,12 @@ validate_plugin_listings() {
 }
 
 install_integrations() {
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
+    prepare_sequential_thinking
+  else
+    echo "Scoped integration: Sequential Thinking runtime update skipped with tooling."
+    SEQUENTIAL_THINKING_STATE=skipped_env
+  fi
   kit_require_real_dir "$HOME/.codex"
   kit_require_real_dir "$HOME/.codex/plugins"
   kit_require_regular_or_absent "$HOME/.codex/config.toml"
@@ -1701,12 +1874,72 @@ if [ "$(uname -s)" = Linux ]; then
 fi
 
 
+if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then install_opencode_configuration; fi
+
 kit_write_tooling_state "installed" "$GRAPHIFY_STATE" "$HEADROOM_STATE" "installed" \
   "$GRAPHIFY_VERSION" "$HEADROOM_VERSION" "$TOOL_BIN_DIR"
 echo "Installed Graphify, Headroom MCP, process-local launchers and the host persistent proxy."
 
 }
+verify_platform_additions() {
+  local source target entry name instructions verify_dir config_result
+  KIT_OPENCODE_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+  check_file "$KIT_OPENCODE_CONFIG_DIR/AGENTS.md"
+  instructions="$(awk '$0 == "# BEGIN UNIVERSAL RESEARCH AGENT KIT" {copy=1; next} $0 == "# END UNIVERSAL RESEARCH AGENT KIT" {copy=0; next} copy' "$KIT_OPENCODE_CONFIG_DIR/AGENTS.md" 2>/dev/null)"
+  [ "$instructions" = "$(cat "$ROOT/opencode/AGENTS.md")" ] || { echo "OpenCode instructions differ from the managed block."; missing=1; }
+  for source in "$ROOT/opencode/agents"/*.md; do
+    check_same_file "$source" "$KIT_OPENCODE_CONFIG_DIR/agents/${source##*/}"
+  done
+  check_same_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
+  if [ -n "${HUMANIZER_REVISION:-}" ] && [ "$HUMANIZER_REVISION" != - ]; then
+    verify_humanizer_source "$HUMANIZER_REVISION" "$HUMANIZER_CONTENT_SHA256" "$HUMANIZER_SOURCE" || { echo "Humanizer source provenance failed."; missing=1; }
+    for target in "$HOME/.agents/skills/humanizer" "$HOME/.claude/skills/humanizer"; do
+      verify_humanizer_skill "$target" "$HUMANIZER_CONTENT_SHA256" || { echo "Humanizer content differs: $target"; missing=1; }
+    done
+  elif [ -f "$STATE_FILE" ] && [ "$(read_state codex_sequential_thinking)" != skipped_env ]; then
+    echo "Humanizer installation/provenance is missing."; missing=1
+  else
+    echo "Scoped verification: Humanizer was skipped with integrations."; scoped=1
+  fi
+  for target in "$HOME/.agents/skills" "$HOME/.claude/skills"; do
+    for entry in "$target"/* "$target"/.[!.]* "$target"/..?*; do
+      [ -e "$entry" ] || [ -L "$entry" ] || continue
+      name="${entry##*/}"
+      [ "$name" != .DS_Store ] || continue
+      if [ -d "$ROOT/skills/$name" ]; then continue; fi
+      if [ "$name" = humanizer ] && [ -n "${HUMANIZER_REVISION:-}" ] && [ "$HUMANIZER_REVISION" != - ]; then continue; fi
+      if [ "$name" = graphify ] && [ "$target" = "$HOME/.claude/skills" ] && [ "$tooling_status_for_prompt" = installed ]; then continue; fi
+      echo "Unexpected global user-skill entry: $entry"; missing=1
+    done
+  done
+  if [ "$tooling_status_for_prompt" = installed ] && [ -f "$STATE_FILE" ] &&
+      [ "$(read_state codex_sequential_thinking)" != skipped_env ]; then
+    if [ ! -f "$KIT_STATE_ROOT/opencode-config.json" ]; then
+      echo "OpenCode configuration ownership state is missing."; missing=1
+    else
+      verify_dir="$(mktemp -d "${TMPDIR:-/tmp}/kit-opencode-verify.XXXXXX")"
+      if prepare_opencode_fragments "$verify_dir"; then
+        if config_result="$(opencode_config_run check)"; then
+          printf '%s\n' "$config_result"
+          if printf '%s' "$config_result" | node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(0,"utf8")).status==="customized"?0:1)'; then
+            echo "Scoped verification: preserved OpenCode user overrides differ from kit defaults."; scoped=1
+          fi
+        else missing=1; fi
+        node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" --check "$KIT_STATE_ROOT/tooling/opencode-btw-plus" "$KIT_OPENCODE_VERSION" || missing=1
+      else missing=1; fi
+      rm -rf -- "$verify_dir"
+      unset KIT_HEADROOM_FRAGMENT KIT_OPENCODE_CLI_FRAGMENT
+      node "$ROOT/scripts/opencode_config.mjs" effective --config-dir "$KIT_OPENCODE_CONFIG_DIR" \
+        --parser "$KIT_STATE_ROOT/tooling/opencode-config/node_modules/jsonc-parser/lib/umd/main.js" |
+        "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" -I -B "$ROOT/headroom/runtime.py" check-opencode-config || missing=1
+    fi
+  else
+    echo "Scoped verification: OpenCode runtime configuration was skipped with integrations/tooling."; scoped=1
+  fi
+}
+
 verify_install() {
+KIT_STATE_ROOT="$HOME/.universal-research-agent-kit"
 TOOLING_STATE_FILE="$HOME/.universal-research-agent-kit/tooling.state"
 read_tooling_state() {
   sed -n "s/^$1=//p" "$TOOLING_STATE_FILE" | sed -n '1p'
@@ -1715,6 +1948,21 @@ read_tooling_state() {
 tooling_status_for_prompt=""
 if [ -f "$TOOLING_STATE_FILE" ] && [ ! -L "$TOOLING_STATE_FILE" ]; then
   tooling_status_for_prompt="$(read_tooling_state status)"
+  recorded_node_dir="$(read_tooling_state node_dir)"
+  case "$recorded_node_dir" in /*) PATH="$recorded_node_dir:$PATH"; export PATH ;; esac
+  KIT_CODEX_VERSION="$(read_tooling_state codex_version)"
+  KIT_CLAUDE_VERSION="$(read_tooling_state claude_version)"
+  KIT_OPENCODE_VERSION="$(read_tooling_state opencode_version)"
+  HUMANIZER_SOURCE="$(read_tooling_state humanizer_source)"
+  HUMANIZER_REVISION="$(read_tooling_state humanizer_revision)"
+  HUMANIZER_CONTENT_SHA256="$(read_tooling_state humanizer_content_sha256)"
+  SEQUENTIAL_THINKING_VERSION="$(read_tooling_state sequential_thinking_version)"
+  [ "$KIT_CODEX_VERSION" != - ] || KIT_CODEX_VERSION=""
+  [ "$KIT_CLAUDE_VERSION" != - ] || KIT_CLAUDE_VERSION=""
+  [ "$KIT_OPENCODE_VERSION" != - ] || KIT_OPENCODE_VERSION=""
+  if [ -n "$SEQUENTIAL_THINKING_VERSION" ] && [ "$SEQUENTIAL_THINKING_VERSION" != - ]; then
+    SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@$SEQUENTIAL_THINKING_VERSION"
+  fi
 fi
 
 if command -v uv >/dev/null 2>&1; then
@@ -1985,6 +2233,8 @@ check_manifest() {
   done
 
   while IFS= read -r name || [ -n "$name" ]; do
+    if [ "$name" = humanizer ] && [ "$source_dir" = "$ROOT/skills" ] &&
+        [ -n "${HUMANIZER_REVISION:-}" ] && [ "$HUMANIZER_REVISION" != - ]; then continue; fi
     if [ -z "$name" ] || [ ! -e "$source_dir/$name" ]; then
       echo "Unexpected manifest entry in $manifest: $name"
       missing=1
@@ -1995,6 +2245,9 @@ check_file "$HOME/.claude/CLAUDE.md"
 check_dir "$HOME/.claude/agents"
 check_dir "$HOME/.claude/skills"
 
+if [ "$tooling_status_for_prompt" = installed ]; then
+  kit_context_run check || { echo "Codex context defaults differ from the requested 1M/800k policy."; missing=1; }
+else
 if ! awk '
   /^\[/ { section = ($0 == "[features.context_management]") }
   section && /^[[:space:]]*experimental_mode[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)$/ { found++ }
@@ -2002,6 +2255,7 @@ if ! awk '
 ' "$HOME/.codex/config.toml"; then
   echo "Missing or disabled context_management.experimental_mode"
   missing=1
+fi
 fi
 check_file "$HOME/.codex/AGENTS.md"
 check_dir "$HOME/.codex/agents"
@@ -2386,6 +2640,7 @@ else
 
 fi
 
+verify_platform_additions
 [ "${KIT_VERIFY_REMOTE:-1}" != 1 ] || verify_codex_remote || missing=1
 if [ "$missing" -ne 0 ]; then
   echo "Install verification failed."
@@ -2395,7 +2650,7 @@ fi
 if [ "$scoped" -eq 1 ]; then
   echo "Scoped verification passed; explicitly skipped components are not verified."
 else
-  echo "Full install verification passed. Restart Claude Code and Codex sessions."
+  echo "Full install verification passed. Restart Claude Code, Codex and OpenCode sessions."
 fi
 
 }
@@ -2453,8 +2708,8 @@ main() {
       -h|--help)
         cat <<'HELP'
 Usage: sh install.sh [--integrations ponytail|none] [--without-statusline] [--verify | --cleanup-backups]
-Default: install/update core, Ponytail, Sequential Thinking MCP, Graphify, Headroom and both statuslines.
-Missing Codex, Claude and Node.js/npx are installed automatically; existing CLIs are preserved.
+Default: update Codex, Claude Code, OpenCode V2, core skills, Humanizer, Ponytail, MCP, Graphify, Headroom and statuslines.
+All three CLIs are checked against their official latest release on every install. Global user skills are replaced after backup.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
 Kit-owned Headroom services/MCP servers are stopped normally before installation and the service starts afterward.
 Standard existing headroom-default deployments are backed up and adopted in place, retaining their profile and sessions.
@@ -2505,6 +2760,7 @@ HELP
     kit_die "Remote Control host setup requires the persistent Headroom tooling step."
   fi
   kit_validate_home
+  kit_maintenance_run opencode-idle || kit_die "OpenCode is in use; installation did not change this host."
   if [ "$WITH_STATUSLINE" -eq 1 ]; then
     command -v jq >/dev/null 2>&1 || kit_die "Claude statusline requires jq. Install jq (brew install jq or sudo apt install jq), or use --without-statusline."
   fi
@@ -2523,6 +2779,7 @@ HELP
   fi
   kit_init_state
   kit_enable_rollback
+  kit_maintenance_run opencode-idle || kit_die "OpenCode became active before installation."
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
     if [ "$KIT_STOP_HEADROOM" -eq 1 ]; then
       KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
@@ -2555,6 +2812,14 @@ HELP
       "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" adopt-default "$KIT_MAINTENANCE_RECORD" || kit_die "Default Headroom adoption failed."
     fi
   fi
+  if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
+    if [ "${KIT_TEST_FIXTURES_ONLY:-0}" = 1 ] && [ -n "${KIT_TEST_HUMANIZER_REPOSITORY:-}" ]; then
+      prepare_humanizer --fixture-repository "$KIT_TEST_HUMANIZER_REPOSITORY"
+    else
+      prepare_humanizer
+    fi
+  fi
+  kit_maintenance_run opencode-idle || kit_die "OpenCode became active before skill replacement."
   install_core
   kit_replace_managed_block "$HOME/.config/git/ignore" "$ROOT/global_research_agents.gitignore" git/ignore '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = 1 ]; then
@@ -2589,6 +2854,6 @@ HELP
     enable_codex_remote
     verify_codex_remote
   fi
-  echo "Done for the verified scope. Restart Claude Code and Codex sessions."
+  echo "Done for the verified scope. Restart Claude Code, Codex and OpenCode sessions."
 }
 [ "${BASH_SOURCE[0]}" != "$0" ] || main "$@"

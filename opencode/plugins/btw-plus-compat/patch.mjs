@@ -16,6 +16,27 @@ export const UPSTREAM = {
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
+export function verifyInstalled(directory, hostVersion) {
+  if (hostVersion.replace(/^v/, "") !== "2.2.5") throw new Error("Unverified BTW host version");
+  const provenance = JSON.parse(readFileSync(join(directory, "UPSTREAM.json"), "utf8"));
+  for (const [key, value] of Object.entries(UPSTREAM)) {
+    if (provenance[key] !== value) throw new Error(`BTW provenance differs: ${key}`);
+  }
+  if (provenance.host?.opencode !== "2.2.5" || provenance.host?.opentui !== "0.8.0") throw new Error("BTW host provenance differs");
+  if (sha256(readFileSync(join(directory, "dist/tui.js"))) !== UPSTREAM.patchedSha256) throw new Error("BTW compatibility bundle differs");
+  const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+  const lock = JSON.parse(readFileSync(fileURLToPath(new URL("./runtime-package-lock.json", import.meta.url)), "utf8"));
+  const expected = lock.packages[""].dependencies;
+  if (manifest.name !== lock.name || manifest.version !== lock.version || manifest.exports?.["./tui"] !== "./dist/tui.js" ||
+      Object.keys(manifest.dependencies ?? {}).length !== Object.keys(expected).length) throw new Error("BTW package identity differs");
+  for (const [name, version] of Object.entries(expected)) {
+    if (manifest.dependencies[name] !== version) throw new Error(`BTW dependency declaration differs: ${name}`);
+    const installed = JSON.parse(readFileSync(join(directory, "node_modules", name, "package.json"), "utf8"));
+    if (installed.version !== version) throw new Error(`BTW dependency differs: ${name}`);
+  }
+  return provenance;
+}
+
 export function prepare(sourceDirectory, outputDirectory, hostVersion) {
   if (hostVersion.replace(/^v/, "") !== "2.2.5") throw new Error("BTW compatibility patch is verified only for OpenCode 2.2.5");
   const source = realpathSync(sourceDirectory);
@@ -57,6 +78,11 @@ export function prepare(sourceDirectory, outputDirectory, hostVersion) {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  if (process.argv[2] === "--check") {
+    if (process.argv.length !== 5) throw new Error("Usage: patch.mjs --check INSTALLED_DIRECTORY OPENCODE_VERSION");
+    verifyInstalled(process.argv[3], process.argv[4]);
+    process.exit(0);
+  }
   if (process.argv.length !== 5) throw new Error("Usage: patch.mjs UPSTREAM_PACKAGE_DIRECTORY EMPTY_STAGING_DIRECTORY OPENCODE_VERSION");
   process.stdout.write(JSON.stringify(prepare(...process.argv.slice(2))) + "\n");
 }

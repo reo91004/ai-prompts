@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, cpSync, existsSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
-import { prepare, UPSTREAM } from "../opencode/plugins/btw-plus-compat/patch.mjs";
+import { prepare, verifyInstalled, UPSTREAM } from "../opencode/plugins/btw-plus-compat/patch.mjs";
 
 if (!process.argv[2]) throw new Error("Usage: node tests/test_opencode_btw_patch.mjs VERIFIED_UPSTREAM_PACKAGE_DIRECTORY");
 const source = resolve(process.argv[2]);
@@ -20,6 +20,17 @@ try {
   assert.equal(manifest.peerDependencies, undefined);
   assert.equal(manifest.exports["./tui"], "./dist/tui.js");
   assert.equal(provenance.commit, UPSTREAM.commit);
+  for (const [name, version] of Object.entries(manifest.dependencies)) {
+    const dependency = join(output, "node_modules", name);
+    mkdirSync(dependency, { recursive: true });
+    writeFileSync(join(dependency, "package.json"), JSON.stringify({ name, version }));
+  }
+  verifyInstalled(output, "2.2.5");
+  writeFileSync(join(output, "package.json"), JSON.stringify({ ...manifest, dependencies: {} }));
+  assert.throws(() => verifyInstalled(output, "2.2.5"), /identity differs/);
+  writeFileSync(join(output, "package.json"), JSON.stringify(manifest));
+  writeFileSync(join(output, "dist/tui.js"), "corrupt");
+  assert.throws(() => verifyInstalled(output, "2.2.5"), /bundle differs/);
   assert.throws(() => prepare(source, output, "2.2.5"), /must be empty/);
   const rejected = join(directory, "rejected");
   assert.throws(() => prepare(source, rejected, "2.2.6"), /verified only/);

@@ -115,7 +115,7 @@ max_threads = 4
         updated = context.merge_config(original, self.defaults)
         features = tomllib.loads(updated)["features"]
         self.assertIs(features["token_budget"], False)
-        self.assertTrue(features["context_management"]["enabled"])
+        self.assertEqual(features["context_management"], {"experimental_mode": True})
         self.assertIn("token_budget = false # intentionally disabled", updated)
         context.check_config(updated, self.defaults)
 
@@ -128,7 +128,7 @@ max_threads = 4
                 updated = context.merge_config(original, self.defaults)
                 features = tomllib.loads(updated)["features"]
                 self.assertEqual(features["token_budget"], {"enabled": True, "auto_compact_fallback_prompt": ""})
-                self.assertEqual(features["context_management"], {"enabled": False, "experimental_mode": True})
+                self.assertEqual(features["context_management"], {"experimental_mode": True})
                 for line in original.splitlines():
                     if "#" in line:
                         self.assertIn("#" + line.split("#", 1)[1], updated)

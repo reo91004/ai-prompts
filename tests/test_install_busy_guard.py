@@ -94,6 +94,15 @@ sys.exit(row.get('exit', 0))
                 self.assertNotIn("SECRET_ARG", result.stdout + result.stderr)
                 self.assertEqual(list(self.home.iterdir()), [])
 
+    def test_managed_node_runtime_blocks_replacement(self):
+        command = str(self.kit / "cli/node/bin/node")
+        self.set_snapshots("246 " + command + " server.js SECRET_ARG_MUST_NOT_BE_LOGGED\n")
+        result = self.run_shell("kit_tooling_idle")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("PID 246", result.stderr)
+        self.assertNotIn("SECRET_ARG", result.stdout + result.stderr)
+        self.assertEqual(list(self.home.iterdir()), [])
+
     def test_words_in_prompts_or_code_are_not_processes(self):
         commands = ["/usr/bin/rg headroom", "/bin/bash -c 'python -m headroom.cli'",
                     "/usr/bin/python3 -c 'print(\"headroom proxy\")'",

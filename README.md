@@ -1,6 +1,6 @@
 # Research Agent Kit
 
-Codex와 Claude Code에서 같은 연구 원칙과 스킬을 사용하는 개인 하네스입니다. **Simple is best**: 현재 요청에 필요 없는 구현 곁가지를 처음부터 만들지 않고, 필요한 근거와 검증은 온전히 남깁니다.
+Codex·Claude Code·OpenCode V2에서 연구 공통 원칙과 스킬을 사용하는 개인 하네스입니다. AI/ML, SCA, 하드웨어, 소프트웨어, 이론 연구의 실제 대상과 주장에 맞는 근거를 남깁니다. **Simple is best**: 현재 요청에 필요 없는 구현 곁가지를 처음부터 만들지 않고, 필요한 근거와 검증은 온전히 남깁니다.
 
 ## 작업 원칙
 
@@ -25,7 +25,7 @@ sh install.sh --cleanup-backups     # 키트 설치 백업만 명시적으로 �
 sh install.sh --help
 ```
 
-기본 설치는 두 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom, Codex·Claude Code statusline을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
+기본 설치는 세 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom, Codex·Claude Code statusline을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
 
 Statusline은 이 패키지에 담은 현재 Mac의 설정으로 **기본 설치·재설치 때 덮어씁니다.** Codex는 `tui.status_line`만 병합하고, Claude Code는 `statusLine` 설정과 `~/.claude/statusline.sh`를 설치합니다. 그 밖의 설정과 인증 정보는 복사하지 않습니다. 변경 전 설정·스크립트는 기존 설치 백업에 보존하며 실패하면 journal로 복구합니다. 기존 statusline을 유지하려면 `--without-statusline`을 지정하세요. 이 옵션은 statusline 검증도 생략합니다.
 
@@ -38,7 +38,7 @@ Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, U
 - Headroom은 호스트의 `127.0.0.1:8787`에서 상시 실행하며 Codex의 전역 provider와 두 CLI의 셸 분기를 구성합니다. 세션마다 설정 파일을 임시로 바꾸지 않습니다. 아래 사용 표를 참고하세요.
 - Graphify의 전역 안내는 유용한 기존 그래프나 명시적인 Graphify 요청에 적용합니다. 단순 코드 질문을 위해 그래프 구축을 요구하지 않습니다.
 
-Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 20 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
+Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 24 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
 
 처음에는 Git, Bash, curl 또는 wget, 인터넷 연결, 사용자 서비스 관리자가 필요합니다. 로그인·계정 이용 권한·조직 정책·pairing은 각 호스트에서 본인이 완료해야 합니다. 키트는 인증 정보를 복사하지 않습니다. `CLAUDE_CONFIG_DIR`과 기본 `~/.codex` 이외의 `CODEX_HOME`은 지원하지 않으며 설치 전에 거부합니다. Python minor 버전과 최상위 패키지는 고정하지만 운영체제별 wheel·전이 의존성까지 완전히 동일하다는 뜻은 아닙니다.
 
@@ -46,7 +46,7 @@ Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니�
 
 모든 도구는 설치할 때 최신 버전을 사용합니다. Graphify·Headroom·uv는 PyPI, 키트가 설치하는 대체용 Node.js는 공식 최신 LTS를 확인하고, 설치한 버전은 `~/.universal-research-agent-kit/tooling.state`에 기록합니다. `--verify`는 기록된 버전으로 설치 상태를 확인합니다.
 
-이미 설치한 컴퓨터는 Claude Code·Codex 세션을 모두 닫고 `sh install.sh`를 다시 실행하면 갱신됩니다. 설치기가 Headroom 서비스와 MCP를 정상 종료하고, 최신 버전과 다른 관리 도구 환경을 백업한 뒤 다시 만듭니다. 키트가 설치한 Node.js도 최신 LTS와 다르면 같은 방식으로 교체합니다. 키트 소유 서비스의 실행 설정(환경변수·proxy 인수)과 runner는 설치된 Headroom이 생성하는 값으로 다시 만든 뒤 서비스를 시작해 검증합니다. 새 릴리스 때문에 설치나 검증이 실패하면 journal로 이전 상태를 복구하고 원래 서비스를 재개합니다.
+이미 설치한 컴퓨터는 Claude Code·Codex·OpenCode 세션을 모두 닫고 `sh install.sh`를 다시 실행하면 갱신됩니다. 설치기가 Headroom 서비스와 MCP를 정상 종료하고, 최신 버전과 다른 관리 도구 환경을 백업한 뒤 다시 만듭니다. 키트가 설치한 Node.js도 최신 LTS와 다르면 같은 방식으로 교체합니다. 키트 소유 서비스의 실행 설정(환경변수·proxy 인수)과 runner는 설치된 Headroom이 생성하는 값으로 다시 만든 뒤 서비스를 시작해 검증합니다. 새 릴리스 때문에 설치나 검증이 실패하면 journal로 이전 상태를 복구하고 원래 서비스를 재개합니다.
 
 ### Mac 로컬 작업과 여러 컴퓨터
 
@@ -158,7 +158,7 @@ sh install.sh
 sh install.sh --integrations none
 ```
 
-`none`은 **통합 단계 생략이 아닙니다.** 키트 소유 Ponytail과 식별 가능한 LazyCodex 레거시 항목을 정리하고 Sequential Thinking·Graphify·Headroom은 유지합니다. 기본 `ponytail` 프로필도 레거시 항목을 정리합니다. 사용자 소유 스킬·agent·MCP와 무관한 설정은 보존하며, 사용자 `max_threads`를 일괄 변경하지 않습니다.
+`none`은 **통합 단계 생략이 아닙니다.** 키트 소유 Ponytail과 식별 가능한 LazyCodex 레거시 항목을 정리하고 Sequential Thinking·Graphify·Headroom은 유지합니다. 기본 `ponytail` 프로필도 레거시 항목을 정리합니다. 사용자 소유 agent·MCP와 무관한 설정은 보존하며, 전역 사용자 스킬은 새 정본으로 교체하고, 사용자 `max_threads`를 일괄 변경하지 않습니다.
 
 등록 경로와 소유권 기록으로 관리 대상을 구분합니다. 같은 키트 항목은 백업 후 갱신하고, 선택에서 제외된 키트 항목만 정리합니다. 통합 결과는 `~/.universal-research-agent-kit/integrations.state`, 도구 결과는 `tooling.state`에 기록하며 검증은 이 상태와 실제 설치를 함께 확인합니다.
 
@@ -189,9 +189,32 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 `--cleanup-backups`는 설치 중에는 실행하지 않으며 키트 백업만 제거합니다. 소유 목록과 활성 설정은 보존합니다. `--verify`는 설치나 정리를 실행하지 않습니다.
 
+## 세 플랫폼 갱신과 연구 스킬
+
+`sh install.sh`는 세 CLI, Headroom, 키트 관리 로컬 MCP·통합 도구를 최신 배포판으로 갱신하고 정확 버전·revision을 기록합니다. OpenCode는 V2 공식 채널을 사용합니다. 전역 사용자 스킬은 기존 추가 스킬까지 탐색 경로 밖에 백업한 뒤 새 정본으로 교체합니다. CLI 내장·플러그인 스킬은 해당 관리자로 갱신하고 프로젝트 로컬 스킬·실험 자료·인증·BTW 이력은 정리에 포함하지 않습니다.
+
+[research-repo-protocol](skills/research-repo-protocol/SKILL.md)은 질문·사양·실행·근거·판정·인계를 연결하며 기존 설계 스킬도 통합했습니다. [계층 구조](skills/research-repo-protocol/references/directory-roles.md)와 [공통 연구 원칙](skills/research-domain-router/references/research_principles.md)을 작업에 맞게 참조합니다. [paper-writing](skills/paper-writing/SKILL.md)은 논문 집필을 맡고, 기본 설치·갱신하는 [Humanizer](https://github.com/blader/humanizer)를 문체 편집에 사용합니다. 수치·수식·인용·전문용어·주장 강도는 보존합니다.
+
+## 일상 원격 제어
+
+전체 설치·갱신 이후의 일상 조작은 다음 명령으로 수행하며 전체 갱신을 다시 실행하지 않습니다.
+
+```bash
+sh codex-remote.sh enable
+sh codex-remote.sh pair
+sh codex-remote.sh status
+sh codex-remote.sh disable
+```
+
+인수 없는 실행은 status입니다. disable은 원격 제어·자동 시작을 해제하며 daemon 전체를 중지하지 않습니다. 제한된 unmanaged 복구는 `sh codex-remote.sh repair`로 분리했습니다. 기존 install.sh 원격 옵션은 호환 경로로 유지합니다.
+
+## OpenCode V2와 컨텍스트
+
+[OpenCode 구성](opencode/README.md)은 간결한 TUI, 공통 스킬, 읽기 전용 연구 역할, 공식 Headroom V2 연결을 제공합니다. Codex와 OpenCode의 로컬 harness 한도는 1,000,000토큰, 자동 압축 기준은 800,000토큰입니다. 실제 provider의 모델 용량은 별개입니다. Codex는 fallback prompt를 비우고 별도 post-turn 압축을 끄며 명시적 설정으로 model-owned token-budget 기본값 자동 선택이 달라집니다.
+
 ## 원본과 설치 위치
 
-공통 스킬은 **`skills/` 한 곳에서 관리**하고 두 플랫폼에 복사합니다. 설치 디렉터리는 각 플랫폼의 기존 위치를 유지합니다.
+공통 스킬은 **`skills/` 한 곳에서 관리**하고 Codex·OpenCode가 공유하는 `~/.agents/skills/`와 Claude의 `~/.claude/skills/`에 배포합니다. 설치 디렉터리는 각 플랫폼의 기존 위치를 유지합니다.
 
 | 원본 | 설치 위치 |
 |---|---|
@@ -216,7 +239,7 @@ Codex agent 16개와 Claude agent 15개는 **플랫폼별 정의를 유지**합�
 | `no-placeholder-development` | 연구 코드의 완전성·실패 처리·재현성을 구현하거나 확인할 때 |
 | `code-comment-hygiene` | 주석 감사나 코드와 설명의 불일치를 조사할 때; 일상 변경은 주변 주석을 함께 갱신 |
 | `research-domain-router` | 연구 분야가 교차하거나 필요한 근거가 불명확할 때 |
-| `research-repo-design` | 실제 실험의 저장소 구조를 선택하거나 변경할 때 |
+| `research-repo-protocol` | 실제 실험의 저장소 구조를 선택하거나 변경할 때 |
 | `ai-ml-experiment` | ML 데이터 분할·평가·기준선·재현성을 설계하거나 판단할 때 |
 | `hardware-vivado` | RTL·합성·구현·타이밍·자원 보고를 다룰 때 |
 | `side-channel-analysis` | 부채널 실험·누설·방어 기법의 근거를 다룰 때 |
