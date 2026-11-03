@@ -88,7 +88,7 @@ sh install.sh --remote-control-status
 sh install.sh --headroom-status
 ```
 
-`app server is running but is not managed by codex app-server daemon`은 기존 App Server가 관리 daemon 소유가 아니라는 뜻입니다. `--enable-codex-remote-control`은 이 오류가 나면 제어 소켓의 실제 PID·사용자·실행파일·실행 인자를 확인하고, 정상 종료 동작을 확인한 **실행 버전 0.153.4**에만 `SIGHUP`을 한 번 보냅니다. 최대 30초 동안 종료를 기다린 뒤 managed 시작을 한 번 재시도합니다. 이 복구 경로는 강제 종료하지 않습니다. 기존 실행의 일회성 `-c` 옵션은 새 daemon으로 복사하지 않으며 새 daemon은 호스트에 저장된 설정을 사용합니다. 0.153.4는 실행 중 turn의 완료를 기다리지만 대기 중 새 요청을 계속 받으므로 모든 대기 요청의 보존까지 보장하지는 않습니다. [해당 버전의 종료 처리](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/lib.rs#L199)
+`app server is running but is not managed by codex app-server daemon`은 기존 App Server가 관리 daemon 소유가 아니라는 뜻입니다. `--enable-codex-remote-control`은 이 오류가 나면 제어 소켓의 실제 PID·사용자·실행파일·실행 인자를 확인하고, 정상 종료 동작을 확인한 **실행 버전 0.153.4·0.166.0**에만 `SIGHUP`을 한 번 보냅니다. 현재 사용자 소유의 소켓 링크도 지원하며, 링크와 대상 소켓의 소유권 및 검사 중 변경 여부를 모두 확인합니다. 최대 30초 동안 종료를 기다린 뒤 managed 시작을 한 번 재시도합니다. 이 복구 경로는 강제 종료하지 않습니다. 기존 실행의 일회성 `-c` 옵션은 새 daemon으로 복사하지 않으며 새 daemon은 호스트에 저장된 설정을 사용합니다. [0.153.4의 종료 처리](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/lib.rs#L199)는 실행 중 turn의 완료를 기다리지만 대기 중 새 요청을 계속 받으므로 모든 대기 요청의 보존까지 보장하지는 않습니다. [0.166.0의 종료 처리](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/app-server/src/lib.rs#L228)는 새 turn 요청을 거부하고 실행 중 turn과 이미 수락한 요청의 완료를 기다립니다.
 
 기존 작업이 끝나지 않으면 설치기는 종료 요청만 남기고 실패하며 서버가 나중에 종료될 수 있습니다. 서버가 새 PID로 재생성되면 추가 종료를 반복하지 않습니다. Mac 앱에서 **해당 호스트의 SSH 연결을 해제**하고 `sh install.sh --enable-codex-remote-control`을 다시 실행하세요. 확인되지 않은 버전·실행 방식은 기존 세션에서 작업을 마치고 서버를 종료해야 합니다. 서버 내부에서 실행 중인 설치기는 자체 작업의 종료를 기다리지 않도록 외부 터미널 실행을 안내합니다. 활성화가 성공하면 `codex remote-control pair`로 연결합니다.
 

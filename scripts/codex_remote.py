@@ -66,7 +66,10 @@ def process(pid):
 
 def socket_owner(path):
     before = path.lstat()
-    if not stat.S_ISSOCK(before.st_mode) or before.st_uid != os.getuid():
+    # Codex can expose its Unix socket through a user-owned symlink.
+    target_before = path.stat()
+    if (not stat.S_ISSOCK(target_before.st_mode) or before.st_uid != os.getuid()
+            or target_before.st_uid != os.getuid()):
         raise RuntimeError("The Codex control socket is not owned by this user.")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
         peer.settimeout(2)
@@ -82,8 +85,10 @@ def socket_owner(path):
         else:
             raise RuntimeError("Cannot inspect the Codex socket on this platform.")
     after = path.lstat()
-    if (before.st_dev, before.st_ino, before.st_uid) != (after.st_dev, after.st_ino, after.st_uid):
-        raise RuntimeError("The Codex control socket changed during inspection.")
+    target_after = path.stat()
+    for old, new in ((before, after), (target_before, target_after)):
+        if (old.st_dev, old.st_ino, old.st_uid) != (new.st_dev, new.st_ino, new.st_uid):
+            raise RuntimeError("The Codex control socket changed during inspection.")
     owner = process(pid)
     if uid != os.getuid() or owner.uid != uid:
         raise RuntimeError("The Codex socket process belongs to another user.")
@@ -191,8 +196,8 @@ def recover(binary, home, wait_seconds=30):
     if not known_listener(owner, home, binary):
         raise RuntimeError("The existing Codex listener has an unrecognized executable or launch command. " + RETRY)
     data = version(binary)
-    # Only this running server version's SIGHUP contract has been source-verified.
-    if data.get("status") != "running" or data.get("backend") is not None or data.get("appServerVersion") != "0.153.4":
+    # These running server versions' SIGHUP contracts have been source-verified.
+    if data.get("status") != "running" or data.get("backend") is not None or data.get("appServerVersion") not in ("0.153.4", "0.166.0"):
         raise RuntimeError("The existing server's unmanaged status or graceful shutdown version is unverified. Finish its work and stop it from its original session.")
     ancestor = os.getpid()
     while ancestor > 1:

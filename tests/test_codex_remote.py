@@ -88,16 +88,18 @@ class RecoveryTests(unittest.TestCase):
                 rc.enable(self.binary, self.home)
 
     def test_verified_owner_receives_only_sighup(self):
-        with ExitStack() as stack, redirect_stdout(self.output):
-            _, kill = self.recovery_boundaries(stack)
-            rc.recover(self.binary, self.home)
-            kill.assert_called_once_with(self.owner.pid, signal.SIGHUP)
+        for server_version in ("0.153.4", "0.166.0"):
+            with self.subTest(version=server_version), ExitStack() as stack, redirect_stdout(self.output):
+                _, kill = self.recovery_boundaries(stack, version={"status": "running", "appServerVersion": server_version})
+                rc.recover(self.binary, self.home)
+                kill.assert_called_once_with(self.owner.pid, signal.SIGHUP)
 
     def test_changed_owner_unknown_version_and_ancestor_refuse_signal(self):
         cases = [
             {"owners": [self.owner, replace(self.owner, start="reused PID")]},
             {"owners": [self.owner, replace(self.owner, pid=1234)]},
             {"version": {"status": "running", "appServerVersion": "0.153.3"}},
+            {"version": {"status": "running", "appServerVersion": "0.166.1"}},
             {"version": {"status": "running", "backend": "pid", "appServerVersion": "0.153.4"}},
             {"version": {"status": "running", "cliVersion": "0.153.4"}},
             {"ancestor": self.owner.pid},
@@ -168,6 +170,7 @@ class RecoveryTests(unittest.TestCase):
     def test_real_socket_credentials_and_graceful_signal_to_test_child(self):
         path = self.home / ".codex/app-server-control/app-server-control.sock"
         path.parent.mkdir()
+        target = path.with_suffix(".native")
         child = subprocess.Popen([sys.executable, "-u", "-c", '''
 import pathlib, signal, socket, sys
 path = pathlib.Path(sys.argv[1])
@@ -182,10 +185,12 @@ print('ready', flush=True)
 while True:
     connection, _ = server.accept()
     connection.close()
-''', str(path)], stdout=subprocess.PIPE, text=True)
+''', str(target)], stdout=subprocess.PIPE, text=True)
         try:
             self.assertEqual(child.stdout.readline().strip(), "ready")
-            owner = rc.socket_owner(path)
+            owner = rc.socket_owner(target)
+            path.symlink_to(target)
+            self.assertEqual(rc.socket_owner(path), owner)
             self.assertEqual(owner.pid, child.pid)
             self.assertEqual(owner.uid, os.getuid())
             self.assertEqual(owner.argv[1:3], ("-u", "-c"))
@@ -193,16 +198,30 @@ while True:
             with patch.object(rc, "process", return_value=replace(owner, uid=owner.uid + 1)):
                 with self.assertRaisesRegex(RuntimeError, "another user"):
                     rc.socket_owner(path)
-            wrong_path = path.with_suffix(".other")
-            wrong_path.symlink_to(path)
+            relative = path.with_suffix(".relative")
+            relative.symlink_to(target.name)
+            self.assertEqual(rc.socket_owner(relative), owner)
             with self.assertRaisesRegex(RuntimeError, "control socket"):
-                rc.socket_owner(wrong_path)
+                rc.socket_owner(self.auth)
+            link_info, target_info = path.lstat(), path.stat()
+            for method, original in (("lstat", link_info), ("stat", target_info)):
+                with self.subTest(method=method):
+                    changed = list(original)
+                    changed[4] += 1  # st_uid
+                    with patch.object(Path, "lstat", return_value=link_info), patch.object(Path, method, return_value=os.stat_result(changed)):
+                        with self.assertRaisesRegex(RuntimeError, "control socket"):
+                            rc.socket_owner(path)
+                    changed = list(original)
+                    changed[1] += 1  # st_ino
+                    with patch.object(Path, "lstat", return_value=link_info), patch.object(Path, method, side_effect=[original, os.stat_result(changed)]):
+                        with self.assertRaisesRegex(RuntimeError, "changed during inspection"):
+                            rc.socket_owner(path)
             # Only the executable/launch and native probe are fixtures; PID, UID,
             # socket, process identity, signal and exit wait use the real OS.
-            with patch.object(rc, "known_listener", return_value=True), patch.object(rc, "version", return_value={"status": "running", "appServerVersion": "0.153.4"}), redirect_stdout(self.output):
+            with patch.object(rc, "known_listener", return_value=True), patch.object(rc, "version", return_value={"status": "running", "appServerVersion": "0.166.0"}), redirect_stdout(self.output):
                 rc.recover(self.binary, self.home, wait_seconds=5)
             self.assertEqual(child.wait(timeout=2), 0)
-            self.assertEqual(path.with_suffix(".signal").read_text(), str(signal.SIGHUP))
+            self.assertEqual(target.with_suffix(".signal").read_text(), str(signal.SIGHUP))
         finally:
             if child.poll() is None:
                 child.terminate()

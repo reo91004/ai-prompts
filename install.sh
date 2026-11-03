@@ -1679,7 +1679,12 @@ for graphify_existing_skill in \
   "$HOME/.kimi/skills/graphify"; do
   [ "$graphify_existing_skill" = "$GRAPHIFY_CLAUDE_SKILL" ] && continue
   [ "$graphify_existing_skill" = "$GRAPHIFY_CODEX_SKILL" ] && continue
-  [ ! -L "$graphify_existing_skill" ] || kit_die "Refusing a symlinked Graphify skill: $graphify_existing_skill"
+  # Linked skills are safe only when their contents are already backed up above.
+  if [ -L "$graphify_existing_skill" ] &&
+      [ ! "$graphify_existing_skill" -ef "$GRAPHIFY_CLAUDE_SKILL" ] &&
+      [ ! "$graphify_existing_skill" -ef "$GRAPHIFY_CODEX_SKILL" ]; then
+    kit_die "Refusing a symlinked Graphify skill: $graphify_existing_skill"
+  fi
   if [ -e "$graphify_existing_skill" ] && [ ! -d "$graphify_existing_skill" ]; then
     kit_die "Graphify skill path is not a directory: $graphify_existing_skill"
   fi

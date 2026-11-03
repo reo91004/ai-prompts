@@ -118,7 +118,12 @@ run_tooling() {
 }
 
 UV_TOOL_BIN_DIR="$TMP_ROOT/tool-bin"
+mkdir -p "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills"
+printf '%s\n' '# existing codex skill' > "$TMP_HOME/.codex/skills/graphify/SKILL.md"
+ln -s "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills/graphify"
 run_tooling
+[ -L "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-existing-0 ]
+grep -Fqx '# existing codex skill' "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-codex-skill/SKILL.md
 
 grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall graphifyy==0.9.82' "$CALLS"
 grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[all]==0.42.0' "$CALLS"
@@ -246,6 +251,10 @@ printf '%s\n' 'old-version' > "$GRAPHIFY_FAIL_HOME/.config/opencode/skills/graph
 mkdir -p "$GRAPHIFY_FAIL_HOME/.gemini/config/skills/graphify"
 printf '%s\n' '# existing antigravity skill' > "$GRAPHIFY_FAIL_HOME/.gemini/config/skills/graphify/SKILL.md"
 printf '%s\n' 'old-antigravity-version' > "$GRAPHIFY_FAIL_HOME/.gemini/config/skills/graphify/.graphify_version"
+mkdir -p "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify" "$GRAPHIFY_FAIL_HOME/.agents/skills"
+printf '%s\n' '# existing claude skill' > "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify/SKILL.md"
+printf '%s\n' 'old-claude-version' > "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify/.graphify_version"
+ln -s ../../.claude/skills/graphify "$GRAPHIFY_FAIL_HOME/.agents/skills/graphify"
 set +e
 HOME="$GRAPHIFY_FAIL_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
   UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
@@ -256,7 +265,6 @@ set -e
 grep -Fq 'Graphify Codex global installation failed.' "$TMP_ROOT/graphify-failure.out"
 for unexpected in \
   "$GRAPHIFY_FAIL_HOME/.claude/CLAUDE.md" \
-  "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify" \
   "$GRAPHIFY_FAIL_HOME/.codex/skills/graphify" \
   "$GRAPHIFY_FAIL_HOME/.codex/AGENTS.md" \
   "$GRAPHIFY_FAIL_HOME/.config/headroom/auto-wrap.sh" \
@@ -273,6 +281,25 @@ grep -Fqx '# existing opencode skill' "$GRAPHIFY_FAIL_HOME/.config/opencode/skil
 grep -Fqx 'old-version' "$GRAPHIFY_FAIL_HOME/.config/opencode/skills/graphify/.graphify_version"
 grep -Fqx '# existing antigravity skill' "$GRAPHIFY_FAIL_HOME/.gemini/config/skills/graphify/SKILL.md"
 grep -Fqx 'old-antigravity-version' "$GRAPHIFY_FAIL_HOME/.gemini/config/skills/graphify/.graphify_version"
+[ "$(readlink "$GRAPHIFY_FAIL_HOME/.agents/skills/graphify")" = ../../.claude/skills/graphify ]
+grep -Fqx '# existing claude skill' "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify/SKILL.md"
+grep -Fqx 'old-claude-version' "$GRAPHIFY_FAIL_HOME/.claude/skills/graphify/.graphify_version"
+
+for link_target in external missing; do
+  SYMLINK_HOME="$TMP_ROOT/graphify-$link_target-home"
+  mkdir -p "$SYMLINK_HOME/.config/opencode/skills" "$SYMLINK_HOME/external"
+  printf '%s\n' 'user-owned skill' > "$SYMLINK_HOME/external/SKILL.md"
+  ln -s "$SYMLINK_HOME/$link_target" "$SYMLINK_HOME/.config/opencode/skills/graphify"
+  if HOME="$SYMLINK_HOME" PATH="$MOCK_BIN:$UV_TOOL_BIN_DIR:/usr/bin:/bin" \
+      UV_TOOL_BIN_DIR="$UV_TOOL_BIN_DIR" TOOLING_TEST_CALLS="$CALLS" \
+      bash "$ROOT/install.sh" >"$TMP_ROOT/graphify-$link_target.out" 2>&1; then
+    echo 'an unbacked Graphify symlink was incorrectly accepted' >&2
+    exit 1
+  fi
+  grep -Fq 'Refusing a symlinked Graphify skill:' "$TMP_ROOT/graphify-$link_target.out"
+  [ "$(readlink "$SYMLINK_HOME/.config/opencode/skills/graphify")" = "$SYMLINK_HOME/$link_target" ]
+  grep -Fqx 'user-owned skill' "$SYMLINK_HOME/external/SKILL.md"
+done
 
 FAIL_HOME="$TMP_ROOT/fail-home"
 mkdir -p "$FAIL_HOME"
