@@ -10,6 +10,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 case "$url" in
+  https://releases.openai.com/codex/channels/latest)
+    printf '{"tag_name":"rust-v0.153.4","prerelease":false}\n' > "$output"; exit 0 ;;
+  https://downloads.claude.ai/claude-code-releases/latest)
+    printf '2.1.0\n' > "$output"; exit 0 ;;
+  https://opencode.ai/update/api/latest/cli/npm)
+    printf '{"version":"2.2.5","metadata":{"package":"@opencode/cli"},"active":true}\n' > "$output"; exit 0 ;;
   https://pypi.org/pypi/graphifyy/json) version=0.9.82 ;;
   https://pypi.org/pypi/headroom-ai/json) version=0.40.0 ;;
   https://pypi.org/pypi/uv/json) version=0.12.24 ;;

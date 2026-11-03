@@ -34,17 +34,39 @@ export PATH="$WORK/bin"
 kit_init_state
 KIT_HEADROOM_PYTHON="$TEST_PYTHON"
 export BOOTSTRAP_CALLS="$WORK/calls"
+export MOCK_CODEX_LATEST=0.153.4 MOCK_CLAUDE_LATEST=2.1.0 MOCK_OPENCODE_LATEST=2.2.5
 printf '%s\n' '#!/bin/sh' 'echo v12.0.0' > "$WORK/bin/node"
 chmod +x "$WORK/bin/node"
 
 download_file() {
-  # The latest-LTS lookup runs on every bootstrap; only real downloads are recorded.
+  # Record CLI metadata and payload requests; keep the Node fixture lookup quiet.
   if [ "$1" = https://nodejs.org/dist/index.json ]; then
     printf '%s\n' '[' '{"version":"v25.1.0","lts":false},' '{"version":"v24.21.0","lts":"Krypton"},' > "$2"
     return
   fi
   printf '%s\n' "$1" >> "$BOOTSTRAP_CALLS"
   case "$1" in
+    https://releases.openai.com/codex/channels/latest)
+      [ "${MOCK_CODEX_PRIMARY_DOWN:-0}" -ne 1 ] || return 22
+      printf '{"tag_name":"rust-v%s","prerelease":false}\n' "$MOCK_CODEX_LATEST" > "$2" ;;
+    https://api.github.com/repos/openai/codex/releases/latest)
+      printf '{"tag_name":"rust-v%s","prerelease":false}\n' "$MOCK_CODEX_LATEST" > "$2" ;;
+    https://downloads.claude.ai/claude-code-releases/latest)
+      printf '%s\n' "$MOCK_CLAUDE_LATEST" > "$2" ;;
+    https://opencode.ai/update/api/latest/cli/npm)
+      printf '{"version":"%s","metadata":{"package":"@opencode/cli"},"active":true}\n' "$MOCK_OPENCODE_LATEST" > "$2" ;;
+    https://registry.npmjs.org/@opencode%2fcli-*/*)
+      mkdir -p "$WORK/opencode-package/package/bin"
+      printf '%s\n' '#!/bin/sh' 'case "$*" in' "  --version) echo v${1##*/} ;;" '  "plugin --help") : ;;' '  *) exit 1 ;;' 'esac' \
+        > "$WORK/opencode-package/package/bin/opencode"
+      chmod +x "$WORK/opencode-package/package/bin/opencode"
+      tar -czf "$WORK/opencode-package.tgz" -C "$WORK/opencode-package" package
+      node -e 'const fs=require("fs"),c=require("crypto"),u=new URL(process.argv[1]),parts=decodeURIComponent(u.pathname.slice(1)).split("/"),v=parts.pop();
+        console.log(JSON.stringify({name:parts.join("/"),version:v,dist:{tarball:"https://registry.npmjs.org/@opencode/cli-fixture/-/package.tgz",integrity:"sha512-"+c.createHash("sha512").update(fs.readFileSync(process.argv[2])).digest("base64")}}));' \
+        "$1" "$WORK/opencode-package.tgz" > "$2" ;;
+    https://registry.npmjs.org/@opencode/cli-fixture/-/package.tgz)
+      cp "$WORK/opencode-package.tgz" "$2"
+      [ "${MOCK_OPENCODE_CORRUPT:-0}" -ne 1 ] || printf 'corrupt' >> "$2" ;;
     *nodejs.org*tar.gz) cp "$WORK/node.tar.gz" "$2" ;;
     *nodejs.org*SHASUMS256.txt)
       if command -v shasum >/dev/null; then digest="$(shasum -a 256 "$WORK/node.tar.gz")"; else digest="$(sha256sum "$WORK/node.tar.gz")"; fi
@@ -56,11 +78,14 @@ download_file() {
       cat > "$2" <<'INSTALL'
 #!/bin/sh
 test "$CODEX_NON_INTERACTIVE" = 1
+test "$1" = --release
+test "$2" = "$MOCK_CODEX_LATEST"
 mkdir -p "$HOME/.codex/packages/standalone/current/bin" "$CODEX_INSTALL_DIR"
+printf '%s\n' "$2" > "$HOME/.codex/packages/standalone/current/fixture-version"
 cat > "$HOME/.codex/packages/standalone/current/bin/codex" <<'CLI'
 #!/bin/sh
 case "$*" in
-  --version) echo 'codex 0.146.1' ;;
+  --version) printf 'codex %s\n' "$(cat "$HOME/.codex/packages/standalone/current/fixture-version")" ;;
   *--help) : ;;
   'remote-control start --json')
     case "${REMOTE_TEST_FAILURE:-}" in
@@ -92,9 +117,10 @@ INSTALL
     https://claude.ai/install.sh)
       cat > "$2" <<'INSTALL'
 #!/bin/sh
+test "$1" = "$MOCK_CLAUDE_LATEST"
 mkdir -p "$HOME/.local/bin" "$HOME/.local/share/claude/versions"
-printf '%s\n' '#!/bin/sh' 'echo "2.1.0 (Claude Code)"' > "$HOME/.local/share/claude/versions/2.1.0"
-ln -s "$HOME/.local/share/claude/versions/2.1.0" "$HOME/.local/bin/claude"
+printf '%s\n' '#!/bin/sh' "echo '$1 (Claude Code)'" > "$HOME/.local/share/claude/versions/$1"
+ln -s "$HOME/.local/share/claude/versions/$1" "$HOME/.local/bin/claude"
 chmod +x "$HOME/.local/bin/claude"
 INSTALL
       ;;
@@ -103,19 +129,45 @@ INSTALL
 }
 
 bootstrap_cli
-for name in codex claude node npx; do command -v "$name" >/dev/null; done
+for name in codex claude opencode node npx; do command -v "$name" >/dev/null; done
 ! grep -Fq remote-start "$BOOTSTRAP_CALLS"
 [ ! -e "$KIT_STATE_ROOT/codex-remote-control.state" ]
 before="$(cat "$BOOTSTRAP_CALLS")"
 bootstrap_cli
 [ "$before" = "$(cat "$BOOTSTRAP_CALLS")" ]
 # Existing native payloads repair missing/dangling kit launchers without download.
-rm "$KIT_STATE_ROOT/cli/bin/codex" "$KIT_STATE_ROOT/cli/bin/claude"
+rm "$KIT_STATE_ROOT/cli/bin/codex" "$KIT_STATE_ROOT/cli/bin/claude" "$KIT_STATE_ROOT/cli/bin/opencode"
 ln -s "$WORK/missing-codex" "$KIT_STATE_ROOT/cli/bin/codex"
 ln -s "$WORK/missing-claude" "$KIT_STATE_ROOT/cli/bin/claude"
+ln -s "$WORK/missing-opencode" "$KIT_STATE_ROOT/cli/bin/opencode"
 bootstrap_cli
 verify_native_clis
 [ "$before" = "$(cat "$BOOTSTRAP_CALLS")" ]
+
+# A new install resolves new release metadata even when all old CLIs still work.
+export MOCK_CODEX_LATEST=0.154.0 MOCK_CLAUDE_LATEST=2.1.1 MOCK_OPENCODE_LATEST=2.2.6
+unset KIT_CLI_VERSIONS_RESOLVED
+bootstrap_cli
+verify_native_clis
+[ "$(cli_version "$(managed_codex)")" = 0.154.0 ]
+[ "$(cli_version "$HOME/.local/bin/claude")" = 2.1.1 ]
+[ "$(cli_version "$HOME/.opencode/bin/opencode")" = 2.2.6 ]
+for endpoint in codex/channels/latest claude-code-releases/latest latest/cli/npm; do
+  [ "$(grep -c "$endpoint" "$BOOTSTRAP_CALLS")" -eq 2 ]
+done
+
+# Preserve the official installer's GitHub fallback when its primary host is unavailable.
+(
+  MOCK_CODEX_PRIMARY_DOWN=1 KIT_CLI_VERSIONS_RESOLVED=0 bootstrap_cli
+  [ "$KIT_CODEX_SOURCE" = https://api.github.com/repos/openai/codex/releases/latest ]
+) > "$WORK/codex-fallback.log" 2>&1
+
+# Bad V2 metadata and corrupt packages must leave the selected binary intact.
+if (MOCK_OPENCODE_LATEST=1.19.5 KIT_CLI_VERSIONS_RESOLVED=0 bootstrap_cli) > "$WORK/v1-refused.log" 2>&1; then exit 1; fi
+grep -Fq 'Invalid OpenCode V2 release metadata' "$WORK/v1-refused.log"
+if (MOCK_OPENCODE_LATEST=2.2.7 MOCK_OPENCODE_CORRUPT=1 KIT_CLI_VERSIONS_RESOLVED=0 bootstrap_cli) > "$WORK/corrupt-opencode.log" 2>&1; then exit 1; fi
+grep -Fq 'OpenCode archive integrity mismatch' "$WORK/corrupt-opencode.log"
+[ "$(cli_version "$HOME/.opencode/bin/opencode")" = 2.2.6 ]
 # A kit Node too old for the CLIs is replaced cleanly with the latest LTS.
 printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo v18.0.0; else exec "$TEST_NODE" "$@"; fi' > "$KIT_STATE_ROOT/cli/node/bin/node"
 : > "$KIT_STATE_ROOT/cli/node/stale-file"
@@ -180,7 +232,7 @@ if (cleanup_legacy_clis) > "$WORK/refused-cleanup.log" 2>&1; then exit 1; fi
 grep -Fq 'Legacy packages were preserved' "$WORK/refused-cleanup.log"
 mv "$WORK/native-codex" "$HOME/.codex/packages/standalone/current/bin/codex"
 # A broken native payload triggers the official installer again, without RC.
-printf '%s\n' '#!/bin/sh' 'exit 127' > "$HOME/.local/share/claude/versions/2.1.0"
+printf '%s\n' '#!/bin/sh' 'exit 127' > "$HOME/.local/bin/claude"
 bootstrap_cli
 verify_native_clis
 printf '%s\n' '#!/bin/sh' 'echo codex 0.100.0' 'exit 1' > "$HOME/.codex/packages/standalone/current/bin/codex"
