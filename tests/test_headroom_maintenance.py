@@ -82,6 +82,71 @@ class MaintenanceTests(unittest.TestCase):
         command = str(root / "uv-tools/headroom-ai/bin/python3") + " " + str(root / "bin/headroom") + " mcp serve"
         self.table[pid] = ("Wed Sep 9 10:00:00 2026", command)
 
+    def test_opencode_process_detection_matches_entrypoints_only(self):
+        entries = [
+            str(maintenance.HOME / ".opencode/bin/opencode") + " serve --service",
+            str(maintenance.KIT / "cli/bin/opencode") + " run a task",
+            "/opt/homebrew/bin/opencode serve --stdio --port 0",
+            "opencode-v2",
+            "/usr/bin/node --conditions node /usr/lib/node_modules/@opencode/cli/bin/opencode serve",
+            "/usr/bin/bun run /usr/lib/node_modules/@opencode/cli/dist/index.js",
+            "/bin/bash " + str(maintenance.HOME / ".opencode/bin/opencode") + " serve",
+        ]
+        for arguments in entries:
+            self.assertTrue(maintenance.opencode_process(arguments), arguments)
+        for arguments in (
+            "/usr/bin/python3 my-experiment.py --description opencode",
+            "/usr/bin/node -e '/usr/bin/opencode serve'",
+            "/usr/bin/node -peval /usr/bin/opencode",
+            "/bin/bash -lc /usr/bin/opencode",
+            "/usr/bin/node /app/other.js /usr/lib/node_modules/@opencode/cli/bin/opencode",
+            "/usr/bin/tail -f experiment.log",
+            "/usr/bin/opencode-helper serve",
+        ):
+            self.assertFalse(maintenance.opencode_process(arguments), arguments)
+
+    def test_opencode_blocks_maintenance_without_touching_monitor_or_experiment(self):
+        self.seed_service()
+        self.add_mcp()
+        self.table[300] = ("same start", str(maintenance.HOME / ".opencode/bin/opencode") + " serve --password PRIVATE_TOKEN")
+        self.table[301] = ("same start", "/bin/sh -c tail -f experiment.log")
+        self.table[302] = ("same start", "/usr/bin/python3 train.py")
+        before = self.table.copy()
+        for action in (lambda: maintenance.pause(self.record), maintenance.stop_service):
+            with self.assertRaisesRegex(RuntimeError, "OpenCode is still running \\(PID 300\\)") as error:
+                action()
+            self.assertNotIn("PRIVATE_TOKEN", str(error.exception))
+            self.assertEqual(before, self.table)
+            self.assertTrue(self.active)
+            self.assertEqual(self.events, [])
+            self.assertFalse(self.record.exists())
+
+    def test_opencode_starting_after_inspection_prevents_service_stop(self):
+        self.seed_service()
+        later = {**self.table, 300: ("same start", "opencode serve --service")}
+        with patch.object(maintenance, "processes", side_effect=[self.table.copy(), later]):
+            with self.assertRaisesRegex(RuntimeError, "OpenCode is still running"):
+                maintenance.pause(self.record)
+        self.assertTrue(self.active)
+        self.assertFalse(any("stop" in event or "bootout" in event for event in self.events))
+
+    def test_opencode_starting_before_mcp_signal_prevents_termination(self):
+        self.add_mcp()
+        initial = self.table.copy()
+        later = {**initial, 300: ("same start", "opencode serve --service")}
+        with patch.object(maintenance, "processes", side_effect=[initial, initial, later]):
+            with self.assertRaisesRegex(RuntimeError, "OpenCode is still running"):
+                maintenance.pause(self.record)
+        self.assertEqual(self.table, initial)
+        self.assertNotIn(("term", 246), self.events)
+
+    def test_opencode_idle_cli_is_read_only(self):
+        before = list(maintenance.HOME.rglob("*"))
+        with patch.object(sys, "argv", ["maintenance.py", "opencode-idle"]):
+            maintenance.main()
+        self.assertEqual(before, list(maintenance.HOME.rglob("*")))
+        self.assertEqual(self.events, [])
+
     def terminate(self, pid, sig):
         self.assertEqual(sig, signal.SIGTERM)
         self.assertTrue(maintenance.owned_mcp(self.table[pid][1]))

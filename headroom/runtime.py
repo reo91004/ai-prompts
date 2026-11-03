@@ -8,6 +8,7 @@ removal to its owned block while preserving the prior root provider settings.
 
 import importlib
 import importlib.metadata
+import fnmatch
 import fcntl
 import json
 import os
@@ -466,6 +467,54 @@ def install_mcp(agent):
     headroom("mcp", "install", "--agent", agent)
 
 
+def opencode_config():
+    """Return native V2 integration without replacing provider/model selections."""
+    module = importlib.import_module("headroom.providers.opencode.runtime")
+    if not callable(getattr(module, "with_opencode_standalone", None)):
+        fail("Installed Headroom lacks OpenCode V2 support. Update the kit before enabling this integration.")
+    # Use the installed wheel's self-contained bundle, not a checkout/env override.
+    plugin = Path(module.__file__).resolve().parent / "_dist"
+    if not plugin.is_dir() or not (plugin / "index.js").is_file():
+        fail("Installed Headroom has no bundled OpenCode V2 plugin directory.")
+    return {
+        "plugins": [{"package": str(plugin), "options": {"proxyUrl": BASE_URL}}],
+        "mcp": {"servers": {"headroom": {
+            "type": "local",
+            "command": [sys.executable, "-m", "headroom.cli", "mcp", "serve"],
+            "environment": {"HEADROOM_PROXY_URL": BASE_URL},
+        }}},
+    }
+
+
+def check_opencode_config(config):
+    expected = opencode_config()
+    if not isinstance(config, dict) or not isinstance(config.get("plugins"), list):
+        fail("OpenCode has no native Headroom plugin configuration.")
+    wanted = expected["plugins"][0]
+    configured = enabled = False
+    for plugin in config["plugins"]:
+        if isinstance(plugin, dict) and plugin.get("package") == wanted["package"]:
+            if not isinstance(plugin.get("options"), dict) or plugin["options"].get("proxyUrl") != BASE_URL:
+                fail("OpenCode Headroom plugin points at a different proxy.")
+            configured = enabled = True
+        elif isinstance(plugin, str):
+            pattern = plugin.removeprefix("-")
+            if fnmatch.fnmatchcase("headroom", pattern):
+                enabled = not plugin.startswith("-")
+    if not configured or not enabled:
+        fail("OpenCode does not enable the installed native Headroom plugin.")
+    mcp = config.get("mcp", {})
+    servers = mcp.get("servers", {}) if isinstance(mcp, dict) else {}
+    entry = servers.get("headroom") if isinstance(servers, dict) else None
+    wanted_mcp = expected["mcp"]["servers"]["headroom"]
+    if (not isinstance(entry, dict) or entry.get("disabled", False) is not False
+            or entry.get("type") != "local" or entry.get("command") != wanted_mcp["command"]
+            or not isinstance(entry.get("environment"), dict)
+            or entry["environment"].get("HEADROOM_PROXY_URL") != BASE_URL):
+        fail("OpenCode Headroom MCP does not match the managed interpreter and proxy.")
+    print("OpenCode Headroom plugin/MCP configuration verified; provider traffic and claude-agent routing are not probed.")
+
+
 def codex_oauth():
     from headroom.providers.codex.install import codex_uses_chatgpt_auth
     return codex_uses_chatgpt_auth(CONFIG.parent / "auth.json")
@@ -767,6 +816,10 @@ def main():
         adopt_default(args[0])
     elif action == "install-mcp":
         install_mcp(args[0])
+    elif action == "opencode-config":
+        print(json.dumps(opencode_config()))
+    elif action == "check-opencode-config":
+        check_opencode_config(json.load(sys.stdin))
     elif action == "install":
         install()
     elif action == "check":

@@ -65,6 +65,48 @@ def processes():
     return found
 
 
+def opencode_process(arguments):
+    # ps flattens argv, so preserve known paths with spaces before token matching.
+    paths = [HOME / ".opencode/bin/opencode", HOME / ".local/bin/opencode", KIT / "cli/bin/opencode"]
+    prefixes = {str(path) for path in paths} | {str(path.resolve()) for path in paths if path.exists()}
+
+    def known_entry(value):
+        return any(value == prefix or value.startswith(prefix + " ") for prefix in prefixes)
+
+    if known_entry(arguments):
+        return True
+    executable, _, remaining = arguments.partition(" ")
+    name = Path(executable).name
+    if name in ("opencode", "opencode-v2"):
+        return True
+    if name not in ("node", "nodejs", "bun", "sh", "bash", "dash", "zsh"):
+        return False
+    while remaining:
+        remaining = remaining.lstrip()
+        if known_entry(remaining):
+            return True
+        argument, _, remaining = remaining.partition(" ")
+        if (argument in ("-c", "--command", "-e", "--eval", "-p", "--print")
+                or argument.startswith(("-c", "-e", "-p", "--eval=", "--print="))
+                or (name in ("sh", "bash", "dash", "zsh") and argument.startswith("-")
+                    and not argument.startswith("--") and "c" in argument[1:])):
+            return False
+        if argument in ("--conditions", "--require", "-r", "--import", "--loader"):
+            _, _, remaining = remaining.lstrip().partition(" ")
+        elif argument.startswith("-") or (name == "bun" and argument == "run"):
+            continue
+        else:
+            return (Path(argument).name in ("opencode", "opencode-v2")
+                    or any(marker in argument for marker in ("/node_modules/@opencode/cli/", "/node_modules/opencode-ai/")))
+    return False
+
+
+def opencode_idle(snapshot=None):
+    for pid, (_, arguments) in (processes() if snapshot is None else snapshot).items():
+        if opencode_process(arguments):
+            fail("OpenCode is still running (PID " + str(pid) + "). Finish its jobs and close its client/server before updating; no process was stopped.")
+
+
 def owned_mcp(arguments):
     # Match complete known invocation prefixes, including HOME with spaces.
     # Never interpret -c source, arbitrary Python jobs, or external Headroom.
@@ -252,15 +294,18 @@ def inspect():
                  + str(path.parent) + ". Back up its configuration and use its original installer "
                  "to remove or relocate that profile before retrying. Stopping its process alone "
                  "leaves the conflicting deployment record. No process was stopped.")
+    snapshot = processes()
+    opencode_idle(snapshot)
     owned = owned_service()
     registered, active = service_state() if owned else (False, False)
-    mcps = {pid: identity for pid, identity in processes().items() if owned_mcp(identity[1])}
+    mcps = {pid: identity for pid, identity in snapshot.items() if owned_mcp(identity[1])}
     if not owned and not mcps:
         fail("No safely identifiable kit service or MCP server can be stopped. Close the reported process with its owning application.")
     return owned, registered, active, mcps
 
 
 def stop_service():
+    opencode_idle()
     if not owned_service():
         return
     registered, _ = service_state()
@@ -289,7 +334,9 @@ def pause(record):
     for pid, identity in mcps.items():
         # Recheck start time and complete command immediately before SIGTERM.
         # ps snapshots cannot atomically exclude PID reuse; never use pidfiles.
-        if processes().get(pid) == identity:
+        current = processes()
+        opencode_idle(current)
+        if current.get(pid) == identity:
             try:
                 os.kill(pid, signal.SIGTERM)
                 print("Requested normal shutdown of kit Headroom MCP (PID " + str(pid) + ").")
@@ -298,6 +345,7 @@ def pause(record):
     deadline = time.monotonic() + STOP_TIMEOUT
     while time.monotonic() < deadline:
         current = processes()
+        opencode_idle(current)
         if not any(current.get(pid) == identity for pid, identity in mcps.items()):
             if any(owned_mcp(identity[1]) for identity in current.values()):
                 fail("A client restarted Headroom MCP during installation. Close that client and rerun; the environment was preserved.")
@@ -359,6 +407,8 @@ def main():
     if action == "probe":
         if sys.version_info < (3, 8):
             fail("Python 3.8+ is required for maintenance.")
+    elif action == "opencode-idle":
+        opencode_idle()
     elif action == "inspect":
         inspect()
     elif action == "pause":

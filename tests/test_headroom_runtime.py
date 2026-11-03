@@ -1,5 +1,8 @@
 """Behavioral tests for ownership, health and session isolation (no OS services)."""
 import importlib.util
+import copy
+from contextlib import redirect_stdout
+import io
 import json
 import os
 from pathlib import Path
@@ -8,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("kit_runtime", Path(__file__).resolve().parents[1] / "headroom/runtime.py")
@@ -59,6 +63,93 @@ class RuntimeTests(unittest.TestCase):
         record = runtime.KIT / "maintenance.json"
         runtime.write_json(record, {"profile": "default", "adopt_service": True, "resume_service": True})
         return record
+
+    def opencode_module(self):
+        directory = runtime.KIT / "tooling/uv-tools/headroom-ai/lib/site-packages/headroom/providers/opencode"
+        plugin = directory / "_dist"
+        plugin.mkdir(parents=True)
+        (plugin / "index.js").write_text("export default {id: 'headroom', setup() {}};\n")
+        return SimpleNamespace(__file__=str(directory / "runtime.py"), with_opencode_standalone=lambda args, version: args)
+
+    def test_opencode_fragment_uses_bundled_directory_without_provider_changes(self):
+        module = self.opencode_module()
+        before = {path: path.read_bytes() for path in runtime.HOME.rglob("*") if path.is_file()}
+        with patch.object(runtime.importlib, "import_module", return_value=module):
+            fragment = runtime.opencode_config()
+        self.assertEqual(set(fragment), {"plugins", "mcp"})
+        plugin = Path(fragment["plugins"][0]["package"])
+        self.assertTrue(plugin.is_dir())
+        self.assertTrue((plugin / "index.js").is_file())
+        self.assertEqual(fragment["plugins"][0]["options"]["proxyUrl"], runtime.BASE_URL)
+        mcp = fragment["mcp"]["servers"]["headroom"]
+        self.assertEqual(mcp["command"], [sys.executable, "-m", "headroom.cli", "mcp", "serve"])
+        self.assertEqual(mcp["environment"], {"HEADROOM_PROXY_URL": runtime.BASE_URL})
+        self.assertEqual(before, {path: path.read_bytes() for path in runtime.HOME.rglob("*") if path.is_file()})
+        self.assertEqual(self.calls, [])
+
+    def test_opencode_refuses_legacy_or_missing_plugin(self):
+        module = self.opencode_module()
+        legacy = SimpleNamespace(__file__=module.__file__)
+        with patch.object(runtime.importlib, "import_module", return_value=legacy):
+            with self.assertRaisesRegex(RuntimeError, "lacks OpenCode V2"):
+                runtime.opencode_config()
+        (Path(module.__file__).parent / "_dist/index.js").unlink()
+        with patch.object(runtime.importlib, "import_module", return_value=module):
+            with self.assertRaisesRegex(RuntimeError, "no bundled OpenCode V2"):
+                runtime.opencode_config()
+
+    def test_opencode_configuration_validation_preserves_unrelated_settings(self):
+        module = self.opencode_module()
+        with patch.object(runtime.importlib, "import_module", return_value=module):
+            config = runtime.opencode_config()
+            config.update(model="provider/user-model", providers={"user": {"token": "PRIVATE_TOKEN"}})
+            config["plugins"].append({"package": "unrelated-plugin"})
+            config["plugins"][0]["options"]["excludeHosts"] = ["opencode.ai"]
+            before = copy.deepcopy(config)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                runtime.check_opencode_config(config)
+            self.assertEqual(config, before)
+            self.assertNotIn("PRIVATE_TOKEN", output.getvalue())
+            self.assertIn("routing are not probed", output.getvalue())
+
+    def test_opencode_configuration_rejects_disabled_or_misrouted_entries(self):
+        module = self.opencode_module()
+        with patch.object(runtime.importlib, "import_module", return_value=module):
+            original = runtime.opencode_config()
+            cases = []
+            for directive in ("-headroom", "-*"):
+                config = copy.deepcopy(original)
+                config["plugins"].append(directive)
+                cases.append(config)
+            config = copy.deepcopy(original)
+            config["plugins"][0]["package"] += "/index.js"
+            cases.append(config)
+            config = copy.deepcopy(original)
+            config["plugins"][0]["options"]["proxyUrl"] = "http://127.0.0.1:9999"
+            cases.append(config)
+            for key, value in (("disabled", True), ("command", ["unmanaged-headroom", "mcp", "serve"]),
+                               ("environment", {"HEADROOM_PROXY_URL": "http://127.0.0.1:9999"})):
+                config = copy.deepcopy(original)
+                config["mcp"]["servers"]["headroom"][key] = value
+                cases.append(config)
+            for config in cases:
+                with self.subTest(config=config), self.assertRaises(RuntimeError):
+                    runtime.check_opencode_config(config)
+
+    def test_opencode_cli_fragment_and_effective_json_validation(self):
+        module = self.opencode_module()
+        with patch.object(runtime.importlib, "import_module", return_value=module):
+            output = io.StringIO()
+            with patch.object(sys, "argv", ["runtime.py", "opencode-config"]), redirect_stdout(output):
+                runtime.main()
+            config = json.loads(output.getvalue())
+            config["providers"] = {"user": {"token": "PRIVATE_TOKEN"}}
+            output = io.StringIO()
+            with patch.object(sys, "argv", ["runtime.py", "check-opencode-config"]), \
+                    patch.object(sys, "stdin", io.StringIO(json.dumps(config))), redirect_stdout(output):
+                runtime.main()
+            self.assertNotIn("PRIVATE_TOKEN", output.getvalue())
 
     def test_default_adoption_preserves_config_auth_database_and_service_manifest(self):
         record = self.seed_default_adoption()
