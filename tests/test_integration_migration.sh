@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+KIT_FIXTURE_SETUP_ONLY="${KIT_TEST_FIXTURES_ONLY:-0}"
 command -v node >/dev/null 2>&1 || { echo "node is required for the migration tests" >&2; exit 1; }
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/harness-migration.XXXXXX")"
@@ -10,10 +11,30 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
 MOCK_BIN="$WORK/bin"
 mkdir -p "$MOCK_BIN"
+export KIT_TEST_FIXTURES_ONLY=1
+export KIT_TEST_REAL_GIT="$(command -v git)"
+export KIT_TEST_HUMANIZER_REPOSITORY="$WORK/humanizer-fixture"
+mkdir -p "$KIT_TEST_HUMANIZER_REPOSITORY"
+cp -R "$ROOT/tests/fixtures/humanizer/." "$KIT_TEST_HUMANIZER_REPOSITORY/"
+"$KIT_TEST_REAL_GIT" -c init.defaultBranch=main init --quiet "$KIT_TEST_HUMANIZER_REPOSITORY"
+"$KIT_TEST_REAL_GIT" -C "$KIT_TEST_HUMANIZER_REPOSITORY" add .
+"$KIT_TEST_REAL_GIT" -C "$KIT_TEST_HUMANIZER_REPOSITORY" -c user.name=Fixture \
+  -c user.email=fixture@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+  commit --quiet -m "Create installer Humanizer fixture"
 # This fixture does not inspect or mutate the real host's running tools.
-printf '%s\n' '#!/bin/sh' 'echo "42 /usr/bin/idle-fixture"' > "$MOCK_BIN/ps"
+printf '%s\n' '#!/bin/sh' 'case "$*" in *lstart=*) echo "42 Tue Nov 3 00:00:00 2026 /usr/bin/idle-fixture" ;; *) echo "42 /usr/bin/idle-fixture" ;; esac' > "$MOCK_BIN/ps"
 chmod +x "$MOCK_BIN/ps"
 ln -s "$(command -v node)" "$MOCK_BIN/node"
+cat > "$MOCK_BIN/opencode" <<'MOCK'
+#!/bin/sh
+case "$*" in
+  --version) echo 2.2.5 ;;
+  *--help) : ;;
+  *) echo "Unexpected OpenCode fixture command: $*" >&2; exit 99 ;;
+esac
+MOCK
+chmod +x "$MOCK_BIN/opencode"
+cp "$ROOT/tests/mock_latest_curl.sh" "$MOCK_BIN/curl"
 
 # Mock CLIs replay plugin/marketplace state from JSON files and record every
 # invocation, so reconciliation logic is testable without real CLIs, network,
@@ -86,8 +107,10 @@ case "$cmd" in
   "mcp remove sequential_thinking")
     rm -f "$STATE/mcp_sequential"
     ;;
-  "mcp add sequential_thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@latest")
-    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
+  "mcp add sequential_thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@"*)
+    package="${cmd##* }"
+    [[ "$package" =~ ^@modelcontextprotocol/server-sequential-thinking@(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 99
+    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "$package" > "$STATE/mcp_sequential"
     ;;
   "mcp list")
     config="$HOME/.codex/config.toml"
@@ -137,8 +160,10 @@ case "$cmd" in
   "mcp remove sequential-thinking -s user")
     rm -f "$STATE/mcp_sequential"
     ;;
-  "mcp add -s user sequential-thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@latest")
-    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "@modelcontextprotocol/server-sequential-thinking@latest" > "$STATE/mcp_sequential"
+  "mcp add -s user sequential-thinking -- $HOME/.universal-research-agent-kit/cli/bin/kit-npx -y @modelcontextprotocol/server-sequential-thinking@"*)
+    package="${cmd##* }"
+    [[ "$package" =~ ^@modelcontextprotocol/server-sequential-thinking@(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 99
+    printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "$package" > "$STATE/mcp_sequential"
     ;;
   *)
     echo "claude mock: unhandled command: $cmd" >&2
@@ -228,7 +253,7 @@ seed_claude_mock_state() {
 seed_native_clis() {
   local home="$1" name target
   [ ! -d "$home/.codex/packages/standalone/current/bin" ] || return 0
-  mkdir -p "$home/.codex/packages/standalone/current/bin" "$home/.local/bin" "$home/.local/share/claude/versions"
+  mkdir -p "$home/.codex/packages/standalone/current/bin" "$home/.local/bin" "$home/.local/share/claude/versions" "$home/.opencode/bin"
   for name in codex claude; do
     if [ "$name" = codex ]; then target="$home/.codex/packages/standalone/current/bin/codex"
     else target="$home/.local/share/claude/versions/2.1.0"; fi
@@ -236,12 +261,30 @@ seed_native_clis() {
     chmod +x "$target"
   done
   ln -s "$home/.local/share/claude/versions/2.1.0" "$home/.local/bin/claude"
+  printf '#!/bin/bash\nexec %q "$@"\n' "$MOCK_BIN/opencode" > "$home/.opencode/bin/opencode"
+  chmod +x "$home/.opencode/bin/opencode"
 }
 cat > "$MOCK_BIN/npm" <<'MOCK'
 #!/bin/sh
 case "$*" in
   'root --global') echo "$HOME/empty-npm/lib/node_modules" ;;
   --version) echo 10.0.0 ;;
+  'ci --prefix '*)
+    case "$3" in "$HOME/.universal-research-agent-kit/"*) ;; *) exit 99 ;; esac
+    name="$(node -p 'require(process.argv[1]).name' "$3/package.json")"
+    rm -rf "$3/node_modules"
+    case "$name" in
+      research-agent-kit-opencode-config)
+        [ -f "$KIT_TEST_JSONC_PARSER/lib/umd/main.js" ] || exit 98
+        mkdir -p "$3/node_modules"
+        cp -R "$KIT_TEST_JSONC_PARSER" "$3/node_modules/jsonc-parser"
+        ;;
+      research-agent-kit-btw-plus-compat)
+        exec "$KIT_TEST_PYTHON" "$KIT_TEST_BTW_ADAPTER" dependencies "$3"
+        ;;
+      *) exit 99 ;;
+    esac
+    ;;
   *) exit 99 ;;
 esac
 MOCK
@@ -267,7 +310,7 @@ run_kit() {
     "$@"
 }
 
-[ "${KIT_TEST_FIXTURES_ONLY:-0}" != 1 ] || return 0
+[ "$KIT_FIXTURE_SETUP_ONLY" != 1 ] || return 0
 
 echo "Scenario A: legacy kit integrations reconcile to profile none"
 A_HOME="$WORK/home-a"
@@ -315,6 +358,8 @@ cat > "$MOCK_BIN/git" <<MOCK
 #!/usr/bin/env bash
 set -euo pipefail
 cmd="\$*"
+case "\$cmd" in *https://github.com/blader/humanizer*) echo 'Humanizer test must use its local fixture.' >&2; exit 99 ;; esac
+case "\$cmd" in *humanizer*) exec "\$KIT_TEST_REAL_GIT" "\$@" ;; esac
 case "\$cmd" in
   "ls-remote "*"HEAD") printf '%s\tHEAD\n' "$PONYTAIL_REVISION" ;;
   *"rev-parse HEAD") echo "$PONYTAIL_REVISION" ;;

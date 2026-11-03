@@ -35,13 +35,21 @@ class BusyInstallTests(unittest.TestCase):
                     "UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS", "UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING"):
             self.env.pop(key, None)
         self.executable(self.bin / "ps", f"#!{sys.executable}\n" + '''import json, os, pathlib, sys
-assert sys.argv[1:] == ['-ww', '-u', str(os.getuid()), '-o', 'pid=', '-o', 'args=']
+base = ['-ww', '-u', str(os.getuid()), '-o', 'pid=']
+with_start = sys.argv[1:] == base + ['-o', 'lstart=', '-o', 'args=']
+assert with_start or sys.argv[1:] == base + ['-o', 'args=']
 counter = pathlib.Path(os.environ['GUARD_COUNTER'])
 index = int(counter.read_text()) if counter.exists() else 0
-counter.write_text(str(index + 1))
+if not with_start:
+    counter.write_text(str(index + 1))
 rows = json.loads(pathlib.Path(os.environ['GUARD_SNAPSHOTS']).read_text())
 row = rows[min(index, len(rows) - 1)]
-sys.stdout.write(row['text'])
+text = row['text']
+if with_start:
+    text = ''.join((line.split(None, 1)[0] + ' Tue Nov 3 00:00:00 2026 ' + line.split(None, 1)[1] + '\\n')
+                   if len(line.split(None, 1)) == 2 and line.split(None, 1)[0].isdigit() else line + '\\n'
+                   for line in text.splitlines())
+sys.stdout.write(text)
 sys.exit(row.get('exit', 0))
 ''')
         self.set_snapshots("42 /usr/bin/idle-fixture\n")
@@ -117,7 +125,9 @@ sys.exit(row.get('exit', 0))
                 self.set_snapshots(row)
                 result = self.run_shell('bootstrap_cli() { echo unexpected > "$GUARD_EVENTS"; return 99; }\nmain')
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("stopped before changing this host", result.stderr)
+                self.assertTrue("stopped before changing this host" in result.stderr or
+                                "installation did not change this host" in result.stderr,
+                                result.stderr)
                 self.assertFalse(self.events.exists())
                 self.assertEqual(list(self.home.iterdir()), [sentinel])
                 self.assertEqual(sentinel.read_text(), "keep")
@@ -132,9 +142,33 @@ sys.exit(row.get('exit', 0))
         self.assertFalse((self.kit / "cli").exists())
         self.assertFalse((self.kit / ".lock").exists())
 
+    def test_live_opencode_blocks_all_installation_before_mutation(self):
+        commands = ["/outside/bin/opencode serve", str(self.home / ".opencode/bin/opencode") + " --standalone"]
+        for command in commands:
+            with self.subTest(command=command):
+                self.set_snapshots("246 " + command + " SECRET_ARG_MUST_NOT_BE_LOGGED\n")
+                result = self.run_shell('bootstrap_cli() { echo unexpected > "$GUARD_EVENTS"; return 99; }\nmain')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("PID 246", result.stderr)
+                self.assertNotIn("SECRET_ARG", result.stdout + result.stderr)
+                self.assertFalse(self.events.exists())
+                self.assertEqual(list(self.home.iterdir()), [])
+
+    def test_opencode_appearing_after_lock_blocks_bootstrap(self):
+        self.set_snapshots("42 /usr/bin/idle-fixture\n", "246 /outside/bin/opencode serve\n")
+        result = self.run_shell('bootstrap_cli() { echo unexpected > "$GUARD_EVENTS"; return 99; }\nmain')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("OpenCode became active", result.stderr)
+        self.assertFalse(self.events.exists())
+        self.assertFalse((self.kit / "cli").exists())
+        self.assertFalse((self.kit / ".lock").exists())
+
     def test_ownership_refusal_reports_the_remaining_pid(self):
         self.set_snapshots("246 /outside/bin/headroom mcp serve\n")
-        result = self.run_shell('''kit_maintenance_run() { echo 'No owned Headroom found.' >&2; return 1; }
+        result = self.run_shell('''kit_maintenance_run() {
+  [ "$1" != opencode-idle ] || return 0
+  echo 'No owned Headroom found.' >&2; return 1
+}
 main
 ''')
         self.assertNotEqual(result.returncode, 0)
@@ -153,7 +187,7 @@ bootstrap_cli() { echo bootstrap >> "$GUARD_EVENTS"; return 42; }
 main
 ''')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "profile", "bootstrap", "resume"])
+        self.assertEqual(self.events.read_text().splitlines(), ["opencode-idle", "inspect", "opencode-idle", "pause", "profile", "bootstrap", "resume"])
         self.assertFalse((self.kit / "tooling").exists())
 
     def test_failed_shutdown_never_reaches_bootstrap(self):
@@ -167,7 +201,7 @@ bootstrap_cli() { echo unexpected >> "$GUARD_EVENTS"; }
 main
 ''')
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "resume"])
+        self.assertEqual(self.events.read_text().splitlines(), ["opencode-idle", "inspect", "opencode-idle", "pause", "resume"])
         self.assertFalse((self.kit / "tooling").exists())
 
     def test_stopped_default_is_inspected_backed_up_and_resumed_on_failure(self):
@@ -190,7 +224,7 @@ bootstrap_cli() {
 main
 ''')
         self.assertEqual(result.returncode, 42)
-        self.assertEqual(self.events.read_text().splitlines(), ["inspect", "pause", "profile", "bootstrap", "resume"])
+        self.assertEqual(self.events.read_text().splitlines(), ["opencode-idle", "inspect", "opencode-idle", "pause", "profile", "bootstrap", "resume"])
         self.assertEqual(manifest.read_text(), '{"profile":"default","port":8787}')
         self.assertFalse((self.kit / "headroom.json").exists())
 

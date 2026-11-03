@@ -24,11 +24,21 @@ home_prompt_signature() {
 before_signature="$(home_prompt_signature)"
 
 echo "Validation regression: local Serena state must not require manifest entries"
-tar -C "$ROOT" --exclude=.git --exclude=.serena -cf - . | tar -C "$VALIDATION_ROOT" -xf -
+tar -C "$ROOT" --exclude=.git --exclude=.serena --exclude=.agent_tmp --exclude=node_modules -cf - . | tar -C "$VALIDATION_ROOT" -xf -
 mkdir -p "$VALIDATION_ROOT/.serena/cache/bash"
 printf '%s\n' 'generated cache' > "$VALIDATION_ROOT/.serena/cache/bash/document_symbols.pkl"
 printf '%s\n' 'generated project state' > "$VALIDATION_ROOT/.serena/project.local.yml"
 bash "$VALIDATION_ROOT/scripts/validate_harness.sh"
+mkdir -p "$VALIDATION_ROOT/fixture-bin"
+cat > "$VALIDATION_ROOT/fixture-bin/ps" <<'MOCK'
+#!/bin/sh
+case "$*" in
+  *lstart=*) echo '42 Tue Nov 3 00:00:00 2026 /usr/bin/idle-fixture' ;;
+  *) echo '42 /usr/bin/idle-fixture' ;;
+esac
+MOCK
+chmod +x "$VALIDATION_ROOT/fixture-bin/ps"
+export PATH="$VALIDATION_ROOT/fixture-bin:$PATH"
 
 mkdir -p \
   "$TMP_HOME/.codex/agents" \
@@ -39,6 +49,12 @@ printf '%s\n' 'third-party-codex-agent' > "$TMP_HOME/.codex/agents/third_party.t
 printf '%s\n' 'third-party-codex-skill' > "$TMP_HOME/.agents/skills/third-party/SKILL.md"
 printf '%s\n' 'third-party-claude-agent' > "$TMP_HOME/.claude/agents/third-party.md"
 printf '%s\n' 'third-party-claude-skill' > "$TMP_HOME/.claude/skills/third-party/SKILL.md"
+mkdir -p "$TMP_HOME/.codex/skills/.system/native" "$TMP_HOME/.codex/skills/legacy-user" \
+  "$TMP_HOME/.config/opencode/skills/legacy-user" "$TMP_HOME/.agents/skills/research-repo-design"
+printf '%s\n' 'native skill' > "$TMP_HOME/.codex/skills/.system/native/SKILL.md"
+printf '%s\n' 'legacy skill' > "$TMP_HOME/.codex/skills/legacy-user/SKILL.md"
+printf '%s\n' 'legacy OpenCode skill' > "$TMP_HOME/.config/opencode/skills/legacy-user/SKILL.md"
+printf '%s\n' 'retired research skill' > "$TMP_HOME/.agents/skills/research-repo-design/SKILL.md"
 
 echo "Install regression run 1 (POSIX sh bootstrap)"
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 sh "$ROOT/install.sh" --without-statusline
@@ -47,7 +63,7 @@ cat > "$TMP_HOME/expected-config.toml" <<'EOF'
 experimental_mode = true
 EOF
 cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
-# A valid ownership record permits pruning only the obsolete kit entry.
+# The new source set replaces every old user skill, including untracked entries.
 printf '%s\n' obsolete-kit >> "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills"
 cksum "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills" | awk '{ print $1 ":" $2 }' > "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills.cksum"
 mkdir -p "$TMP_HOME/.agents/skills/obsolete-kit"
@@ -122,11 +138,19 @@ experimental_mode = false
 done
 
 grep -Fqx 'third-party-codex-agent' "$TMP_HOME/.codex/agents/third_party.toml"
-grep -Fqx 'third-party-codex-skill' "$TMP_HOME/.agents/skills/third-party/SKILL.md"
 grep -Fqx 'third-party-claude-agent' "$TMP_HOME/.claude/agents/third-party.md"
-grep -Fqx 'third-party-claude-skill' "$TMP_HOME/.claude/skills/third-party/SKILL.md"
+[ ! -e "$TMP_HOME/.agents/skills/third-party" ]
+[ ! -e "$TMP_HOME/.claude/skills/third-party" ]
+[ ! -e "$TMP_HOME/.agents/skills/research-repo-design" ]
+[ ! -e "$TMP_HOME/.codex/skills/legacy-user" ]
+[ ! -e "$TMP_HOME/.config/opencode/skills/legacy-user" ]
+grep -Fqx 'native skill' "$TMP_HOME/.codex/skills/.system/native/SKILL.md"
+grep -Fqx 'third-party-codex-skill' "$TMP_HOME"/.universal-research-agent-kit/backups/run.*/codex/skills/third-party/SKILL.md
+grep -Fqx 'third-party-claude-skill' "$TMP_HOME"/.universal-research-agent-kit/backups/run.*/claude/skills/third-party/SKILL.md
+[ -s "$TMP_HOME/.config/opencode/AGENTS.md" ]
+[ -s "$TMP_HOME/.config/opencode/agents/research-reviewer.md" ]
 
-for manifest in claude-agents claude-skills codex-agents codex-skills; do
+for manifest in claude-agents claude-skills codex-agents codex-skills opencode-agents; do
   path="$TMP_HOME/.universal-research-agent-kit/manifests/$manifest"
   [ -f "$path" ] && [ -f "$path.cksum" ]
   expected="$(cat "$path.cksum")"
@@ -177,8 +201,22 @@ rmdir "$state/.lock"
 HOME="$TMP_HOME" sh "$ROOT/install.sh" --without-statusline --cleanup-backups
 [ ! -e "$state/backups" ]
 [ -f "$state/manifests/codex-skills" ]
-grep -Fqx 'third-party-codex-skill' "$TMP_HOME/.agents/skills/third-party/SKILL.md"
+[ ! -e "$TMP_HOME/.agents/skills/third-party" ]
 
+
+echo "Global skill symlink replacement preserves the external target"
+SYMLINK_CASE="$VALIDATION_ROOT/symlink-case"
+mkdir -p "$SYMLINK_CASE/host/.agents" "$SYMLINK_CASE/external/user-skill"
+printf 'external evidence\n' > "$SYMLINK_CASE/external/user-skill/SKILL.md"
+ln -s "$SYMLINK_CASE/external" "$SYMLINK_CASE/host/.agents/skills"
+HOME="$SYMLINK_CASE/host" bash "$ROOT/install.sh" --without-statusline > "$SYMLINK_CASE/install.log"
+[ ! -L "$SYMLINK_CASE/host/.agents/skills" ]
+[ -s "$SYMLINK_CASE/host/.agents/skills/research-repo-protocol/SKILL.md" ]
+[ ! -e "$SYMLINK_CASE/host/.agents/skills/user-skill" ]
+grep -Fqx 'external evidence' "$SYMLINK_CASE/external/user-skill/SKILL.md"
+for backup_link in "$SYMLINK_CASE/host"/.universal-research-agent-kit/backups/run.*/codex/skills; do
+  [ -L "$backup_link" ] && [ "$(readlink "$backup_link")" = "$SYMLINK_CASE/external" ]
+done
 
 echo "Unit regression: kit_restore_entry must not delete a target without its backup"
 (

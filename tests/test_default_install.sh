@@ -1,15 +1,57 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+trap 'printf "Default installer test failed at %s:%s\n" "${BASH_SOURCE[0]}" "$LINENO" >&2' ERR
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export KIT_TEST_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+[ -x "$KIT_TEST_PYTHON" ] && "$KIT_TEST_PYTHON" -I -B -c 'import tomllib, tomlkit, mcp' >/dev/null 2>&1 || {
+  echo 'SKIP: default installer tests require Python 3.11+ with tomlkit and the MCP SDK.'
+  exit 77
+}
+export KIT_TEST_REAL_NODE="$(command -v node)"
 export KIT_TEST_MOCK_RUNTIME="$ROOT/tests/mock_runtime.py"
+export KIT_TEST_JSONC_PARSER="${KIT_TEST_JSONC_PARSER:-$ROOT/scripts/opencode-config/node_modules/jsonc-parser}"
+[ -f "$KIT_TEST_JSONC_PARSER/lib/umd/main.js" ] || {
+  echo 'SKIP: run npm ci --prefix scripts/opencode-config --ignore-scripts before installer orchestration tests.'
+  exit 77
+}
 KIT_TEST_FIXTURES_ONLY=1 source "$ROOT/tests/test_integration_migration.sh"
+export KIT_TEST_FIXTURES_ONLY=1
 unset UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING
 export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="$WORK/claude"
 JQ_BIN="$(command -v jq)"
 export PATH="$MOCK_BIN:/usr/bin:/bin"
 export TOOLING_TEST_CALLS="$WORK/tooling-calls.log" UV_TOOL_BIN_DIR="$HOME/.universal-research-agent-kit/tooling/bin"
 mkdir -p "$HOME"
+export KIT_TEST_BTW_ADAPTER="$ROOT/tests/fixtures/btw_package.py"
+export KIT_TEST_BTW_METADATA="$WORK/btw-release.json"
+export KIT_TEST_BTW_ARCHIVE="$WORK/btw-fixture.tgz"
+mkdir -p "$WORK/btw-source/package/dist"
+printf '%s\n' '{"name":"opencode-btw-plus","version":"0.1.3"}' > "$WORK/btw-source/package/package.json"
+printf '%s\n' "export default {id: 'btw-fixture', setup() {}};" > "$WORK/btw-source/package/dist/tui.js"
+cp "$ROOT/tests/fixtures/humanizer/LICENSE" "$WORK/btw-source/package/LICENSE"
+tar -czf "$KIT_TEST_BTW_ARCHIVE" -C "$WORK/btw-source" package
+"$KIT_TEST_PYTHON" - "$KIT_TEST_BTW_ARCHIVE" "$KIT_TEST_BTW_METADATA" <<'PY'
+import base64, hashlib, json, pathlib, sys
+archive, metadata = map(pathlib.Path, sys.argv[1:])
+metadata.write_text(json.dumps({
+    "name": "opencode-btw-plus", "version": "0.1.3", "dist": {
+        "tarball": "https://registry.npmjs.org/opencode-btw-plus/-/opencode-btw-plus-0.1.3.tgz",
+        "integrity": "sha512-" + base64.b64encode(hashlib.sha512(archive.read_bytes()).digest()).decode(),
+    },
+}))
+PY
+rm "$MOCK_BIN/node"
+cat > "$MOCK_BIN/node" <<'MOCK'
+#!/bin/bash
+case "${1:-}" in
+  */opencode/plugins/btw-plus-compat/patch.mjs)
+    shift
+    exec "$KIT_TEST_PYTHON" "$KIT_TEST_BTW_ADAPTER" patch "$@"
+    ;;
+esac
+exec "$KIT_TEST_REAL_NODE" "$@"
+MOCK
+chmod +x "$MOCK_BIN/node"
 cat > "$MOCK_BIN/python3" <<'EOF'
 #!/bin/sh
 case "$*" in
@@ -68,7 +110,7 @@ case "$*" in
     chmod +x "$UV_TOOL_DIR/graphifyy/bin/python"
     ;;
   *headroom-ai*)
-    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.40.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
+    printf '%s\n' '#!/usr/bin/env bash' 'if [ "${1:-}" = "--version" ]; then printf "%s\\n" "headroom 0.42.0"; exit 0; fi' 'printf "headroom %s\\n" "$*" >> "$TOOLING_TEST_CALLS"' 'printf "headroom-resolved %s\\n" "$(command -v headroom)" >> "$TOOLING_TEST_CALLS"' > "$MOCK_TOOL_BIN/headroom"
     chmod +x "$MOCK_TOOL_BIN/headroom"
     mkdir -p "$UV_TOOL_DIR/headroom-ai/bin"
     printf '%s\n' '#!/bin/sh' 'exec "$KIT_TEST_PYTHON" "$KIT_TEST_MOCK_RUNTIME" "$@"' > "$UV_TOOL_DIR/headroom-ai/bin/python"
@@ -79,7 +121,11 @@ esac
 EOF
 
 chmod +x "$MOCK_BIN/uv"
-printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo 10.0.0; else exit 99; fi' > "$MOCK_BIN/npx"
+{
+  printf '%s\n' '#!/bin/bash' 'if [ "${1:-}" = --version ]; then echo 10.0.0; exit 0; fi'
+  printf '%s\n' '[ "$#" -eq 2 ] && [ "$1" = -y ] && [ "$2" = @modelcontextprotocol/server-sequential-thinking@2.0.0 ] || exit 99'
+  printf 'exec %q -I -B %q\n' "$KIT_TEST_PYTHON" "$ROOT/tests/fixtures/sequential_thinking_server.py"
+} > "$MOCK_BIN/npx"
 chmod +x "$MOCK_BIN/npx"
 seed_codex_mock_state "$CODEX_MOCK_STATE" "$HOME" empty
 seed_claude_mock_state "$CLAUDE_MOCK_STATE" "$HOME" empty
@@ -115,6 +161,8 @@ cat > "$MOCK_BIN/git" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 revision=0a4dd63ad4541f4f655c4108a295916f3c1d8fda
+case "$*" in *https://github.com/blader/humanizer*) echo 'Humanizer test must use its local fixture.' >&2; exit 99 ;; esac
+case "$*" in *humanizer*) exec "$KIT_TEST_REAL_GIT" "$@" ;; esac
 if [ "$1" = ls-remote ]; then printf '%s\tHEAD\n' "$revision"; exit; fi
 [ "$1" = -C ] || exit 1
 directory="$2"; shift 2
@@ -137,16 +185,27 @@ expect_failure() {
 }
 assert_defaults() {
   [ -s "$HOME/.codex/AGENTS.md" ] && [ -s "$HOME/.claude/CLAUDE.md" ]
+  [ -s "$HOME/.config/opencode/AGENTS.md" ]
+  [ -x "$HOME/.opencode/bin/opencode" ]
+  [ "$("$HOME/.opencode/bin/opencode" --version)" = 2.2.5 ]
+  [ "$(find "$HOME/.config/opencode/agents" -name '*.md' | wc -l | tr -d ' ')" = 2 ]
   [ "$(find "$HOME/.codex/agents" -name '*.toml' | wc -l | tr -d ' ')" = 16 ]
   [ "$(find "$HOME/.claude/agents" -name '*.md' | wc -l | tr -d ' ')" = 15 ]
   for target in "$HOME/.agents/skills" "$HOME/.claude/skills"; do
-    for skill in "$ROOT/skills"/*; do diff -qr "$skill" "$target/${skill##*/}"; done
+    for skill in "$ROOT/skills"/*; do [ ! -d "$skill" ] || diff -qr "$skill" "$target/${skill##*/}"; done
+    cmp "$KIT_TEST_HUMANIZER_REPOSITORY/SKILL.md" "$target/humanizer/SKILL.md"
+    cmp "$KIT_TEST_HUMANIZER_REPOSITORY/LICENSE" "$target/humanizer/LICENSE"
+    diff -qr "$HOME/.universal-research-agent-kit/sources/humanizer/skill" "$target/humanizer"
+    [ ! -e "$target/research-repo-design" ]
   done
-  [ "$(wc -l < "$HOME/.universal-research-agent-kit/manifests/codex-skills" | tr -d ' ')" = 15 ]
-  [ "$(wc -l < "$HOME/.universal-research-agent-kit/manifests/claude-skills" | tr -d ' ')" = 15 ]
-  grep -Fqx 'experimental_mode = true' "$HOME/.codex/config.toml"
-  grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$CODEX_MOCK_STATE/mcp_sequential"
-  grep -Fq '@modelcontextprotocol/server-sequential-thinking@latest' "$CLAUDE_MOCK_STATE/mcp_sequential"
+  expected_skills=$(($(find "$ROOT/skills" -mindepth 1 -maxdepth 1 -type d | wc -l) + 1))
+  [ "$(wc -l < "$HOME/.universal-research-agent-kit/manifests/codex-skills" | tr -d ' ')" -eq "$expected_skills" ]
+  [ "$(wc -l < "$HOME/.universal-research-agent-kit/manifests/claude-skills" | tr -d ' ')" -eq "$expected_skills" ]
+  grep -Fq '@modelcontextprotocol/server-sequential-thinking@2.0.0' "$CODEX_MOCK_STATE/mcp_sequential"
+  grep -Fq '@modelcontextprotocol/server-sequential-thinking@2.0.0' "$CLAUDE_MOCK_STATE/mcp_sequential"
+  "$KIT_TEST_PYTHON" -I -B "$ROOT/scripts/context_defaults.py" check "$ROOT/codex/context.toml" "$HOME/.codex/config.toml"
+  [ -s "$HOME/.config/opencode/cli.json" ] && [ -s "$HOME/.config/opencode/opencode.jsonc" ]
+  [ -s "$HOME/.config/opencode/research-agent-kit/context/index.js" ]
   [ -s "$HOME/.claude/skills/graphify/SKILL.md" ] && [ -s "$HOME/.codex/skills/graphify/SKILL.md" ]
   [ -x "$UV_TOOL_BIN_DIR/graphify" ] && [ -x "$UV_TOOL_BIN_DIR/headroom" ]
   cmp "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
@@ -164,7 +223,7 @@ seed_native_clis "$HOME"
 rm "$HOME/.local/bin/claude"
 mv "$MOCK_BIN/claude" "$MOCK_BIN/claude-hidden"
 expect_failure bash "$ROOT/install.sh"
-grep -Fq 'Download failed: https://claude.ai/install.sh' "$WORK/expected-failure.log"
+grep -Eq 'Download failed: https://(releases.openai.com/codex/channels/latest|api.github.com/repos/openai/codex/releases/latest)' "$WORK/expected-failure.log"
 [ ! -e "$HOME/.codex/AGENTS.md" ]
 cp "$ROOT/tests/mock_latest_curl.sh" "$MOCK_BIN/curl"
 mv "$MOCK_BIN/claude-hidden" "$MOCK_BIN/claude"
@@ -172,11 +231,30 @@ ln -s "$HOME/.local/share/claude/versions/2.1.0" "$HOME/.local/bin/claude"
 echo 'Full default install from empty HOME'
 sh "$ROOT/install.sh"
 assert_defaults
+first_humanizer_revision="$(node -p 'require(process.argv[1]).revision' "$HOME/.universal-research-agent-kit/sources/humanizer/source.json")"
+cp "$MOCK_BIN/opencode" "$WORK/opencode-current"
+sed 's/2.2.5/2.2.4/' "$WORK/opencode-current" > "$MOCK_BIN/opencode"
+expect_failure bash "$ROOT/install.sh" --verify
+cp "$WORK/opencode-current" "$MOCK_BIN/opencode"
+cp "$HOME/.agents/skills/humanizer/SKILL.md" "$WORK/humanizer-original"
+printf '\nUntracked modification.\n' >> "$HOME/.agents/skills/humanizer/SKILL.md"
+expect_failure bash "$ROOT/install.sh" --verify
+cp "$WORK/humanizer-original" "$HOME/.agents/skills/humanizer/SKILL.md"
+mkdir -p "$KIT_TEST_HUMANIZER_REPOSITORY/references"
+printf 'A new upstream reference.\n' > "$KIT_TEST_HUMANIZER_REPOSITORY/references/revision.md"
+"$KIT_TEST_REAL_GIT" -C "$KIT_TEST_HUMANIZER_REPOSITORY" add .
+"$KIT_TEST_REAL_GIT" -C "$KIT_TEST_HUMANIZER_REPOSITORY" -c user.name=Fixture \
+  -c user.email=fixture@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+  commit --quiet -m "Update installer Humanizer fixture"
 # A failed install keeps superseded Ponytail revisions; a verified install removes them.
 for root in marketplaces sources; do mkdir -p "$HOME/.universal-research-agent-kit/$root/ponytail-old"; done
 expect_failure env TOOLING_TEST_GRAPHIFY_FAIL=codex bash "$ROOT/install.sh"
+[ "$(node -p 'require(process.argv[1]).revision' "$HOME/.universal-research-agent-kit/sources/humanizer/source.json")" = "$first_humanizer_revision" ]
+[ ! -e "$HOME/.agents/skills/humanizer/references/revision.md" ]
 for root in marketplaces sources; do [ -d "$HOME/.universal-research-agent-kit/$root/ponytail-old" ]; done
 bash "$ROOT/install.sh"
+[ "$(node -p 'require(process.argv[1]).revision' "$HOME/.universal-research-agent-kit/sources/humanizer/source.json")" != "$first_humanizer_revision" ]
+cmp "$KIT_TEST_HUMANIZER_REPOSITORY/references/revision.md" "$HOME/.agents/skills/humanizer/references/revision.md"
 for root in marketplaces sources; do [ ! -e "$HOME/.universal-research-agent-kit/$root/ponytail-old" ]; done
 # Kit-owned plugins require an on-disk manifest with a nonempty version.
 kit_manifests=("$HOME"/.universal-research-agent-kit/marketplaces/ponytail-*/ponytail/.claude-plugin/plugin.json)
