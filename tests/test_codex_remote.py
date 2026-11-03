@@ -60,14 +60,21 @@ class RecoveryTests(unittest.TestCase):
 
     def test_only_known_native_error_recovers_once(self):
         with patch.object(rc, "native", side_effect=[result(error=rc.UNMANAGED), result({"status": "connected"}), result({"status": "running", "backend": "pid"})]) as native, patch.object(rc, "recover") as recover, redirect_stdout(self.output):
-            rc.enable(self.binary, self.home)
+            rc.enable(self.binary, self.home, recover_unmanaged=True)
             recover.assert_called_once_with(self.binary, self.home)
             self.assertEqual(native.call_count, 3)
         with patch.object(rc, "native", return_value=result(error=rc.UNMANAGED)) as native, patch.object(rc, "recover") as recover:
             with self.assertRaisesRegex(RuntimeError, "reappeared"):
-                rc.enable(self.binary, self.home)
+                rc.enable(self.binary, self.home, recover_unmanaged=True)
             self.assertEqual(native.call_count, 2)
             recover.assert_called_once()
+
+    def test_routine_enable_never_recovers_unmanaged_server(self):
+        with patch.object(rc, "native", return_value=result(error=rc.UNMANAGED)) as native, patch.object(rc, "recover") as recover:
+            with self.assertRaisesRegex(RuntimeError, "codex-remote.sh repair"):
+                rc.enable(self.binary, self.home)
+            native.assert_called_once()
+            recover.assert_not_called()
 
     def test_other_failures_do_not_signal_or_recover(self):
         failures = [result(error="network failed"), subprocess.CompletedProcess([], 0, "PRIVATE invalid JSON", ""), result([]), result({"status": "stopped"})]
@@ -109,7 +116,7 @@ class RecoveryTests(unittest.TestCase):
             native = stack.enter_context(patch.object(rc, "native", return_value=result(error=rc.UNMANAGED)))
             stack.enter_context(patch.object(rc.time, "monotonic", side_effect=[0, 31]))
             with self.assertRaisesRegex(RuntimeError, "may exit later"):
-                rc.enable(self.binary, self.home)
+                rc.enable(self.binary, self.home, recover_unmanaged=True)
             kill.assert_called_once_with(self.owner.pid, signal.SIGHUP)
             native.assert_called_once()
 
@@ -131,6 +138,25 @@ class RecoveryTests(unittest.TestCase):
             with patch.object(rc, "version", return_value={"status": "running", "backend": "pid"}):
                 with self.assertRaisesRegex(RuntimeError, "preference is disabled"):
                     rc.verify(self.binary, self.home)
+
+    def test_status_reports_preferences_after_daemon_inspection_failure(self):
+        with patch.object(rc, "version", side_effect=RuntimeError("inspection unavailable")), redirect_stdout(self.output):
+            self.assertFalse(rc.status(self.binary, self.home))
+        self.assertIn("Codex daemon: inspection failed", self.output.getvalue())
+        self.assertIn("Remote Control preference: enabled", self.output.getvalue())
+        self.assertIn("Pairing/relay: not verified", self.output.getvalue())
+
+    def test_status_does_not_print_native_private_fields(self):
+        with patch.object(rc, "version", return_value={"status": "running", "backend": "pid", "environmentId": "PRIVATE"}), redirect_stdout(self.output):
+            self.assertTrue(rc.status(self.binary, self.home))
+        self.assertNotIn("PRIVATE", self.output.getvalue())
+
+    def test_status_rejects_invalid_preferences_without_hiding_daemon_state(self):
+        (self.home / ".codex/app-server-daemon/settings.json").write_text('[]')
+        with patch.object(rc, "version", return_value={"status": "running", "backend": "pid"}), redirect_stdout(self.output):
+            self.assertFalse(rc.status(self.binary, self.home))
+        self.assertIn("Codex daemon: running (managed)", self.output.getvalue())
+        self.assertIn("preference: inspection failed", self.output.getvalue())
 
     def test_launch_scope(self):
         self.assertTrue(rc.known_listener(self.owner, self.home, self.binary))

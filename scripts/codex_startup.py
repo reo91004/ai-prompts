@@ -163,7 +163,7 @@ def install(home, binary):
             if result.returncode or not linger():
                 raise RuntimeError('Codex startup is registered, but login-free boot startup still needs linger. '
                                    'Run: sudo loginctl enable-linger "$(id -un)"; then rerun '
-                                   'sh install.sh --enable-codex-remote-control. No sudo command was run by the installer.')
+                                   'sh codex-remote.sh enable. No sudo command was run.')
     else:
         # LaunchAgents are read at GUI login. Do not bootstrap/kickstart the
         # current job or disturb the detached daemon that is already running.
@@ -174,14 +174,14 @@ def install(home, binary):
 def verify(home, binary):
     check(home, binary)
     if not owned_file(home):
-        raise RuntimeError("Codex automatic startup is not registered; rerun sh install.sh --enable-codex-remote-control.")
+        raise RuntimeError("Codex automatic startup is not registered; run sh codex-remote.sh enable.")
     layout = str(binary.relative_to(home))
     path = startup_path(home)
     if path.stat().st_mode & 0o022:
-        raise RuntimeError("Codex startup file is writable by other users; rerun the enable option to repair its permissions.")
+        raise RuntimeError("Codex startup file is writable by other users; run sh codex-remote.sh enable to repair its permissions.")
     if sys.platform == "linux":
         if path.read_text() not in {unit_text(layout, headroom_profile(home), legacy) for legacy in (False, True)}:
-            raise RuntimeError("Codex startup uses an older executable or Headroom profile; rerun the enable option.")
+            raise RuntimeError("Codex startup uses an older executable or Headroom profile; run sh codex-remote.sh enable.")
         if command("systemctl", "--user", "is-enabled", UNIT) != "enabled":
             raise RuntimeError("Codex automatic startup is not enabled.")
         if not linger():
@@ -189,7 +189,7 @@ def verify(home, binary):
         print("Codex startup: registered for boot without login (reboot/relay not tested).")
     else:
         if plistlib.loads(path.read_bytes()) != launch_agent(home, layout):
-            raise RuntimeError("Codex login startup uses an older executable; rerun the enable option.")
+            raise RuntimeError("Codex login startup uses an older executable; run sh codex-remote.sh enable.")
         if launchd_disabled():
             raise RuntimeError("Codex login startup is disabled.")
         print("Codex startup: registered for GUI login; it does not run before login (login/relay not tested).")

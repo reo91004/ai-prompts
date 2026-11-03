@@ -279,17 +279,18 @@ backup_codex_startup() {
 }
 
 enable_codex_remote() {
-  local binary
+  local binary action=repair
+  [ "${1:-1}" = 1 ] || action=enable
   kit_require_regular_or_absent "$KIT_STATE_ROOT/codex-remote-control.state"
-  install_standalone_codex
   codex_remote_capability || kit_die "Installed Codex does not support the required managed Remote Control commands."
   binary="$(managed_codex)"
   backup_codex_startup "$binary" || return 1
   # The helper keeps native JSON (including environment IDs) out of kit state.
-  "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/scripts/codex_remote.py" enable "$binary" || return 1
+  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" \
+    -I -B "$ROOT/scripts/codex_remote.py" "$action" "$binary" || return 1
   codex_startup_command install "$binary" || return 1
   printf '%s\n' 'enabled=1' > "$KIT_STATE_ROOT/codex-remote-control.state"
-  echo "Pair separately on this host: codex remote-control pair"
+  echo "Pair separately on this host: sh codex-remote.sh pair"
 }
 
 verify_codex_remote() {
@@ -315,19 +316,37 @@ disable_codex_remote() {
 }
 
 show_codex_remote() {
+  local binary python failed=0
   if [ -f "$HOME/.universal-research-agent-kit/codex-remote-control.state" ] &&
       grep -Fqx 'enabled=1' "$HOME/.universal-research-agent-kit/codex-remote-control.state"; then
-    verify_codex_remote
+    echo "Kit Remote Control setup: enabled."
   else
     echo "No completed Remote Control setup is recorded, or the kit setting is disabled."
     echo "The native daemon may still be enabled after a partial setup failure."
-    echo "Complete/retry setup: sh install.sh --enable-codex-remote-control"
-    local binary python
-    python="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
-    if binary="$(managed_codex)" && [ -x "$python" ]; then
-      "$python" -I -B "$ROOT/scripts/codex_remote.py" verify "$binary" || return 1
-      codex_startup_command verify "$binary" || return 1
-    fi
+    echo "Complete/retry setup: sh codex-remote.sh enable"
+    failed=1
+  fi
+  python="${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}"
+  if ! binary="$(managed_codex)"; then
+    echo "Managed Codex: unavailable. Run sh install.sh."
+    echo "Daemon, Remote Control preference and automatic startup: not inspected."
     return 1
   fi
+  if [ ! -x "$python" ]; then
+    echo "Managed Python: unavailable. Run sh install.sh."
+    echo "Daemon, Remote Control preference and automatic startup: not inspected."
+    return 1
+  fi
+  "$python" -I -B "$ROOT/scripts/codex_remote.py" status "$binary" || failed=1
+  if ! codex_startup_command verify "$binary"; then
+    echo "Codex automatic startup: not verified."
+    failed=1
+  fi
+  return "$failed"
+}
+
+pair_codex_remote() {
+  local binary
+  binary="$(managed_codex)" || kit_die "No managed Codex installation. Run sh install.sh first."
+  "$binary" remote-control pair
 }

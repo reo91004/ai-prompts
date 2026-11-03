@@ -1,4 +1,4 @@
-"""Enable native Remote Control, recovering one verified unmanaged listener."""
+"""Inspect and enable native Remote Control, with explicit bounded recovery."""
 
 import ctypes
 import json
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 
 UNMANAGED = "Error: app server is running but is not managed by codex app-server daemon"
-RETRY = "Disconnect this host's SSH connection in the Mac Codex app, then rerun sh install.sh --enable-codex-remote-control."
+RETRY = "Disconnect this host's SSH connection in the Codex app, then rerun sh codex-remote.sh repair."
 
 
 @dataclass(frozen=True)
@@ -150,6 +150,41 @@ def verify(binary, home):
         raise RuntimeError("Codex daemon remote-control preference is disabled.")
 
 
+def status(binary, home):
+    daemon_ok = preference_ok = False
+    try:
+        data = version(binary)
+        daemon_ok = data.get("status") == "running" and data.get("backend") == "pid"
+        if daemon_ok:
+            print("Codex daemon: running (managed).")
+        elif data.get("status") == "running":
+            print("Codex daemon: running, but managed ownership is not verified.")
+        else:
+            print("Codex daemon: not running.")
+    except (RuntimeError, OSError, ValueError) as error:
+        print(f"Codex daemon: inspection failed: {error}")
+
+    settings = home / ".codex/app-server-daemon/settings.json"
+    try:
+        preferences = json.loads(settings.read_text())
+        if not isinstance(preferences, dict) or not isinstance(preferences.get("remoteControlEnabled"), bool):
+            raise ValueError("remoteControlEnabled is not a boolean")
+        preference_ok = preferences["remoteControlEnabled"]
+        print("Codex Remote Control preference: " + ("enabled." if preference_ok else "disabled."))
+        if not preference_ok:
+            print("Codex daemon remote-control preference is disabled.")
+    except FileNotFoundError:
+        print("Codex Remote Control preference: not configured.")
+    except (OSError, ValueError) as error:
+        print(f"Codex Remote Control preference: inspection failed: {error}")
+
+    if daemon_ok and preference_ok:
+        print("Codex remote host: managed daemon running, Remote Control enabled (pairing/relay not verified).")
+    else:
+        print("Pairing/relay: not verified.")
+    return daemon_ok and preference_ok
+
+
 def recover(binary, home, wait_seconds=30):
     path = home / ".codex/app-server-control/app-server-control.sock"
     owner = socket_owner(path)
@@ -192,9 +227,11 @@ def recover(binary, home, wait_seconds=30):
     raise RuntimeError("The Codex server is still finishing work; no forced stop was sent. It may exit later. Wait for the task to finish, then retry activation.")
 
 
-def enable(binary, home):
+def enable(binary, home, *, recover_unmanaged=False):
     result = native(binary, "remote-control", "start", "--json")
     if result.returncode and UNMANAGED in result.stderr.splitlines():
+        if not recover_unmanaged:
+            raise RuntimeError("An unmanaged Codex server is already running. Finish its work, then use sh codex-remote.sh repair for supported recovery.")
         recover(binary, home)
         result = native(binary, "remote-control", "start", "--json")
         if result.returncode and UNMANAGED in result.stderr.splitlines():
@@ -211,15 +248,21 @@ def enable(binary, home):
 
 if __name__ == "__main__":
     try:
+        if len(sys.argv) != 3:
+            raise RuntimeError("Usage: codex_remote.py enable|repair|verify|status <managed-codex>")
         binary, home = Path(sys.argv[2]), Path.home()
         if os.environ.get("CODEX_HOME") not in (None, "", str(home / ".codex")):
             raise RuntimeError("Custom CODEX_HOME is not supported by this installer.")
         if sys.argv[1] == "enable":
             enable(binary, home)
+        elif sys.argv[1] == "repair":
+            enable(binary, home, recover_unmanaged=True)
         elif sys.argv[1] == "verify":
             verify(binary, home)
             print("Codex remote host: managed daemon running, Remote Control enabled (pairing/relay not verified).")
+        elif sys.argv[1] == "status":
+            sys.exit(0 if status(binary, home) else 1)
         else:
-            raise RuntimeError("Expected enable or verify.")
+            raise RuntimeError("Expected enable, repair, verify or status.")
     except (RuntimeError, OSError, ValueError) as error:
         sys.exit(str(error))
