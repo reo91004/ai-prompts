@@ -1,0 +1,6 @@
+{
+  "name": "research-agent-kit-context",
+  "private": true,
+  "type": "module",
+  "exports": "./index.js"
+}

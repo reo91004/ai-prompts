@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "session": {
+    "verbosity": "low",
+    "grouping": "auto",
+    "thinking": "hide",
+    "tps": false,
+    "permissions": "autoaccept"
+  },
+  "tabs": {
+    "mode": "on",
+    "scope": "cwd"
+  },
+  "attention": {
+    "notifications": true,
+    "sound": false
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "research-agent-kit-opencode-config",
+  "private": true,
+  "dependencies": {
+    "jsonc-parser": "3.3.1"
+  }
+}
