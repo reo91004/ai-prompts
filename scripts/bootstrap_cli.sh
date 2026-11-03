@@ -20,7 +20,7 @@ cli_usable() {
     claude) printf '%s\n' "$version" | grep -Eq '[0-9]+\.[0-9]+\.[0-9]+.*Claude Code' || return 1 ;;
     opencode) printf '%s\n' "$version" | grep -Eq '^(opencode )?v?2\.[0-9]+\.[0-9]+([[:space:]]|$)' || return 1 ;;
     node)
-      [[ "$version" =~ ^v?([0-9]+)\.[0-9]+\.[0-9]+ ]] && [ "${BASH_REMATCH[1]}" -ge 20 ] || return 1 ;;
+      [[ "$version" =~ ^v?([0-9]+)\.[0-9]+\.[0-9]+ ]] && [ "${BASH_REMATCH[1]}" -ge 24 ] || return 1 ;;
     npx) printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' || return 1 ;;
   esac
   case "$tool" in
@@ -305,7 +305,7 @@ bootstrap_cli() {
   local platform architecture archive expected actual node_bin npx_bin
   PATH="$cli_root/bin:$HOME/.local/bin:$PATH"
   export PATH
-  # Any usable Node.js (20+) is reused; otherwise the kit copy is replaced with the latest LTS.
+  # Sequential Thinking 2 requires Node 24+; otherwise install the latest LTS.
   if ! node_bin="$(find_usable_cli node)" || ! npx_bin="$(find_usable_cli npx)"; then
     node_version="$(latest_node_lts)"
     kit_require_real_dir "$cli_root"

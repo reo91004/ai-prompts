@@ -169,7 +169,7 @@ if (MOCK_OPENCODE_LATEST=2.2.7 MOCK_OPENCODE_CORRUPT=1 KIT_CLI_VERSIONS_RESOLVED
 grep -Fq 'OpenCode archive integrity mismatch' "$WORK/corrupt-opencode.log"
 [ "$(cli_version "$HOME/.opencode/bin/opencode")" = 2.2.6 ]
 # A kit Node too old for the CLIs is replaced cleanly with the latest LTS.
-printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo v18.0.0; else exec "$TEST_NODE" "$@"; fi' > "$KIT_STATE_ROOT/cli/node/bin/node"
+printf '%s\n' '#!/bin/sh' 'if [ "${1:-}" = --version ]; then echo v22.0.0; else exec "$TEST_NODE" "$@"; fi' > "$KIT_STATE_ROOT/cli/node/bin/node"
 : > "$KIT_STATE_ROOT/cli/node/stale-file"
 bootstrap_cli
 [ "$(grep -c 'nodejs.org.*tar.gz$' "$BOOTSTRAP_CALLS")" -eq 2 ]
