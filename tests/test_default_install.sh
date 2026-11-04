@@ -172,10 +172,14 @@ directory="$2"; shift 2
 case "$*" in
   'init -q') mkdir -p "$directory/.git" ;;
   'remote add '*|'fetch '*) : ;;
-  'checkout '*) mkdir -p "$directory/.claude-plugin"; printf '%s\n' '{"name":"ponytail","version":"4.9.0"}' > "$directory/.claude-plugin/plugin.json" ;;
+  'checkout '*)
+    mkdir -p "$directory/.claude-plugin" "$directory/.opencode/plugins"
+    printf '%s\n' '{"name":"ponytail","version":"4.9.0"}' > "$directory/.claude-plugin/plugin.json"
+    printf '%s\n' '{"type":"module"}' > "$directory/package.json"
+    printf '%s\n' 'export default {id: "ponytail", setup() {}};' > "$directory/.opencode/plugins/index.js" ;;
   'rev-parse HEAD') echo "$revision" ;;
   'status --porcelain'*) : ;;
-  'archive HEAD') tar -C "$directory" -cf - .claude-plugin ;;
+  'archive HEAD') tar -C "$directory" -cf - .claude-plugin .opencode package.json ;;
   *) exit 1 ;;
 esac
 MOCK
@@ -210,6 +214,8 @@ assert_defaults() {
   [ -s "$HOME/.config/opencode/cli.json" ] && [ -s "$HOME/.config/opencode/opencode.jsonc" ]
   [ -s "$HOME/.config/opencode/research-agent-kit/context/index.js" ]
   node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER);if(!p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins.includes("opencode-latex@0.2.0"))process.exit(1)' "$HOME/.config/opencode/opencode.jsonc"
+  node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),expected=process.argv[2]+"/.opencode/plugins",plugins=p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins;if(plugins.filter(x=>x===expected).length!==1||!fs.existsSync(expected+"/index.js"))process.exit(1)' \
+    "$HOME/.config/opencode/opencode.jsonc" "$HOME/.universal-research-agent-kit/marketplaces/ponytail-$PONYTAIL_REVISION/ponytail"
   [ -s "$HOME/.claude/skills/graphify/SKILL.md" ] && [ -s "$HOME/.codex/skills/graphify/SKILL.md" ]
   [ -x "$UV_TOOL_BIN_DIR/graphify" ] && [ -x "$UV_TOOL_BIN_DIR/headroom" ]
   cmp "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
@@ -271,6 +277,17 @@ expect_failure bash "$ROOT/install.sh" --verify
 grep -Fq 'Missing Codex integration: Ponytail' "$WORK/expected-failure.log"
 grep -Fq 'Missing Claude integration: Ponytail' "$WORK/expected-failure.log"
 mv "$WORK/kit-plugin.json" "${kit_manifests[0]}"
+# Read-only verification must catch a missing OpenCode Ponytail registration and entrypoint.
+cp "$HOME/.config/opencode/opencode.jsonc" "$WORK/opencode-before.jsonc"
+node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),f=process.argv[1],d=p.parse(fs.readFileSync(f,"utf8"));d.plugins=d.plugins.filter(x=>typeof x!=="string"||!x.includes("/ponytail/.opencode/plugins"));fs.writeFileSync(f,JSON.stringify(d));' "$HOME/.config/opencode/opencode.jsonc"
+expect_failure bash "$ROOT/install.sh" --verify
+grep -Fq 'Missing or overridden OpenCode integration: Ponytail' "$WORK/expected-failure.log"
+mv "$WORK/opencode-before.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+ponytail_entrypoint="${kit_manifests[0]%/.claude-plugin/plugin.json}/.opencode/plugins/index.js"
+mv "$ponytail_entrypoint" "$WORK/ponytail-entrypoint.js"
+expect_failure bash "$ROOT/install.sh" --verify
+grep -Fq 'Missing OpenCode Ponytail entrypoint' "$WORK/expected-failure.log"
+mv "$WORK/ponytail-entrypoint.js" "$ponytail_entrypoint"
 # A stale external manifest must not delete a just-installed current core role.
 mkdir -p "$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage"
 printf '{"agents":["%s/.codex/agents/implementation_engineer.toml"]}\n' "$HOME" > "$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage/.installed-agents.json"
@@ -316,6 +333,7 @@ grep -Fq 'Enable ponytail@ponytail in Codex plugin settings' "$WORK/expected-fai
 grep -Fq /opt/user-marketplace "$CODEX_MOCK_STATE/marketplaces.json"
 # Explicit none keeps the disabled user-owned plugin choice.
 bash "$ROOT/install.sh" --integrations none
+node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),plugins=p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins;if(plugins.some(x=>typeof x==="string"&&x.includes("/ponytail/.opencode/plugins")))process.exit(1)' "$HOME/.config/opencode/opencode.jsonc"
 node -e 'const fs=require("fs"),x=JSON.parse(fs.readFileSync(process.argv[1]));if(x.installed[0].enabled!==false)process.exit(1);' "$CODEX_MOCK_STATE/plugins.json"
 printf '%s\n' '{malformed-json' > "$CODEX_MOCK_STATE/plugins.json"
 expect_failure bash "$ROOT/install.sh" --verify

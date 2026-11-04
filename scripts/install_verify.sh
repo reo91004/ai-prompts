@@ -41,6 +41,10 @@ verify_platform_additions() {
       if prepare_opencode_fragments "$verify_dir"; then
         if config_result="$(opencode_config_run check)"; then
           printf '%s\n' "$config_result"
+          if [ "$(read_state requested_profile)" = ponytail ] &&
+              printf '%s' "$config_result" | node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(0,"utf8")).overrides.includes("opencode.jsonc:plugins:@dietrichgebert/ponytail")?0:1)'; then
+            echo "Missing or overridden OpenCode integration: Ponytail"; missing=1
+          fi
           if printf '%s' "$config_result" | node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(0,"utf8")).status==="customized"?0:1)'; then
             echo "Scoped verification: preserved OpenCode user overrides differ from kit defaults."; scoped=1
           fi

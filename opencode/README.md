@@ -10,6 +10,7 @@
 | opencode.jsonc | The configuration directory's opencode.jsonc |
 | plugins/research-context/ | The configuration directory's research-agent-kit/context/ |
 | Shared research skills and Humanizer | `~/.agents/skills/`, discovered natively |
+| Ponytail (default integration profile) | `~/.universal-research-agent-kit/marketplaces/ponytail-<revision>/ponytail/.opencode/plugins/` |
 
 The installer edits only its JSONC keys and plugin entries, preserving comments, providers, credentials, other MCP servers, and user plugin order. It records absent keys separately from null and preserves subsequent user changes on reinstall/removal. User additions to global skill discovery directories are backed up and retired under the requested full skill replacement policy. Project-local skills and session/BTW data have a separate lifecycle.
 
@@ -20,6 +21,8 @@ The full-screen TUI uses low verbosity, automatic grouping, hidden reasoning dis
 Native build/plan agents remain available. context-explorer and research-reviewer allow read/glob/grep, native skill loading, and sandboxed Code Mode over the permitted read tools. Shell, edits, network fetches, MCP/custom tools, and delegation remain denied. The configured inventory and effective permissions must be checked before claiming a role is read-only in a different environment. An inherited model is an independent session of that model, not cross-model or requested Astra review.
 
 The context plugin sets chat-model context/input metadata to 1,000,000 tokens without replacing provider/model IDs, variants, output limits, or credentials. `compaction.auto=true` and `buffer="20%"` give an 800,000-token compaction ceiling. This is a harness policy; it does not expand a provider's actual supported context.
+
+Ponytail uses the same downloaded revision as Codex and Claude Code. Its V2 plugin injects the rules on each turn and registers `/ponytail` and the companion commands and skills. The upstream default is `full`; an existing saved level or `off` is preserved. Use `/ponytail full` to enable it again. Installation and `--verify` check the V2 entrypoint and configuration registration. Reinstallation replaces an older Ponytail registration in place to avoid duplicate plugin IDs. `--integrations none` removes the kit registration and restores any registration that preceded it.
 
 ## LaTeX
 

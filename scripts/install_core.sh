@@ -130,12 +130,18 @@ prepare_btw_plugin() {
 }
 
 prepare_opencode_fragments() {
-  local output="$1" npx="${KIT_NPX:-$KIT_STATE_ROOT/cli/bin/kit-npx}"
+  local output="$1" npx="${KIT_NPX:-$KIT_STATE_ROOT/cli/bin/kit-npx}" ponytail=""
+  if [ "$(sed -n 's/^requested_profile=//p' "$KIT_STATE_ROOT/integrations.state")" = ponytail ]; then
+    ponytail="${KIT_PONYTAIL_PATH:-${PONYTAIL_MARKETPLACE:+$PONYTAIL_MARKETPLACE/ponytail}}/.opencode/plugins"
+    [ -s "$ponytail/index.js" ] || kit_die "Missing OpenCode Ponytail entrypoint: $ponytail/index.js"
+    node --input-type=module -e 'import {pathToFileURL} from "node:url";const p=(await import(pathToFileURL(process.argv[1]))).default;if(p?.id!=="ponytail"||typeof p.setup!=="function")throw new Error("Ponytail does not support OpenCode V2")' "$ponytail/index.js" ||
+      kit_die "OpenCode Ponytail plugin validation failed."
+  fi
   KIT_HEADROOM_FRAGMENT="$output/opencode-headroom.json"
   "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" -I -B "$ROOT/headroom/runtime.py" opencode-config > "$KIT_HEADROOM_FRAGMENT" ||
     kit_die "Cannot prepare the official Headroom OpenCode integration."
-  node -e 'const fs=require("fs"),f=process.argv[1],d=JSON.parse(fs.readFileSync(f,"utf8"));d.mcp.servers["sequential-thinking"]={type:"local",command:[process.argv[2],"-y",process.argv[3]],environment:{}};fs.writeFileSync(f,JSON.stringify(d)+"\n")' \
-    "$KIT_HEADROOM_FRAGMENT" "$npx" "$SEQUENTIAL_THINKING_PACKAGE"
+  node -e 'const fs=require("fs"),f=process.argv[1],d=JSON.parse(fs.readFileSync(f,"utf8"));d.mcp.servers["sequential-thinking"]={type:"local",command:[process.argv[2],"-y",process.argv[3]],environment:{}};if(process.argv[4])d.plugins.push(process.argv[4]);fs.writeFileSync(f,JSON.stringify(d)+"\n")' \
+    "$KIT_HEADROOM_FRAGMENT" "$npx" "$SEQUENTIAL_THINKING_PACKAGE" "$ponytail"
   KIT_OPENCODE_CLI_FRAGMENT="$output/opencode-cli-plugins.json"
   node -e 'require("fs").writeFileSync(process.argv[1],JSON.stringify({plugins:["-opencode.btw",process.argv[2]]})+"\n")' "$KIT_OPENCODE_CLI_FRAGMENT" "$KIT_STATE_ROOT/tooling/opencode-btw-plus"
 }

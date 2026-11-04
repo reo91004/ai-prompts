@@ -92,6 +92,21 @@ test("a user-selected package version and repeated enable directives survive", (
   assert.deepEqual(parseConfig(parser, removed.text).plugins, ["user", "-user", "user", "opencode-btw-plus@0.2.0"]);
 });
 
+test("Ponytail replaces a legacy local registration and updates without duplicate IDs", () => {
+  const legacy = "/config/packages/ponytail-5.1.0/.opencode/plugins";
+  const current = "/kit/marketplaces/ponytail-rev1/ponytail/.opencode/plugins";
+  const updated = "/kit/marketplaces/ponytail-rev2/ponytail/.opencode/plugins";
+  for (const original of [legacy, "@dietrichgebert/ponytail@5.1.0"]) {
+    const source = JSON.stringify({ plugins: ["user-first", original, "user-last"] });
+    const first = reconcile(parser, source, { plugins: [current] });
+    assert.deepEqual(parseConfig(parser, first.text).plugins, ["user-first", current, "user-last"]);
+    const next = reconcile(parser, first.text, { plugins: [updated] }, first.state);
+    assert.deepEqual(parseConfig(parser, next.text).plugins, ["user-first", updated, "user-last"]);
+    assert.deepEqual(parseConfig(parser, reconcile(parser, next.text, {}, next.state).text).plugins,
+      ["user-first", original, "user-last"]);
+  }
+});
+
 test("reject malformed and duplicate configuration before editing", () => {
   for (const source of ['{"broken":', '{"same":1,"same":2}', '{"a":{"same":1,"same":2}}', "[]"]) {
     assert.throws(() => reconcile(parser, source, { valid: true }), /JSONC/);

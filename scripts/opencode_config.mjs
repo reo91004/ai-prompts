@@ -49,6 +49,8 @@ function edit(parser, text, path, snapshot) {
 function packageID(entry) {
   const id = typeof entry === "string" ? entry : entry?.package;
   if (typeof id !== "string" || !id) throw new Error("Plugin entries must have a package string");
+  // V2 rejects duplicate plugin IDs, including Ponytail registered from an older local checkout.
+  if (/(?:^|\/)ponytail(?:-[^/]+)?\/\.opencode\/plugins\/?$/.test(id)) return "@dietrichgebert/ponytail";
   const npm = /^((?:@[a-z0-9._-]+\/)?[a-z0-9._-]+)(?:@[^/]+)?$/i.exec(id);
   return npm?.[1] ?? id;
 }
