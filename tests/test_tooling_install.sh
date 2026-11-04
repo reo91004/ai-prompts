@@ -43,6 +43,11 @@ set -euo pipefail
 printf 'uv %s\n' "$*" >> "$TOOLING_TEST_CALLS"
 [ "${1:-}" != "--version" ] || { echo "uv 0.12.24"; exit 0; }
 [ "${TOOLING_TEST_UV_FAIL:-0}" != "1" ] || exit 42
+[ -z "${UV_CACHE_DIR:-}" ] || {
+  mkdir -p "$UV_CACHE_DIR"
+  printf '%s\n' "$UV_LINK_MODE" > "$UV_CACHE_DIR/install-link-mode"
+  printf 'uv-cache %s %s\n' "$UV_CACHE_DIR" "$UV_LINK_MODE" >> "$TOOLING_TEST_CALLS"
+}
 MOCK_TOOL_BIN="${XDG_BIN_HOME:-$UV_TOOL_BIN_DIR}"
 mkdir -p "$MOCK_TOOL_BIN"
 case "$*" in
@@ -122,6 +127,8 @@ mkdir -p "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills"
 printf '%s\n' '# existing codex skill' > "$TMP_HOME/.codex/skills/graphify/SKILL.md"
 ln -s "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills/graphify"
 run_tooling
+! find "$TMP_HOME/.universal-research-agent-kit/backups" -type d -name work | grep -q .
+grep -Eq '^uv-cache .*/backups/run\.[^/]+/work/uv-cache copy$' "$CALLS"
 [ -L "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-existing-0 ]
 grep -Fqx '# existing codex skill' "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-codex-skill/SKILL.md
 

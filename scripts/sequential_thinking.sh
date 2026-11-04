@@ -12,7 +12,7 @@ check_sequential_thinking() {
     echo "Sequential Thinking verification requires the kit npx launcher and managed Python." >&2
     return 1
   }
-  "$python" -I -B - "$KIT_NPX" "$package" "$timeout" "$KIT_BACKUP_DIR/sequential-thinking-server.log" <<'PY'
+  "$python" -I -B - "$KIT_NPX" "$package" "$timeout" "$KIT_WORK_DIR/sequential-thinking-server.log" <<'PY'
 import asyncio
 import json
 import sys
@@ -56,7 +56,7 @@ prepare_sequential_thinking() {
   [ "${SEQUENTIAL_THINKING_PREPARED:-0}" -eq 0 ] || return 0
   if [ "${SEQUENTIAL_THINKING_RESOLVED:-0}" -eq 0 ]; then
     SEQUENTIAL_THINKING_SOURCE=https://registry.npmjs.org/@modelcontextprotocol%2fserver-sequential-thinking/latest
-    local metadata="$KIT_BACKUP_DIR/sequential-thinking-release.json" values
+    local metadata="$KIT_WORK_DIR/sequential-thinking-release.json" values
     download_file "$SEQUENTIAL_THINKING_SOURCE" "$metadata" || kit_die "Could not resolve Sequential Thinking from npm."
     values="$(node - "$metadata" <<'NODE'
 const fs = require('fs'), data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -91,7 +91,7 @@ NODE
     SEQUENTIAL_THINKING_RESOLVED=1
   fi
   SEQUENTIAL_THINKING_STATE=checking
-  check_sequential_thinking "$SEQUENTIAL_THINKING_PACKAGE" > "$KIT_BACKUP_DIR/sequential-thinking-check.json" || {
+  check_sequential_thinking "$SEQUENTIAL_THINKING_PACKAGE" > "$KIT_WORK_DIR/sequential-thinking-check.json" || {
     SEQUENTIAL_THINKING_STATE=failed
     kit_die "Sequential Thinking did not initialize and expose its tool; registration was not verified."
   }

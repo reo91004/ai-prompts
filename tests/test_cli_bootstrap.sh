@@ -9,7 +9,7 @@ export HOME="$WORK/home"
 mkdir -p "$HOME" "$WORK/bin" "$WORK/node/bin"
 "$TEST_PYTHON" - "$ROOT" <<'PY'
 import os, pathlib, subprocess, sys, tempfile
-for action in ([], ['--disable-codex-remote-control'], ['--remote-control-status'], ['--verify']):
+for action in ([], ['--verify']):
     with tempfile.TemporaryDirectory() as directory:
         home = pathlib.Path(directory) / 'home'
         home.mkdir()
@@ -30,6 +30,7 @@ for name in node npm npx; do
 done
 tar -czf "$WORK/node.tar.gz" -C "$WORK" node
 source "$ROOT/install.sh"
+source "$ROOT/scripts/codex_remote.sh"
 export PATH="$WORK/bin"
 kit_init_state
 KIT_HEADROOM_PYTHON="$TEST_PYTHON"
@@ -291,7 +292,7 @@ grep -Fq 'Remote Control: connected' "$WORK/enable.log"
 ! grep -RFq DO_NOT_PERSIST "$KIT_STATE_ROOT" "$WORK/enable.log"
 mkdir -p "$KIT_STATE_ROOT/tooling/uv-tools/headroom-ai/bin"
 ln -s "$TEST_PYTHON" "$KIT_STATE_ROOT/tooling/uv-tools/headroom-ai/bin/python"
-verify_codex_remote > "$WORK/verify.log"
+show_codex_remote > "$WORK/verify.log"
 disable_codex_remote
 grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
 for failure in unmanaged invalid_json; do
@@ -316,7 +317,7 @@ if (REMOTE_TEST_BACKEND=unmanaged enable_codex_remote) > "$WORK/unmanaged-versio
 grep -Fqx enabled=0 "$KIT_STATE_ROOT/codex-remote-control.state"
 enable_codex_remote > "$WORK/re-enable.log"
 for failure in failed invalid_json; do
-  if (REMOTE_TEST_VERSION_FAILURE="$failure" verify_codex_remote) > "$WORK/failed-version.log" 2>&1; then exit 1; fi
+  if (REMOTE_TEST_VERSION_FAILURE="$failure" show_codex_remote) > "$WORK/failed-version.log" 2>&1; then exit 1; fi
   ! grep -Eq 'Traceback|JSONDecodeError|DO_NOT_PERSIST' "$WORK/failed-version.log"
   grep -Fqx enabled=1 "$KIT_STATE_ROOT/codex-remote-control.state"
 done

@@ -5,6 +5,8 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/kit-release-fallback.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 source "$ROOT/install.sh"
 KIT_BACKUP_DIR="$WORK/evidence"
+KIT_WORK_DIR="$KIT_BACKUP_DIR/work"
+mkdir -p "$KIT_WORK_DIR"
 mkdir -p "$KIT_BACKUP_DIR" "$WORK/bin"
 cp "$ROOT/tests/mock_latest_curl.sh" "$WORK/bin/curl"
 chmod +x "$WORK/bin/curl"

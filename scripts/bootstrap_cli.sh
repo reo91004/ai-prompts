@@ -42,24 +42,24 @@ resolve_cli_versions() {
   KIT_CODEX_SOURCE=https://releases.openai.com/codex/channels/latest
   KIT_CLAUDE_SOURCE=https://downloads.claude.ai/claude-code-releases/latest
   KIT_OPENCODE_SOURCE=https://opencode.ai/update/api/latest/cli/npm
-  if ! (download_file "$KIT_CODEX_SOURCE" "$KIT_BACKUP_DIR/codex-release.json") 2> "$KIT_BACKUP_DIR/codex-release-primary.log"; then
+  if ! (download_file "$KIT_CODEX_SOURCE" "$KIT_WORK_DIR/codex-release.json") 2> "$KIT_WORK_DIR/codex-release-primary.log"; then
     echo "Codex release host unavailable; checking the official GitHub release metadata."
     KIT_CODEX_SOURCE=https://api.github.com/repos/openai/codex/releases/latest
-    download_file "$KIT_CODEX_SOURCE" "$KIT_BACKUP_DIR/codex-release.json" || kit_die "Could not resolve the latest Codex release."
+    download_file "$KIT_CODEX_SOURCE" "$KIT_WORK_DIR/codex-release.json" || kit_die "Could not resolve the latest Codex release."
   fi
-  download_file "$KIT_CLAUDE_SOURCE" "$KIT_BACKUP_DIR/claude-release.txt" || kit_die "Could not resolve the latest Claude Code release."
-  download_file "$KIT_OPENCODE_SOURCE" "$KIT_BACKUP_DIR/opencode-release.json" || kit_die "Could not resolve the latest OpenCode V2 release."
+  download_file "$KIT_CLAUDE_SOURCE" "$KIT_WORK_DIR/claude-release.txt" || kit_die "Could not resolve the latest Claude Code release."
+  download_file "$KIT_OPENCODE_SOURCE" "$KIT_WORK_DIR/opencode-release.json" || kit_die "Could not resolve the latest OpenCode V2 release."
   KIT_CODEX_VERSION="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
     const v=(d.tag_name||"").replace(/^rust-v/,"");
     if(d.prerelease===true||!/^\d+\.\d+\.\d+$/.test(v))process.exit(1);console.log(v);' \
-    "$KIT_BACKUP_DIR/codex-release.json")" || kit_die "Invalid stable Codex release metadata."
+    "$KIT_WORK_DIR/codex-release.json")" || kit_die "Invalid stable Codex release metadata."
   KIT_CLAUDE_VERSION="$(node -e 'const v=require("fs").readFileSync(process.argv[1],"utf8").trim();
     if(!/^\d+\.\d+\.\d+$/.test(v))process.exit(1);console.log(v);' \
-    "$KIT_BACKUP_DIR/claude-release.txt")" || kit_die "Invalid stable Claude Code release metadata."
+    "$KIT_WORK_DIR/claude-release.txt")" || kit_die "Invalid stable Claude Code release metadata."
   KIT_OPENCODE_VERSION="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
     const p=d.metadata?.package||d.package;
     if(p!=="@opencode/cli"||d.active===false||!/^2\.\d+\.\d+$/.test(d.version))process.exit(1);console.log(d.version);' \
-    "$KIT_BACKUP_DIR/opencode-release.json")" || kit_die "Invalid OpenCode V2 release metadata."
+    "$KIT_WORK_DIR/opencode-release.json")" || kit_die "Invalid OpenCode V2 release metadata."
   KIT_CLI_VERSIONS_RESOLVED=1
   printf 'Selected CLI versions: Codex %s, Claude Code %s, OpenCode %s\n' \
     "$KIT_CODEX_VERSION" "$KIT_CLAUDE_VERSION" "$KIT_OPENCODE_VERSION"
@@ -125,7 +125,7 @@ install_standalone_codex() {
   local binary
   resolve_cli_versions
   if binary="$(managed_codex)" && cli_usable codex "$binary" &&
-      [ "$(cli_version "$binary")" = "$KIT_CODEX_VERSION" ] && codex_remote_capability >/dev/null 2>&1; then
+      [ "$(cli_version "$binary")" = "$KIT_CODEX_VERSION" ]; then
     set_cli_launcher codex "$binary"
     return 0
   fi
@@ -135,12 +135,12 @@ install_standalone_codex() {
   KIT_CLI_UPDATE_INDEX=$((${KIT_CLI_UPDATE_INDEX:-0} + 1))
   kit_backup_path "$HOME/.codex/packages/standalone" "bootstrap/codex-payload-$KIT_CLI_UPDATE_INDEX"
   kit_backup_path "$KIT_STATE_ROOT/cli/bin/codex" "bootstrap/codex-vendor-launcher-$KIT_CLI_UPDATE_INDEX"
-  download_file https://chatgpt.com/codex/install.sh "$KIT_BACKUP_DIR/install-codex.sh" || kit_die "Could not download the Codex installer."
+  download_file https://chatgpt.com/codex/install.sh "$KIT_WORK_DIR/install-codex.sh" || kit_die "Could not download the Codex installer."
   # Package-manager cleanup follows verification of all replacements.
   CODEX_INSTALL_DIR="$KIT_STATE_ROOT/cli/bin" CODEX_NON_INTERACTIVE=1 \
-    sh "$KIT_BACKUP_DIR/install-codex.sh" --release "$KIT_CODEX_VERSION" || kit_die "Codex standalone installation failed."
+    sh "$KIT_WORK_DIR/install-codex.sh" --release "$KIT_CODEX_VERSION" || kit_die "Codex standalone installation failed."
   binary="$(managed_codex)" && cli_usable codex "$binary" &&
-    [ "$(cli_version "$binary")" = "$KIT_CODEX_VERSION" ] && codex_remote_capability >/dev/null 2>&1 ||
+    [ "$(cli_version "$binary")" = "$KIT_CODEX_VERSION" ] ||
     kit_die "Official installer did not provide managed Codex $KIT_CODEX_VERSION."
   set_cli_launcher codex "$binary"
 }
@@ -167,8 +167,8 @@ install_native_claude() {
     kit_backup_path "$HOME/.local/share/claude" "bootstrap/claude-payload-$KIT_CLI_UPDATE_INDEX"
     kit_backup_path "$HOME/.local/bin/claude" "bootstrap/claude-native-launcher-$KIT_CLI_UPDATE_INDEX"
     rm -f "$HOME/.local/bin/claude"
-    download_file https://claude.ai/install.sh "$KIT_BACKUP_DIR/install-claude.sh" || kit_die "Could not download the Claude Code installer."
-    bash "$KIT_BACKUP_DIR/install-claude.sh" "$KIT_CLAUDE_VERSION" || kit_die "Claude Code native installation failed."
+    download_file https://claude.ai/install.sh "$KIT_WORK_DIR/install-claude.sh" || kit_die "Could not download the Claude Code installer."
+    bash "$KIT_WORK_DIR/install-claude.sh" "$KIT_CLAUDE_VERSION" || kit_die "Claude Code native installation failed."
     native_claude && [ "$(cli_version "$HOME/.local/bin/claude")" = "$KIT_CLAUDE_VERSION" ] ||
       kit_die "Claude installer did not provide Claude Code $KIT_CLAUDE_VERSION."
   fi
@@ -204,9 +204,9 @@ install_native_opencode() {
   fi
   KIT_CLI_UPDATE_INDEX=$((${KIT_CLI_UPDATE_INDEX:-0} + 1))
   target="$(opencode_platform)"
-  metadata="$KIT_BACKUP_DIR/opencode-package-$KIT_CLI_UPDATE_INDEX.json"
-  archive="$KIT_BACKUP_DIR/opencode-package-$KIT_CLI_UPDATE_INDEX.tgz"
-  stage="$(mktemp -d "$KIT_BACKUP_DIR/opencode-stage.XXXXXX")"
+  metadata="$KIT_WORK_DIR/opencode-package-$KIT_CLI_UPDATE_INDEX.json"
+  archive="$KIT_WORK_DIR/opencode-package-$KIT_CLI_UPDATE_INDEX.tgz"
+  stage="$(mktemp -d "$KIT_WORK_DIR/opencode-stage.XXXXXX")"
   download_file "https://registry.npmjs.org/@opencode%2fcli-$target/$KIT_OPENCODE_VERSION" "$metadata" || kit_die "Could not download OpenCode platform package metadata."
   url="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));
     if(d.name!==process.argv[2]||d.version!==process.argv[3]||!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(d.dist?.integrity||""))process.exit(1);
@@ -289,7 +289,7 @@ verify_native_clis() {
     [ -f "$launcher" ] && grep -Fqx '# research-agent-kit CLI launcher' "$launcher" || return 1
     target="$(sed -n 's/^# target: //p' "$launcher")"
     case "$tool" in
-      codex) [ "$target" = "$(managed_codex)" ] && codex_remote_capability >/dev/null 2>&1 || return 1 ;;
+      codex) [ "$target" = "$(managed_codex)" ] || return 1 ;;
       claude) [ "$target" = "$HOME/.local/bin/claude" ] && native_claude || return 1 ;;
       opencode) [ "$target" = "$HOME/.opencode/bin/opencode" ] || return 1 ;;
     esac
@@ -328,16 +328,16 @@ bootstrap_cli() {
     case "$(uname -s)" in Darwin) platform=darwin ;; Linux) platform=linux ;; *) kit_die "CLI bootstrap supports macOS and Linux." ;; esac
     case "$(uname -m)" in arm64|aarch64) architecture=arm64 ;; x86_64|amd64) architecture=x64 ;; *) kit_die "Unsupported CPU architecture: $(uname -m)" ;; esac
     archive="node-v$node_version-$platform-$architecture.tar.gz"
-    download_file "https://nodejs.org/dist/v$node_version/$archive" "$KIT_BACKUP_DIR/$archive"
-    download_file "https://nodejs.org/dist/v$node_version/SHASUMS256.txt" "$KIT_BACKUP_DIR/node-shasums.txt"
-    expected="$(awk -v name="$archive" '$2 == name { print $1 }' "$KIT_BACKUP_DIR/node-shasums.txt")"
+    download_file "https://nodejs.org/dist/v$node_version/$archive" "$KIT_WORK_DIR/$archive"
+    download_file "https://nodejs.org/dist/v$node_version/SHASUMS256.txt" "$KIT_WORK_DIR/node-shasums.txt"
+    expected="$(awk -v name="$archive" '$2 == name { print $1 }' "$KIT_WORK_DIR/node-shasums.txt")"
     if command -v shasum >/dev/null 2>&1; then
-      actual="$(shasum -a 256 "$KIT_BACKUP_DIR/$archive" | awk '{print $1}')"
+      actual="$(shasum -a 256 "$KIT_WORK_DIR/$archive" | awk '{print $1}')"
     else
-      actual="$(sha256sum "$KIT_BACKUP_DIR/$archive" | awk '{print $1}')"
+      actual="$(sha256sum "$KIT_WORK_DIR/$archive" | awk '{print $1}')"
     fi
     [ -n "$expected" ] && [ "$actual" = "$expected" ] || kit_die "Node.js archive checksum mismatch."
-    tar -xzf "$KIT_BACKUP_DIR/$archive" --strip-components 1 -C "$cli_root/node"
+    tar -xzf "$KIT_WORK_DIR/$archive" --strip-components 1 -C "$cli_root/node"
     local name
     for name in node npm npx; do
       kit_backup_path "$cli_root/bin/$name" "bootstrap/$name-launcher"
@@ -371,98 +371,4 @@ bootstrap_cli() {
     chmod 755 "$KIT_NPX"
     KIT_NPX_PREPARED=1
   fi
-}
-
-codex_remote_capability() {
-  local binary
-  binary="$(managed_codex)" || { echo "Managed standalone Codex is unavailable." >&2; return 1; }
-  "$binary" --version &&
-    "$binary" app-server daemon version --help >/dev/null &&
-    "$binary" app-server daemon bootstrap --help >/dev/null &&
-    "$binary" remote-control start --help >/dev/null
-}
-
-codex_startup_command() {
-  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" \
-    -I -B "$ROOT/scripts/codex_startup.py" "$@"
-}
-
-backup_codex_startup() {
-  local startup_path
-  startup_path="$(codex_startup_command check "$1")" || return 1
-  KIT_REMOTE_BACKUP_INDEX=$((${KIT_REMOTE_BACKUP_INDEX:-0} + 1))
-  kit_backup_path "$startup_path" "remote-control/startup-$KIT_REMOTE_BACKUP_INDEX"
-}
-
-enable_codex_remote() {
-  local binary action=repair
-  [ "${1:-1}" = 1 ] || action=enable
-  kit_require_regular_or_absent "$KIT_STATE_ROOT/codex-remote-control.state"
-  codex_remote_capability || kit_die "Installed Codex does not support the required managed Remote Control commands."
-  binary="$(managed_codex)"
-  backup_codex_startup "$binary" || return 1
-  # The helper keeps native JSON (including environment IDs) out of kit state.
-  "${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}" \
-    -I -B "$ROOT/scripts/codex_remote.py" "$action" "$binary" || return 1
-  codex_startup_command install "$binary" || return 1
-  printf '%s\n' 'enabled=1' > "$KIT_STATE_ROOT/codex-remote-control.state"
-  echo "Pair separately on this host: sh codex-remote.sh pair"
-}
-
-verify_codex_remote() {
-  [ -f "$HOME/.universal-research-agent-kit/codex-remote-control.state" ] || return 0
-  grep -Fqx 'enabled=1' "$HOME/.universal-research-agent-kit/codex-remote-control.state" || return 0
-  codex_remote_capability || return 1
-  local binary
-  binary="$(managed_codex)"
-  "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B \
-    "$ROOT/scripts/codex_remote.py" verify "$binary" || return 1
-  codex_startup_command verify "$binary"
-}
-
-disable_codex_remote() {
-  local binary
-  binary="$(managed_codex)" || kit_die "No managed Codex installation; no remote host was changed."
-  kit_require_regular_or_absent "$KIT_STATE_ROOT/codex-remote-control.state"
-  backup_codex_startup "$binary" || return 1
-  codex_startup_command remove "$binary" || return 1
-  "$binary" app-server daemon disable-remote-control >/dev/null || kit_die "Could not disable Codex Remote Control."
-  printf '%s\n' 'enabled=0' > "$KIT_STATE_ROOT/codex-remote-control.state"
-  echo "Codex Remote Control disabled on this host. Local Codex/Headroom remain available."
-}
-
-show_codex_remote() {
-  local binary python failed=0
-  if [ -f "$HOME/.universal-research-agent-kit/codex-remote-control.state" ] &&
-      grep -Fqx 'enabled=1' "$HOME/.universal-research-agent-kit/codex-remote-control.state"; then
-    echo "Kit Remote Control setup: enabled."
-  else
-    echo "No completed Remote Control setup is recorded, or the kit setting is disabled."
-    echo "The native daemon may still be enabled after a partial setup failure."
-    echo "Complete/retry setup: sh codex-remote.sh enable"
-    failed=1
-  fi
-  python="${KIT_HEADROOM_PYTHON:-$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python}"
-  if ! binary="$(managed_codex)"; then
-    echo "Managed Codex: unavailable. Run sh install.sh."
-    echo "Daemon, Remote Control preference and automatic startup: not inspected."
-    return 1
-  fi
-  if [ ! -x "$python" ]; then
-    echo "Managed Python: unavailable. Run sh install.sh."
-    echo "Daemon, Remote Control preference and automatic startup: not inspected."
-    return 1
-  fi
-  "$python" -I -B "$ROOT/scripts/codex_remote.py" status "$binary" || failed=1
-  if ! codex_startup_command verify "$binary"; then
-    echo "Codex automatic startup: not verified."
-    failed=1
-  fi
-  return "$failed"
-}
-
-pair_codex_remote() {
-  local binary
-  binary="$(managed_codex)" || kit_die "No managed Codex installation. Run sh install.sh first."
-  "$binary" remote-control pair
 }

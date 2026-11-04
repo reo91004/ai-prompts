@@ -103,7 +103,7 @@ def default_adoption(adapter, maintenance, database, artifacts):
                     patch.object(adapter, "port_open", side_effect=lambda: state["active"]), \
                     patch.object(maintenance, "port_open", side_effect=lambda: state["active"]), \
                     patch.object(maintenance, "ready", side_effect=lambda: state["active"]), \
-                    patch.object(adapter, "probe", return_value={"version": importlib.metadata.version("headroom-ai"), "deployment": {"profile": "default", "preset": "persistent-service"}}), \
+                    patch.object(adapter, "probe", return_value={"ready": True, "version": importlib.metadata.version("headroom-ai"), "deployment": {"profile": "default", "preset": "persistent-service"}}), \
                     patch.object(adapter, "headroom", side_effect=headroom_status), \
                     patch.object(adapter, "restore_thread_routing", side_effect=forbidden):
                 record = adapter.KIT / "default-maintenance.json"
@@ -334,12 +334,13 @@ def smoke(runtime_path):
         original = {p: p.read_bytes() for p in (adapter.CONFIG, database)}
         probes = []
 
-        def ready(url):
-            probes.append(url)
-            assert url == adapter.BASE_URL + "/readyz", url
-            return True
+        def ready(endpoint, **kwargs):
+            probes.append(endpoint)
+            assert endpoint in ("/health", "/readyz"), endpoint
+            return {"ready": True, "deployment": {"profile": adapter.PROFILE}}
 
-        stack.enter_context(patch.object(upstream_runtime, "probe_ready", side_effect=ready))
+        stack.enter_context(patch.object(adapter, "probe", side_effect=ready))
+        stack.enter_context(patch.object(upstream_runtime, "runtime_status", return_value="running"))
         for system in ("darwin", "linux"):
             commands = []
 
@@ -439,7 +440,22 @@ def smoke(runtime_path):
                     "maintenance_accepts_upstream_service_definition": True,
                     "start_after_bootout": system == "darwin",
                     "missing_manifest_cleanup": commands, "pid_signals": 0})
-        assert len(probes) == 3, probes
+        assert probes == ["/health", "/health", "/readyz"] * 3, probes
+        # The real new-install CLI passes 45 seconds; permit a slower cold start.
+        from headroom.cli import install as cli_install
+        clock = [0]
+        def delayed_probe(endpoint, **kwargs):
+            return {"ready": clock[0] >= 75, "deployment": {"profile": adapter.PROFILE}}
+        with patch.object(cli_install, "runtime_status", return_value="stopped"), \
+                patch.object(cli_install, "start_supervisor") as start, \
+                patch.object(cli_install, "wait_ready", side_effect=adapter.wait_ready), \
+                patch.object(adapter, "probe", side_effect=delayed_probe), \
+                patch.object(adapter.time, "monotonic", side_effect=lambda: clock[0]), \
+                patch.object(adapter.time, "sleep", side_effect=lambda seconds: clock.__setitem__(0, clock[0] + seconds)):
+            cli_install._start_deployment(deployment, assume_start_lock=True)
+            start.assert_called_once_with(deployment)
+            assert clock[0] == 75, clock
+        evidence["new_install_cold_start"] = {"ready_after_seconds": clock[0], "upstream_timeout_seconds": 45}
         # Exercise the real upstream auth detector against synthetic metadata.
         # No account token or keyring is used, and login status cannot execute.
         auth = adapter.CONFIG.parent / "auth.json"

@@ -254,7 +254,7 @@ echo new > "$KIT_STATE_ROOT/tooling/sentinel"
 KIT_HEADROOM_ACTIVATION_STARTED=1
 kit_maintenance_run() {
   echo "$1" >> "$GUARD_EVENTS"
-  if [ "$1" = stop-service ]; then
+  if [ "$1" = quiesce ]; then
     [ "$(cat "$KIT_STATE_ROOT/tooling/sentinel")" = new ] || exit 90
     return ''' + str(stop_status) + '''
   fi
@@ -263,7 +263,7 @@ kit_maintenance_run() {
 exit 99
 ''')
                 self.assertEqual(result.returncode, 99)
-                self.assertEqual(self.events.read_text().splitlines(), ["stop-service"] if stop_fails else ["stop-service", "resume"])
+                self.assertEqual(self.events.read_text().splitlines(), ["quiesce"] if stop_fails else ["quiesce", "resume"])
                 self.assertEqual(sentinel.read_text(), "new\n" if stop_fails else "original")
                 if stop_fails:
                     self.assertTrue(list((self.kit / "backups").glob("run.*/journal.tsv")))
@@ -285,7 +285,7 @@ KIT_HEADROOM_ACTIVATION_STARTED=1
 KIT_HEADROOM_CREATED=0
 kit_maintenance_run() {
   echo "$1" >> "$GUARD_EVENTS"
-  if [ "$1" = stop-service ]; then
+  if [ "$1" = quiesce ]; then
     test -f "$KIT_STATE_ROOT/headroom.json" || exit 91
     test "$(cat "$HOME/.headroom/deploy/default/run-headroom.sh")" = new-runner || exit 92
   elif [ "$1" = resume ]; then
@@ -298,7 +298,7 @@ kit_maintenance_run() {
 exit 42
 ''')
         self.assertEqual(result.returncode, 42)
-        self.assertEqual(self.events.read_text().splitlines(), ["stop-service", "resume"])
+        self.assertEqual(self.events.read_text().splitlines(), ["quiesce", "resume"])
         self.assertFalse((self.kit / "headroom.json").exists())
         self.assertEqual(runner.read_text(), "old-runner")
 
@@ -389,6 +389,35 @@ kit_rollback_run
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(sentinel.read_text(), "original")
         self.assertTrue(list((self.kit / "backups").glob("run.*/journal.tsv.rolled-back")))
+
+    def test_rollback_pauses_reconnected_mcp_without_overwriting_resume_record(self):
+        self.kit.joinpath("tooling").mkdir(parents=True)
+        sentinel = self.kit / "tooling/sentinel"
+        sentinel.write_text("original")
+        self.set_snapshots("246 " + str(self.kit / "tooling/bin/headroom") + " mcp serve\n")
+        result = self.run_shell('''kit_init_state
+kit_enable_rollback
+KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
+echo original-resume-record > "$KIT_MAINTENANCE_RECORD"
+kit_backup_path "$KIT_STATE_ROOT/tooling" tooling/environment
+echo new > "$KIT_STATE_ROOT/tooling/sentinel"
+TOOL_ROOT_PREPARED=1
+kit_maintenance_run() {
+  echo "$1" >> "$GUARD_EVENTS"
+  if [ "$1" = quiesce ]; then
+    test "$2" != "$KIT_MAINTENANCE_RECORD" || exit 90
+    echo rollback-record > "$2"
+    echo '[{"text":"42 /usr/bin/idle-fixture\\n"}]' > "$GUARD_SNAPSHOTS"
+  else
+    test "$(cat "$2")" = original-resume-record || exit 91
+    test "$(cat "$KIT_STATE_ROOT/tooling/sentinel")" = original || exit 92
+  fi
+}
+exit 99
+''')
+        self.assertEqual(result.returncode, 99, result.stderr)
+        self.assertEqual(self.events.read_text().splitlines(), ["quiesce", "resume"])
+        self.assertEqual(sentinel.read_text(), "original")
 
     def test_real_ps_snapshot_of_a_harmless_headroom_named_process(self):
         program = self.work / "headroom"

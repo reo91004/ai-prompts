@@ -126,6 +126,10 @@ for command in install.sh codex-remote.sh skills/resource-aware-orchestration/sc
   [ -x "$ROOT/$command" ] || fail "missing executable: $command"
   bash -n "$ROOT/$command" || fail "shell syntax: $command"
 done
+for helper in "$ROOT"/scripts/install_*.sh "$ROOT/scripts/codex_remote.sh"; do
+  bash -n "$helper" || fail "shell syntax: $helper"
+done
+
 [ -f "$ROOT/headroom/auto-wrap.sh" ] || fail "missing Headroom wrapper"
 bash -n "$ROOT/headroom/auto-wrap.sh" || fail "Headroom wrapper syntax"
 for obsolete in install_all.sh install_integrations.sh install_tooling.sh verify_install.sh cleanup_backups.sh codex/install.sh claude-code/install.sh lib/install_common.sh; do

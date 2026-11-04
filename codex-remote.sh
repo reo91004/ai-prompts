@@ -1,7 +1,10 @@
 #!/bin/sh
 [ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
 set -euo pipefail
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install.sh"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$ROOT/scripts/install_common.sh"
+source "$ROOT/scripts/bootstrap_cli.sh"
+source "$ROOT/scripts/codex_remote.sh"
 
 usage() {
   cat <<'EOF'

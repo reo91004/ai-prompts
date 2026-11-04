@@ -15,7 +15,7 @@ Codex·Claude Code·OpenCode V2에서 연구 공통 원칙과 스킬을 사용�
 
 ## 설치·갱신·확인
 
-설치 진입점은 **`install.sh` 하나**입니다. macOS 기본 Bash 3.2와 Ubuntu에서 사용하며 `sh`로 실행하면 Bash로 전환합니다. Headroom 서비스에는 macOS 로그인 세션의 launchd 또는 Linux의 사용자 systemd가 필요합니다. WSL은 systemd를 활성화한 환경에 한하며 Native Windows와 Git Bash는 지원 범위가 아닙니다.
+기본 설치는 `install.sh`, 선택적인 Codex Remote Control 설정은 설치 후 `codex-remote.sh`로 실행합니다. macOS 기본 Bash 3.2와 Ubuntu에서 사용하며 `sh`로 실행하면 Bash로 전환합니다. Headroom 서비스에는 macOS 로그인 세션의 launchd 또는 Linux의 사용자 systemd가 필요합니다. WSL은 systemd를 활성화한 환경에 한하며 Native Windows와 Git Bash는 지원 범위가 아닙니다.
 
 ```bash
 sh install.sh                       # 기본 설치 또는 갱신
@@ -41,6 +41,10 @@ Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, U
 Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 24 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
 
 처음에는 Git, Bash, curl 또는 wget, 인터넷 연결, 사용자 서비스 관리자가 필요합니다. 로그인·계정 이용 권한·조직 정책·pairing은 각 호스트에서 본인이 완료해야 합니다. 키트는 인증 정보를 복사하지 않습니다. `CLAUDE_CONFIG_DIR`과 기본 `~/.codex` 이외의 `CODEX_HOME`은 지원하지 않으며 설치 전에 거부합니다. Python minor 버전과 최상위 패키지는 고정하지만 운영체제별 wheel·전이 의존성까지 완전히 동일하다는 뜻은 아닙니다.
+
+설치 제어 흐름과 옵션은 `install.sh`에 두고, 파일 백업·복구, 핵심 파일 배포, 통합 도구, Python 도구, 검증은 `scripts/install_{common,core,integrations,tooling,verify}.sh`에 나눕니다. 각 보조 파일은 함수 정의를 제공하며 독립 설치 진입점으로 실행하지 않습니다.
+
+설치와 검증이 성공하면 해당 실행의 다운로드·압축 해제·생성 파일과 uv 캐시를 자동 삭제합니다. uv 캐시는 키트 실행별 작업 디렉터리를 사용하며 도구를 복사 모드로 설치하므로 캐시 삭제 후에도 실행됩니다. 설치된 uv·Python·도구와 journal에 기록된 원본 백업은 유지합니다. 사용자 공용 uv·npm 캐시는 지우지 않습니다. 실패한 실행의 작업물은 복구 진단을 위해 남깁니다. 이전 백업까지 지우려면 `sh install.sh --cleanup-backups`를 명시적으로 실행하세요.
 
 ### 도구 버전 갱신
 
@@ -68,7 +72,7 @@ CLI 로그인은 `codex login --device-auth`를 기본으로 사용합니다. �
 
 각 호스트의 여러 프로젝트·세션은 같은 proxy를 공유합니다. 일반 CLI의 프로젝트 표시는 현재 디렉터리명 또는 `HEADROOM_PROJECT`를 사용하며, Codex의 `--cd`도 반영합니다. Desktop/Remote Control의 여러 task를 dashboard에서 자동으로 프로젝트별 분리하는 기능은 보장하지 않습니다. 프로젝트별 provider·명시적인 CLI 설정으로 라우팅을 덮어쓰면 해당 설정이 우선할 수 있습니다.
 
-**기본 설치는 Codex·Claude Remote Control을 켜지 않습니다.** Mac을 로컬 작업과 원격 서버 제어용으로만 쓰려면 기본 설치만 하면 됩니다. 이미 이 키트에서 원격 호스트로 선택한 컴퓨터는 재설치 때 그 선택을 유지합니다.
+**기본 설치는 Codex·Claude Remote Control을 켜지 않습니다.** Mac을 로컬 작업과 원격 서버 제어용으로만 쓰려면 기본 설치만 하면 됩니다. 기존 Remote Control 설정은 보존하며 기본 설치·검증에서는 원격 daemon을 조작하거나 검사하지 않습니다. 원격 설정을 갱신하려면 설치 후 `sh codex-remote.sh enable`을 실행합니다.
 
 Git에는 지침·스킬·설치 로직만 공유합니다. `~/.codex`, `~/.claude`, `~/.headroom`, `~/.universal-research-agent-kit` 전체를 컴퓨터 사이에 동기화하지 마세요. 각 호스트가 자체 인증·PID·socket·서비스·pairing 상태를 가집니다. 특히 `codex_raw`도 전역 provider를 읽으므로 Headroom 우회를 뜻하지 않습니다.
 
@@ -82,15 +86,15 @@ Mac 앱에서 Ubuntu 프로젝트를 SSH로 열려면 기본 설치와 호스트
 sh install.sh                                # 최초 설치
 source "$HOME/.config/headroom/auto-wrap.sh"  # 현재 셸의 옛 함수를 갱신
 codex login --device-auth                    # 그 호스트에서 기기 코드 로그인; 이미 로그인했다면 생략
-sh install.sh --enable-codex-remote-control   # 원격 제어 활성화 + 자동 시작 등록
+sh codex-remote.sh enable                   # 설치된 도구로 원격 제어 활성화 + 자동 시작 등록
 codex remote-control pair                    # 표시된 pairing을 Mac Codex App에서 완료
-sh install.sh --remote-control-status
+sh codex-remote.sh status
 sh install.sh --headroom-status
 ```
 
-`app server is running but is not managed by codex app-server daemon`은 기존 App Server가 관리 daemon 소유가 아니라는 뜻입니다. `--enable-codex-remote-control`은 이 오류가 나면 제어 소켓의 실제 PID·사용자·실행파일·실행 인자를 확인하고, 정상 종료 동작을 확인한 **실행 버전 0.153.4·0.166.0**에만 `SIGHUP`을 한 번 보냅니다. 현재 사용자 소유의 소켓 링크도 지원하며, 링크와 대상 소켓의 소유권 및 검사 중 변경 여부를 모두 확인합니다. 최대 30초 동안 종료를 기다린 뒤 managed 시작을 한 번 재시도합니다. 이 복구 경로는 강제 종료하지 않습니다. 기존 실행의 일회성 `-c` 옵션은 새 daemon으로 복사하지 않으며 새 daemon은 호스트에 저장된 설정을 사용합니다. [0.153.4의 종료 처리](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/lib.rs#L199)는 실행 중 turn의 완료를 기다리지만 대기 중 새 요청을 계속 받으므로 모든 대기 요청의 보존까지 보장하지는 않습니다. [0.166.0의 종료 처리](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/app-server/src/lib.rs#L228)는 새 turn 요청을 거부하고 실행 중 turn과 이미 수락한 요청의 완료를 기다립니다.
+`app server is running but is not managed by codex app-server daemon`은 기존 App Server가 관리 daemon 소유가 아니라는 뜻입니다. `sh codex-remote.sh enable`은 이 오류가 나면 작업을 마친 뒤 `sh codex-remote.sh repair`를 실행하도록 안내합니다. `repair`는 제어 소켓의 실제 PID·사용자·실행파일·실행 인자를 확인하고, 정상 종료 동작을 확인한 **실행 버전 0.153.4·0.166.0**에만 `SIGHUP`을 한 번 보냅니다. 현재 사용자 소유의 소켓 링크도 지원하며, 링크와 대상 소켓의 소유권 및 검사 중 변경 여부를 모두 확인합니다. 최대 30초 동안 종료를 기다린 뒤 managed 시작을 한 번 재시도합니다. 이 복구 경로는 강제 종료하지 않습니다. 기존 실행의 일회성 `-c` 옵션은 새 daemon으로 복사하지 않으며 새 daemon은 호스트에 저장된 설정을 사용합니다. [0.153.4의 종료 처리](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/app-server/src/lib.rs#L199)는 실행 중 turn의 완료를 기다리지만 대기 중 새 요청을 계속 받으므로 모든 대기 요청의 보존까지 보장하지는 않습니다. [0.166.0의 종료 처리](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/app-server/src/lib.rs#L228)는 새 turn 요청을 거부하고 실행 중 turn과 이미 수락한 요청의 완료를 기다립니다.
 
-기존 작업이 끝나지 않으면 설치기는 종료 요청만 남기고 실패하며 서버가 나중에 종료될 수 있습니다. 서버가 새 PID로 재생성되면 추가 종료를 반복하지 않습니다. Mac 앱에서 **해당 호스트의 SSH 연결을 해제**하고 `sh install.sh --enable-codex-remote-control`을 다시 실행하세요. 확인되지 않은 버전·실행 방식은 기존 세션에서 작업을 마치고 서버를 종료해야 합니다. 서버 내부에서 실행 중인 설치기는 자체 작업의 종료를 기다리지 않도록 외부 터미널 실행을 안내합니다. 활성화가 성공하면 `codex remote-control pair`로 연결합니다.
+기존 작업이 끝나지 않으면 설치기는 종료 요청만 남기고 실패하며 서버가 나중에 종료될 수 있습니다. 서버가 새 PID로 재생성되면 추가 종료를 반복하지 않습니다. Mac 앱에서 **해당 호스트의 SSH 연결을 해제**하고 `sh codex-remote.sh repair`를 다시 실행하세요. 확인되지 않은 버전·실행 방식은 기존 세션에서 작업을 마치고 서버를 종료해야 합니다. 서버 내부에서 실행 중인 설치기는 자체 작업의 종료를 기다리지 않도록 외부 터미널 실행을 안내합니다. 활성화가 성공하면 `codex remote-control pair`로 연결합니다.
 
 `codex` 명령 하나로 일반 작업과 원격 관리 모두 실행합니다. 일반 명령과 원격 관리 모두 kit launcher가 공식 standalone을 선택합니다. npm 설치만으로는 관리 daemon bootstrap 요건을 충족하지 않습니다. Claude Code의 native 설치는 공식 권장 방식이며, Remote Control에 native만 허용된다는 의미는 아닙니다. [Claude 설치 안내](https://code.claude.com/docs/en/setup) 설치기의 `connected`와 `connecting`은 구분됩니다. `connecting`은 daemon이 시작됐지만 relay 연결을 기다리는 상태이며 pairing 성공을 뜻하지 않습니다. 상태 검사는 daemon 실행과 설정을 확인하며 실계정의 relay 연결·pairing까지 검증하지는 않습니다. [Codex daemon 원본](https://github.com/openai/codex/blob/main/codex-rs/app-server-daemon/README.md)
 
@@ -98,21 +102,21 @@ sh install.sh --headroom-status
 codex app-server daemon version             # daemon 상태
 codex app-server daemon restart             # 설정 변경 후 명시적으로 재시작
 codex remote-control start                  # relay 연결 재시도
-sh install.sh --disable-codex-remote-control # 원격 제어 끄기 + 자동 시작 해제
+sh codex-remote.sh disable                  # 원격 제어 끄기 + 자동 시작 해제
 ```
 
-`--enable-codex-remote-control`은 기본 설치·갱신을 수행한 뒤 Remote Control을 활성화하고 자동 시작을 등록합니다. 기본 설치만 실행하면 새 호스트의 Remote Control은 켜지지 않습니다. 이미 활성화한 호스트는 재설치 때 등록도 갱신합니다. 자동 시작 명령은 저장된 Remote Control 설정을 따르며, 현재 daemon을 다시 시작하지 않습니다. 표준 수동 systemd 서비스는 인식하고 갱신하지만, 내용이 바뀐 서비스나 추가 설정은 덮어쓰지 않습니다.
+`sh codex-remote.sh enable`은 설치된 Codex와 Python으로 Remote Control을 활성화하고 자동 시작을 등록합니다. CLI·패키지를 내려받거나 전체 설치를 반복하지 않습니다. `install.sh`의 원격 옵션은 제거했으며, 기본 설치는 원격 daemon의 연결 실패와 무관하게 검증합니다. 자동 시작 명령은 저장된 Remote Control 설정을 따르며, 현재 daemon을 다시 시작하지 않습니다. 표준 수동 systemd 서비스는 인식하고 갱신하지만, 내용이 바뀐 서비스나 추가 설정은 덮어쓰지 않습니다.
 
 Ubuntu에서는 `codex-remote-control.service`를 사용자 systemd에 등록하고 기존 Headroom 서비스 뒤에 시작하도록 설정합니다. 로그인하지 않아도 부팅 때 시작할 수 있도록 현재 사용자의 linger 활성화를 시도합니다. 권한이 없으면 실패를 알리며 자동으로 sudo를 실행하지 않습니다. 아래 명령 후 활성화 옵션을 다시 실행하세요.
 
 ```bash
 sudo loginctl enable-linger "$(id -un)"
-sh install.sh --enable-codex-remote-control
+sh codex-remote.sh enable
 ```
 
-linger는 해당 사용자의 다른 활성화된 서비스에도 적용됩니다. `--disable-codex-remote-control`은 Codex 자동 시작 등록만 제거하고, Headroom과 기존 linger 설정은 유지합니다. macOS는 `com.research-agent-kit.codex-remote-control` LaunchAgent를 등록하여 **사용자가 GUI에 로그인한 뒤** 시작합니다. 로그인 전 부팅 시점의 실행은 지원하지 않습니다.
+linger는 해당 사용자의 다른 활성화된 서비스에도 적용됩니다. `sh codex-remote.sh disable`은 Codex 자동 시작 등록만 제거하고, Headroom과 기존 linger 설정은 유지합니다. macOS는 `com.research-agent-kit.codex-remote-control` LaunchAgent를 등록하여 **사용자가 GUI에 로그인한 뒤** 시작합니다. 로그인 전 부팅 시점의 실행은 지원하지 않습니다.
 
-자동 시작은 native daemon 시작 명령을 부팅·로그인 때 한 번 실행하는 방식이며, 실행 중 장애를 계속 감시하는 서비스는 아닙니다. `--remote-control-status`는 실제 managed daemon 상태와 자동 시작 등록을 함께 확인합니다. 등록 확인만으로 실제 재부팅·relay 재연결·pairing 성공을 판정하지는 않습니다.
+자동 시작은 native daemon 시작 명령을 부팅·로그인 때 한 번 실행하는 방식이며, 실행 중 장애를 계속 감시하는 서비스는 아닙니다. `sh codex-remote.sh status`는 실제 managed daemon 상태와 자동 시작 등록을 함께 확인합니다. 등록 확인만으로 실제 재부팅·relay 재연결·pairing 성공을 판정하지는 않습니다.
 
 ### Claude Remote Control
 
@@ -132,6 +136,10 @@ sh install.sh --verify
 sh install.sh --headroom-status
 curl -fsS http://127.0.0.1:8787/health
 ```
+
+새 설치와 재설치는 Headroom의 cold start와 외부 API 연결 검사를 위해 최대 180초씩 준비 상태를 기다립니다. 준비 실패 시 새 설치는 upstream 정리가 끝나고 포트가 비어 있는 경우 한 번 다시 적용하며, 재설치는 키트 소유 서비스를 한 번 재시작합니다. 다른 profile의 listener는 재시작하지 않습니다. 계속 실패하면 준비되지 않은 검사 이름과 서비스 로그 경로를 표시합니다. 인증·네트워크·권한 문제는 별도 조치가 필요하며 readiness 검사를 생략해 성공으로 처리하지 않습니다.
+
+설치 실패 시에는 재접속한 키트 MCP와 서비스를 다시 확인해 정상 종료한 뒤 journal로 환경·설정을 복구하고, 원래 실행 중이던 서비스를 최대 180초 동안 준비 확인합니다. 재접속이 반복되거나 다른 작업이 환경을 사용하면 안전한 복원을 위해 파일과 기록을 보존하고 오류를 알립니다. 이런 경우에는 클라이언트를 닫고 다시 설치해야 합니다.
 
 정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile`이 키트 소유 기록과 같은지 함께 확인합니다. 새 설치의 profile은 `research-agent-kit`이며, 기존 표준 설치를 인계한 호스트는 `default`를 유지합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 다른 서비스가 8787 포트를 사용하거나 사용자 설정이 표준 설치와 다르면 충돌 위치를 안내합니다.
 
@@ -212,7 +220,7 @@ sh codex-remote.sh status
 sh codex-remote.sh disable
 ```
 
-인수 없는 실행은 status입니다. disable은 원격 제어·자동 시작을 해제하며 daemon 전체를 중지하지 않습니다. 제한된 unmanaged 복구는 `sh codex-remote.sh repair`로 분리했습니다. 기존 install.sh 원격 옵션은 호환 경로로 유지합니다.
+인수 없는 실행은 status입니다. disable은 원격 제어·자동 시작을 해제하며 daemon 전체를 중지하지 않습니다. 제한된 unmanaged 복구는 `sh codex-remote.sh repair`로 분리했습니다. 원격 기능의 설정·확인·복구는 이 스크립트에서만 수행합니다.
 
 ## OpenCode V2와 컨텍스트
 

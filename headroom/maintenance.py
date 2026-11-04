@@ -275,7 +275,7 @@ def port_open():
         return False
 
 
-def inspect():
+def inspect(require_owned=True):
     for name, expected in (("HEADROOM_WORKSPACE_DIR", HOME / ".headroom"),
                            ("HEADROOM_CONFIG_DIR", HOME / ".headroom/config")):
         if os.environ.get(name) and Path(os.environ[name]).expanduser() != expected:
@@ -299,7 +299,7 @@ def inspect():
     owned = owned_service()
     registered, active = service_state() if owned else (False, False)
     mcps = {pid: identity for pid, identity in snapshot.items() if owned_mcp(identity[1])}
-    if not owned and not mcps:
+    if require_owned and not owned and not mcps:
         fail("No safely identifiable kit service or MCP server can be stopped. Close the reported process with its owning application.")
     return owned, registered, active, mcps
 
@@ -322,8 +322,8 @@ def stop_service():
     fail("Headroom did not stop in time; its environment was preserved.")
 
 
-def pause(record):
-    _, _, active, mcps = inspect()
+def pause(record, allow_idle=False):
+    _, _, active, mcps = inspect(require_owned=not allow_idle)
     record = Path(record)
     safe_path(record)
     record.write_text(json.dumps({"profile": PROFILE, "resume_service": active,
@@ -389,7 +389,7 @@ def resume(record):
             result = command(["systemctl", "--user", "start", SERVICE])
         if result.returncode:
             fail("The previous Headroom service could not be resumed; its files and recovery record were preserved.")
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + 180
     while time.monotonic() < deadline:
         if ready():
             print("Resumed the previous kit Headroom service.")
@@ -413,6 +413,8 @@ def main():
         inspect()
     elif action == "pause":
         pause(args[0])
+    elif action == "quiesce":
+        pause(args[0], allow_idle=True)
     elif action == "profile":
         safe_path(Path(args[0]))
         select_profile(json.loads(Path(args[0]).read_text()).get("profile"))

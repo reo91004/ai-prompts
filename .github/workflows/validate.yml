@@ -70,12 +70,14 @@ jobs:
           bash tests/test_cli_bootstrap.sh
           python3 tests/test_codex_remote.py
           python3 tests/test_codex_startup.py
+          python3 tests/test_codex_remote_entrypoint.py
       - name: Test session dispatch and persistent runtime ownership
         run: |
           python3 tests/test_install_busy_guard.py
           python3 tests/test_headroom_maintenance.py
           python3 tests/test_headroom_dispatch.py
           python3 tests/test_headroom_runtime.py
+          python3 tests/test_headroom_readiness.py
           python3 tests/test_headroom_legacy.py
       - name: Check patch whitespace
         run: |

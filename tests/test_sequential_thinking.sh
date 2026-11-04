@@ -11,6 +11,8 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 source "$ROOT/install.sh"
 source "$ROOT/scripts/sequential_thinking.sh"
 KIT_BACKUP_DIR="$WORK/evidence"
+KIT_WORK_DIR="$KIT_BACKUP_DIR/work"
+mkdir -p "$KIT_WORK_DIR"
 KIT_HEADROOM_PYTHON="$TEST_MCP_PYTHON"
 KIT_NPX="$WORK/fixture-npx"
 mkdir -p "$KIT_BACKUP_DIR"
@@ -71,7 +73,7 @@ prepare_sequential_thinking
 [ "$SEQUENTIAL_THINKING_NODE_REQUIREMENT" = '>=24' ]
 grep -Fqx -- '-y @modelcontextprotocol/server-sequential-thinking@2.0.0' "$WORK/server-calls"
 node -e 'const d=require(process.argv[1]);if(d.server_name!=="fixture-sequential-thinking"||d.tool!=="sequentialthinking")process.exit(1);' \
-  "$KIT_BACKUP_DIR/sequential-thinking-check.json"
+  "$KIT_WORK_DIR/sequential-thinking-check.json"
 MOCK_SEQ_VERSION=2.0.1
 prepare_sequential_thinking
 [ "$(wc -l < "$WORK/downloads")" -eq 1 ]

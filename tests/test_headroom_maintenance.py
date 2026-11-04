@@ -82,6 +82,19 @@ class MaintenanceTests(unittest.TestCase):
         command = str(root / "uv-tools/headroom-ai/bin/python3") + " " + str(root / "bin/headroom") + " mcp serve"
         self.table[pid] = ("Wed Sep 9 10:00:00 2026", command)
 
+    def test_rollback_quiesce_accepts_already_cleaned_new_install(self):
+        maintenance.pause(self.record, allow_idle=True)
+        self.assertFalse(json.loads(self.record.read_text())["resume_service"])
+        self.assertEqual(self.events, [])
+
+    def test_rollback_quiesce_stops_mcp_reconnected_during_install(self):
+        self.seed_service()
+        self.add_mcp(246)
+        maintenance.pause(self.record, allow_idle=True)
+        self.assertNotIn(246, self.table)
+        self.assertFalse(self.active)
+        self.assertTrue(json.loads(self.record.read_text())["resume_service"])
+
     def test_opencode_process_detection_matches_entrypoints_only(self):
         entries = [
             str(maintenance.HOME / ".opencode/bin/opencode") + " serve --service",

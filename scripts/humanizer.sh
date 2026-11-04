@@ -113,7 +113,7 @@ prepare_humanizer() {
     HUMANIZER_PREPARED=1
     return 0
   fi
-  stage="$(mktemp -d "$KIT_BACKUP_DIR/humanizer.XXXXXX")" || kit_die "Could not create the Humanizer staging directory."
+  stage="$(mktemp -d "$KIT_WORK_DIR/humanizer.XXXXXX")" || kit_die "Could not create the Humanizer staging directory."
   checkout="$stage/repository"
   prepared="$stage/prepared"
   mkdir -p "$prepared/skill" || kit_die "Could not create the Humanizer bundle directory."

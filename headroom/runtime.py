@@ -28,6 +28,8 @@ import urllib.request
 PROFILE = "research-agent-kit"
 PORT = 8787
 BASE_URL = f"http://127.0.0.1:{PORT}"
+READY_TIMEOUT = 180
+READINESS_FAILED = False
 HOME = Path.home()
 KIT = HOME / ".universal-research-agent-kit"
 STATE = KIT / "headroom.json"
@@ -93,21 +95,78 @@ def environment(distribution, version):
 
 
 def headroom(*args, capture=False):
-    return subprocess.run(
-        [sys.executable, "-B", "-m", "headroom.cli", *args],
-        check=True, text=True, stdout=subprocess.PIPE if capture else None,
-        timeout=90,
-    )
+    command = [sys.executable, "-B", "-m", "headroom.cli", *args]
+    applying = args[:2] == ("install", "apply")
+    if applying:
+        command = [sys.executable, "-I", "-B", str(Path(__file__).resolve()), "apply", *args]
+    for attempt in range(2):
+        try:
+            return subprocess.run(command, check=True, text=True,
+                                  stdout=subprocess.PIPE if capture else None, timeout=READY_TIMEOUT + 120)
+        except subprocess.CalledProcessError as error:
+            if (not applying or error.returncode != 75 or attempt
+                    or (DEPLOY / "manifest.json").exists() or port_open()):
+                raise
+            print("Headroom startup failed; retrying once after upstream cleanup.", file=sys.stderr)
 
 
-def probe(endpoint):
+def probe(endpoint, *, allow_unready=False):
     # A host-local readiness probe must not use the user's outbound HTTP proxy.
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         with opener.open(BASE_URL + endpoint, timeout=3) as response:
             return json.load(response)
+    except urllib.error.HTTPError as error:
+        if allow_unready and error.code == 503:
+            try:
+                return json.load(error)
+            except (OSError, ValueError):
+                pass
+        return None
     except (OSError, ValueError, urllib.error.URLError):
         return None
+
+
+def wait_ready(deployment, timeout_seconds=READY_TIMEOUT, *, require_identity=False):
+    # Cold model startup and upstream connectivity checks can exceed upstream's 45s limit.
+    from headroom.install.runtime import runtime_status
+    global READINESS_FAILED
+
+    deadline = time.monotonic() + max(timeout_seconds, READY_TIMEOUT)
+    health = readiness = None
+    while time.monotonic() < deadline:
+        health = probe("/health")
+        readiness = probe("/readyz", allow_unready=True)
+        if (isinstance(health, dict) and isinstance(readiness, dict)
+                and health.get("deployment", {}).get("profile") == deployment.profile
+                and readiness.get("ready") is True
+                and (not require_identity or runtime_status(deployment) == "running")):
+            return True
+        time.sleep(1)
+    checks = readiness.get("checks", {}) if isinstance(readiness, dict) else {}
+    failed = [name for name in ("startup", "http_client", "cache", "rate_limiter", "memory", "upstream")
+              if isinstance(checks.get(name), dict) and checks[name].get("ready") is False
+              and not checks[name].get("optional", False)]
+    detail = "Unready checks: " + ", ".join(failed) if failed else "Readiness or deployment identity was not confirmed."
+    # Do not echo upstream error strings: they can contain credentials or private URLs.
+    print(f"Headroom readiness timed out. {detail} Service log: {DEPLOY / 'runner.log'}", file=sys.stderr)
+    READINESS_FAILED = True
+    return False
+
+
+def apply_with_readiness(args):
+    from headroom.cli import install as cli_install, main as cli
+    global READINESS_FAILED
+
+    READINESS_FAILED = False
+    cli_install.wait_ready = wait_ready
+    try:
+        cli(args=list(args), prog_name="headroom")
+    except SystemExit as error:
+        # Only transient startup failures qualify for a second apply; ownership/auth errors do not.
+        if error.code and READINESS_FAILED:
+            raise SystemExit(75) from error
+        raise
 
 
 def port_open():
@@ -547,11 +606,17 @@ def start_service():
     # Its supervisor API only starts the already-installed host service.
     from headroom.install.state import load_manifest
     from headroom.install.supervisors import start_supervisor
-    from headroom.install.runtime import wait_ready
     deployment = load_manifest(PROFILE)
-    start_supervisor(deployment)
-    if not wait_ready(deployment, timeout_seconds=45):
-        fail("Headroom did not become ready after service start.")
+    for attempt in range(2):
+        health = probe("/health")
+        if health and health.get("deployment", {}).get("profile") != PROFILE:
+            fail("Another deployment is listening; automatic service restart refused.")
+        start_supervisor(deployment)
+        if wait_ready(deployment, require_identity=True):
+            return
+        if not attempt:
+            print("Headroom is not ready; restarting the owned service once.", file=sys.stderr)
+    fail("Headroom did not become ready after service start and one automatic retry.")
 
 
 def remove_service():
@@ -822,6 +887,8 @@ def main():
         check_opencode_config(json.load(sys.stdin))
     elif action == "install":
         install()
+    elif action == "apply":
+        apply_with_readiness(args)
     elif action == "check":
         check()
     elif action == "remove":
