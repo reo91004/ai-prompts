@@ -3,7 +3,7 @@
   "update": "notify",
   "share": "disabled",
   "skills": [],
-  "plugins": ["opencode-latex@0.2.0"],
+  "plugins": ["opencode-latex@0.2.0", "github:rndmcnlly/opencode-monitor#main"],
   "compaction": {
     "auto": true,
     "buffer": "20%"

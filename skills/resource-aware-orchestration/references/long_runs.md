@@ -13,7 +13,7 @@ In Codex, direct background terminals require a later session wait or `write_std
 
 In OpenCode V2, prefer its native background-shell/job lifecycle for one long command. Preserve the job identity, durable log, checkpoint, and completion artifacts; use the supported wait/completion path at the dependency boundary. Verify exit status and artifacts after an event. An external event file does not establish that the active agent received a notification.
 
-Use an optional Monitor plugin for ongoing event streams after its installed-version server/TUI compatibility and event delivery are verified. Put observation, not the experiment itself, under a monitor whose stop/timeout cleans up its process tree. Observer timeout is not experiment failure. If event delivery is unavailable, use a supported blocking worker/job wait and record that limitation. Preserve ownership across compaction/handover and follow the recorded resume rule rather than launching duplicate work.
+The kit registers `github:rndmcnlly/opencode-monitor#main` by default. For ongoing event streams, use native `shell` with `background: true, monitor: true` after verifying event delivery in the installed version. Filter output to decisive events. Put observation, not the experiment itself, under a log-watching command whose stop/timeout cleans up its process tree. Observer timeout is not experiment failure. If event delivery is unavailable, use a supported blocking worker/job wait and record that limitation. Preserve ownership across compaction/handover and follow the recorded resume rule rather than launching duplicate work.
 
 ## Run scope and cancellation
 

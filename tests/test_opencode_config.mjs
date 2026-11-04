@@ -139,6 +139,9 @@ test("prepare stages files; check reports effective customizations without mutat
     cpSync(prepared.prepared.state, statePath);
     assert.equal(statSync(statePath).mode & 0o777, 0o600);
     assert.equal(run("check").status, "configured");
+    const installedServer = readFileSync(join(configDir, "opencode.jsonc"), "utf8");
+    const repeated = run("prepare", ["--output-dir", outputDir]);
+    assert.equal(readFileSync(repeated.prepared["opencode.jsonc"], "utf8"), installedServer);
     const cli = parseConfig(parser, readFileSync(join(configDir, "cli.json"), "utf8"));
     cli.session.thinking = "show";
     writeFileSync(join(configDir, "cli.json"), JSON.stringify(cli));
@@ -149,9 +152,12 @@ test("prepare stages files; check reports effective customizations without mutat
     assert.deepEqual(readdirSync(configDir).map((name) => [name, readFileSync(join(configDir, name), "utf8")]), before);
     const effective = run("effective");
     assert.ok(effective.providers.custom.models.one);
-    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context"), "opencode-latex@0.2.0",
+    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context"), "opencode-latex@0.2.0", "github:rndmcnlly/opencode-monitor#main",
       { package: "/kit/headroom", options: { proxyUrl: "http://127.0.0.1:8787" } }]);
     assert.equal(effective.compaction.buffer, "20%");
+    const removed = run("remove", ["--output-dir", outputDir]);
+    assert.deepEqual(parseConfig(parser, readFileSync(removed.prepared["opencode.jsonc"], "utf8")).plugins, []);
+    assert.equal(readFileSync(join(configDir, "opencode.json"), "utf8"), original);
     writeFileSync(extraPath, "invalid");
     assert.throws(() => run("prepare", ["--output-dir", outputDir]), /Invalid JSONC/);
   } finally {

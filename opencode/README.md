@@ -37,7 +37,9 @@ Kitty/SIXEL terminals support graphical output; other terminals use Unicode cell
 
 Headroom's official V2 plugin is read from the installed Python wheel and uses the kit's persistent proxy. Retrieval and the local Headroom MCP are configured through that same deployment. Configuration checks verify directory entrypoints, proxy and MCP paths. OpenAI chat/responses, Anthropic Messages, and the `claude-agent` subprocess are distinct request routes; report only the routes actually tested.
 
-Single long-running jobs use native durable/background execution with terminal evidence. A log match or plugin notification prompts verification of exit status and artifacts. Monitor is an optional event-stream component and needs its own version-specific compatibility check. Its observer lifetime is separate from the experiment process.
+The installer registers [opencode-monitor](https://github.com/rndmcnlly/opencode-monitor) from its `main` branch by default; OpenCode downloads it on startup. Run a native `shell` command with `background: true, monitor: true` to deliver output lines to the agent while the command runs. Filter experiment logs to decisive events such as completion or failure so routine progress does not repeatedly interrupt the agent. Native background jobs also report completion. After a notification, verify the exit status and expected artifacts before continuing dependent work. Keep an experiment separate from any log-watching command whose timeout or cancellation stops its process tree.
+
+Installation and server activation were checked with OpenCode 2.2.5 and upstream commit `6bdb284bcf983da82546d08d852e21005256ee80`. The upstream output-delivery tests passed; live experiment notifications have not been verified.
 
 ## BTW History
 
