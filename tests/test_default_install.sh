@@ -213,6 +213,9 @@ assert_defaults() {
   "$KIT_TEST_PYTHON" -I -B "$ROOT/scripts/context_defaults.py" check "$ROOT/codex/context.toml" "$HOME/.codex/config.toml"
   [ -s "$HOME/.config/opencode/cli.json" ] && [ -s "$HOME/.config/opencode/opencode.jsonc" ]
   [ -s "$HOME/.config/opencode/research-agent-kit/context/index.js" ]
+  diff -qr "$ROOT/opencode/plugins/openai-websocket" "$HOME/.config/opencode/research-agent-kit/openai-websocket"
+  node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),expected=process.argv[2]+"/research-agent-kit/openai-websocket",plugins=p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins;if(plugins.filter(x=>x===expected).length!==1)process.exit(1)' \
+    "$HOME/.config/opencode/opencode.jsonc" "$HOME/.config/opencode"
   node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER);if(!p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins.includes("opencode-latex@0.2.0"))process.exit(1)' "$HOME/.config/opencode/opencode.jsonc"
   node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),expected=process.argv[2]+"/.opencode/plugins",plugins=p.parse(fs.readFileSync(process.argv[1],"utf8")).plugins;if(plugins.filter(x=>x===expected).length!==1||!fs.existsSync(expected+"/index.js"))process.exit(1)' \
     "$HOME/.config/opencode/opencode.jsonc" "$HOME/.universal-research-agent-kit/marketplaces/ponytail-$PONYTAIL_REVISION/ponytail"
@@ -282,6 +285,11 @@ cp "$HOME/.config/opencode/opencode.jsonc" "$WORK/opencode-before.jsonc"
 node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),f=process.argv[1],d=p.parse(fs.readFileSync(f,"utf8"));d.plugins=d.plugins.filter(x=>typeof x!=="string"||!x.includes("/ponytail/.opencode/plugins"));fs.writeFileSync(f,JSON.stringify(d));' "$HOME/.config/opencode/opencode.jsonc"
 expect_failure bash "$ROOT/install.sh" --verify
 grep -Fq 'Missing or overridden OpenCode integration: Ponytail' "$WORK/expected-failure.log"
+mv "$WORK/opencode-before.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+cp "$HOME/.config/opencode/opencode.jsonc" "$WORK/opencode-before.jsonc"
+node -e 'const fs=require("fs"),p=require(process.env.KIT_TEST_JSONC_PARSER),f=process.argv[1],d=p.parse(fs.readFileSync(f,"utf8"));d.plugins=d.plugins.filter(x=>typeof x!=="string"||!x.endsWith("/research-agent-kit/openai-websocket"));fs.writeFileSync(f,JSON.stringify(d));' "$HOME/.config/opencode/opencode.jsonc"
+expect_failure bash "$ROOT/install.sh" --verify
+grep -Fq 'Missing or overridden OpenCode integration: OpenAI WebSocket rotation' "$WORK/expected-failure.log"
 mv "$WORK/opencode-before.jsonc" "$HOME/.config/opencode/opencode.jsonc"
 ponytail_entrypoint="${kit_manifests[0]%/.claude-plugin/plugin.json}/.opencode/plugins/index.js"
 mv "$ponytail_entrypoint" "$WORK/ponytail-entrypoint.js"

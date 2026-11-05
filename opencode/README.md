@@ -9,6 +9,7 @@
 | cli.json | The configuration directory's cli.json |
 | opencode.jsonc | The configuration directory's opencode.jsonc |
 | plugins/research-context/ | The configuration directory's research-agent-kit/context/ |
+| plugins/openai-websocket/ | The configuration directory's research-agent-kit/openai-websocket/ |
 | Shared research skills and Humanizer | `~/.agents/skills/`, discovered natively |
 | Ponytail (default integration profile) | `~/.universal-research-agent-kit/marketplaces/ponytail-<revision>/ponytail/.opencode/plugins/` |
 
@@ -23,6 +24,22 @@ Native build/plan agents remain available. context-explorer and research-reviewe
 The context plugin sets chat-model context/input metadata to 1,000,000 tokens without replacing provider/model IDs, variants, output limits, or credentials. `compaction.auto=true` and `buffer="20%"` give an 800,000-token compaction ceiling. This is a harness policy; it does not expand a provider's actual supported context.
 
 Ponytail uses the same downloaded revision as Codex and Claude Code. Its V2 plugin injects the rules on each turn and registers `/ponytail` and the companion commands and skills. The upstream default is `full`; an existing saved level or `off` is preserved. Use `/ponytail full` to enable it again. Installation and `--verify` check the V2 entrypoint and configuration registration. Reinstallation replaces an older Ponytail registration in place to avoid duplicate plugin IDs. `--integrations none` removes the kit registration and restores any registration that preceded it.
+
+## OpenAI WebSocket Lifetime
+
+Default installation registers a bundled V2 plugin that opens a fresh WebSocket for every model request to the `openai` provider's `/responses` endpoint, including custom base URLs. It assigns a fresh `x-opencode-ws-step-id` handshake header; OpenCode includes handshake headers in its connection reuse key. The existing `x-client-request-id` and authentication headers are preserved. Other provider IDs and HTTP requests are outside this policy.
+
+This provides the per-request rotation behavior of `WEBSOCKET_ROTATE_AFTER_MS = 0` while retaining the official CLI binary. OpenCode's public `experimental.ws.handshake` hook runs before connection selection. Rotation uses its existing cleanup and full-history replay, without interrupting the preceding response. Installation and `--verify` check the plugin files and registration; a removed or overridden registration fails verification. The policy is independent of the Ponytail integration profile.
+
+[OpenAI documents a 60-minute connection lifetime](https://developers.openai.com/api/docs/guides/websocket-mode). Starting each response on a fresh connection avoids spending part of that lifetime on earlier requests. Connection setup and replaying full history can increase latency and network traffic. A single response lasting over 60 minutes and unexplained close-code `1000` failures remain outside this workaround.
+
+The hook and connection behavior were checked against official OpenCode 2.2.5. The isolated localhost smoke test compares two requests without the plugin to two with it, checks connection counts, and verifies replayed history. Run it with Bun and an unmodified official binary:
+
+```bash
+bun tests/smoke_opencode_websocket.mjs /path/to/official/opencode
+```
+
+This test uses a simulated provider and no real account. Later OpenCode releases can change this experimental hook; macOS runtime behavior and real OpenAI latency are not established by the Linux fixture.
 
 ## LaTeX
 

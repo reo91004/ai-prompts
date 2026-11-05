@@ -11,6 +11,7 @@ verify_platform_additions() {
     check_same_file "$source" "$KIT_OPENCODE_CONFIG_DIR/agents/${source##*/}"
   done
   check_same_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
+  check_same_dir "$ROOT/opencode/plugins/openai-websocket" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket"
   if [ -n "${HUMANIZER_REVISION:-}" ] && [ "$HUMANIZER_REVISION" != - ]; then
     verify_humanizer_source "$HUMANIZER_REVISION" "$HUMANIZER_CONTENT_SHA256" "$HUMANIZER_SOURCE" || { echo "Humanizer source provenance failed."; missing=1; }
     for target in "$HOME/.agents/skills/humanizer" "$HOME/.claude/skills/humanizer"; do
@@ -41,6 +42,9 @@ verify_platform_additions() {
       if prepare_opencode_fragments "$verify_dir"; then
         if config_result="$(opencode_config_run check)"; then
           printf '%s\n' "$config_result"
+          if printf '%s' "$config_result" | node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(0,"utf8")).overrides.includes("opencode.jsonc:plugins:"+process.argv[1])?0:1)' "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket"; then
+            echo "Missing or overridden OpenCode integration: OpenAI WebSocket rotation"; missing=1
+          fi
           if [ "$(read_state requested_profile)" = ponytail ] &&
               printf '%s' "$config_result" | node -e 'const fs=require("fs");process.exit(JSON.parse(fs.readFileSync(0,"utf8")).overrides.includes("opencode.jsonc:plugins:@dietrichgebert/ponytail")?0:1)'; then
             echo "Missing or overridden OpenCode integration: Ponytail"; missing=1

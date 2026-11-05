@@ -84,6 +84,8 @@ install_opencode_core() {
   kit_require_real_dir "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit"
   kit_backup_path "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context" "opencode/context"
   kit_replace_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
+  kit_backup_path "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket" "opencode/openai-websocket"
+  kit_replace_dir "$ROOT/opencode/plugins/openai-websocket" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket"
   reset_legacy_skill_root "$KIT_OPENCODE_CONFIG_DIR/skills" "" opencode-legacy-skills
   reset_legacy_skill_root "$HOME/.opencode/skills" "" opencode-v1-legacy-skills
 }

@@ -65,6 +65,8 @@ jobs:
         run: bash tests/test_tooling_install.sh
       - name: Test complete default installation with mock CLIs
         run: bash tests/test_default_install.sh
+      - name: Test OpenAI WebSocket rotation plugin
+        run: node --test tests/test_opencode_websocket.mjs
       - name: Test CLI bootstrap and explicit Remote Control
         run: |
           bash tests/test_cli_bootstrap.sh

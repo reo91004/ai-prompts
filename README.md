@@ -33,6 +33,7 @@ Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, U
 
 - Graphify(`graphifyy`), Headroom(`headroom-ai[all]`), uv는 설치할 때마다 PyPI의 최신 릴리스를 사용하고, Python 3.13과 함께 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. `[all]`에는 proxy 의존성이 포함되며, 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
 - Ponytail은 설치 시 확인한 원격 HEAD의 소스를 세 플랫폼에 사용합니다. OpenCode에는 같은 소스의 V2 plugin을 등록하고 진입점과 설정을 검증합니다. 기본 모드는 `full`이며 기존에 저장한 모드나 `off`는 유지하므로, 꺼 둔 경우 `/ponytail full`로 켤 수 있습니다. Codex·Claude의 사용자 소유 marketplace는 보존하면서 설치·활성 상태를 별도로 확인합니다. 누락된 plugin은 설치하고, Claude의 비활성 plugin은 활성화합니다. Codex의 비활성 plugin은 설정에서 활성화해야 한다는 오류로 중단합니다.
+- OpenCode에는 OpenAI Responses의 매 모델 요청마다 새 WebSocket을 여는 플러그인도 기본 등록합니다. 공식 CLI를 유지하면서 요청 전 handshake 헤더를 바꿔 연결을 교체하므로, 소스의 `WEBSOCKET_ROTATE_AFTER_MS = 0`과 같은 재연결 동작을 적용합니다. 적용 범위는 `openai` provider의 `/responses` WebSocket 요청입니다. 연결·전체 이력 재전송 비용이 늘 수 있으며, 응답 하나가 60분을 넘는 경우나 원인 미확정 종료 코드 `1000`의 해결을 보장하지 않습니다. [구현과 검증 범위](opencode/README.md#openai-websocket-lifetime)를 참고하세요.
 - Sequential Thinking은 키트 이름인 Codex `sequential_thinking`, Claude `sequential-thinking`으로 `@modelcontextprotocol/server-sequential-thinking@latest`를 등록합니다. 다른 이름의 사용자 MCP는 변경하지 않습니다.
 - Codex의 `features.context_management.experimental_mode = true` 설정을 병합합니다. 이외의 모델·추론 설정은 유지합니다. 지원하지 않는 TOML 형태는 원본 교체 전에 오류로 중단합니다.
 - Headroom은 호스트의 `127.0.0.1:8787`에서 상시 실행하며 Codex의 전역 provider와 두 CLI의 셸 분기를 구성합니다. 세션마다 설정 파일을 임시로 바꾸지 않습니다. 아래 사용 표를 참고하세요.

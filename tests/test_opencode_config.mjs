@@ -167,7 +167,7 @@ test("prepare stages files; check reports effective customizations without mutat
     assert.deepEqual(readdirSync(configDir).map((name) => [name, readFileSync(join(configDir, name), "utf8")]), before);
     const effective = run("effective");
     assert.ok(effective.providers.custom.models.one);
-    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context"), "opencode-latex@0.2.0", "github:rndmcnlly/opencode-monitor#main",
+    assert.deepEqual(effective.plugins, ["user-base", join(configDir, "research-agent-kit/context"), join(configDir, "research-agent-kit/openai-websocket"), "opencode-latex@0.2.0", "github:rndmcnlly/opencode-monitor#main",
       { package: "/kit/headroom", options: { proxyUrl: "http://127.0.0.1:8787" } }]);
     assert.equal(effective.compaction.buffer, "20%");
     const removed = run("remove", ["--output-dir", outputDir]);

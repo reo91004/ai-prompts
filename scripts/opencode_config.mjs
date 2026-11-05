@@ -203,7 +203,7 @@ export async function main(args) {
     const plugins = [...pluginArray(desiredServer.plugins), ...pluginArray(extra.plugins)];
     desiredServer = { ...mergeObjects(desiredServer, extra), plugins };
   }
-  desiredServer.plugins = [join(configDir, "research-agent-kit/context"), ...pluginArray(desiredServer.plugins)];
+  desiredServer.plugins = [join(configDir, "research-agent-kit/context"), join(configDir, "research-agent-kit/openai-websocket"), ...pluginArray(desiredServer.plugins)];
   const result = { status: "configured", overrides: [], prepared: {} };
   const nextState = { version: 1, configDir, files: {} };
   for (const [filename, desired, label] of [["cli.json", desiredCli, "cli"], ["opencode.jsonc", desiredServer, "server"]]) {
