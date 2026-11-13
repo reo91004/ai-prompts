@@ -5,6 +5,13 @@ set -euo pipefail
 : "${BTWP_SOURCE:?Set the isolated upstream source checkout path}"
 : "${BTWP_PACKAGE:?Set the prepared compatibility package path}"
 : "${BTWP_EVIDENCE_DIR:?Set the test evidence output directory}"
+export BTWP_OPENCODE_VERSION="${BTWP_OPENCODE_VERSION:-2.2.5}"
+case "$BTWP_OPENCODE_VERSION" in
+  2.2.5) export BTWP_OPENTUI_VERSION=0.8.0 ;;
+  2.2.7) export BTWP_OPENTUI_VERSION=0.8.1 ;;
+  *) echo "Unsupported BTW test host: $BTWP_OPENCODE_VERSION" >&2; exit 1 ;;
+esac
+node "$(dirname "${BASH_SOURCE[0]}")/../opencode/plugins/btw-plus-compat/patch.mjs" --check "$BTWP_PACKAGE" "$BTWP_OPENCODE_VERSION"
 
 [ "$("$BTWP_BUN" --version)" = 1.4.4 ] || { echo "Expected Bun 1.4.4" >&2; exit 1; }
 [ "$(git -C "$BTWP_SOURCE" rev-parse HEAD)" = 872e7df67b8476ebc44626fd7b79178d854c3c41 ] || {
@@ -21,7 +28,7 @@ import { resolve } from "node:path"
 import { ensurePluginRuntime, provides } from "@opencode/plugin/runtime"
 import { Plugin, PluginContextProvider, usePlugin } from "@opencode/plugin/tui"
 import { ensureRuntimePluginSupport } from "@opentui/solid/runtime-plugin-support/configure"
-for (const [name, expected] of [["@opencode/plugin", "2.2.5"], ["@opentui/core", "0.8.0"], ["@opentui/solid", "0.8.0"], ["solid-js", "1.9.17"]]) {
+for (const [name, expected] of [["@opencode/plugin", process.env.BTWP_OPENCODE_VERSION], ["@opentui/core", process.env.BTWP_OPENTUI_VERSION], ["@opentui/solid", process.env.BTWP_OPENTUI_VERSION], ["@opentui/keymap", process.env.BTWP_OPENTUI_VERSION], ["solid-js", "1.9.17"]]) {
   const actual = JSON.parse(readFileSync(resolve(import.meta.dir, "../node_modules", name, "package.json"), "utf8")).version
   if (actual !== expected) throw new Error(`Expected ${name}@${expected}, found ${actual}`)
 }

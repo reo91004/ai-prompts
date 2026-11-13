@@ -15,17 +15,22 @@ export const UPSTREAM = {
 };
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+const HOSTS = {
+  "2.2.5": { opentui: "0.8.0", lock: "runtime-package-lock.json" },
+  "2.2.7": { opentui: "0.8.1", lock: "runtime-2.2.7-package-lock.json" },
+};
 
 export function verifyInstalled(directory, hostVersion) {
-  if (hostVersion.replace(/^v/, "") !== "2.2.5") throw new Error("Unverified BTW host version");
+  hostVersion = hostVersion.replace(/^v/, "");
+  if (!Object.hasOwn(HOSTS, hostVersion)) throw new Error("Unverified BTW host version");
   const provenance = JSON.parse(readFileSync(join(directory, "UPSTREAM.json"), "utf8"));
   for (const [key, value] of Object.entries(UPSTREAM)) {
     if (provenance[key] !== value) throw new Error(`BTW provenance differs: ${key}`);
   }
-  if (provenance.host?.opencode !== "2.2.5" || provenance.host?.opentui !== "0.8.0") throw new Error("BTW host provenance differs");
+  if (provenance.host?.opencode !== hostVersion || provenance.host?.opentui !== HOSTS[hostVersion].opentui) throw new Error("BTW host provenance differs");
   if (sha256(readFileSync(join(directory, "dist/tui.js"))) !== UPSTREAM.patchedSha256) throw new Error("BTW compatibility bundle differs");
   const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
-  const lock = JSON.parse(readFileSync(fileURLToPath(new URL("./runtime-package-lock.json", import.meta.url)), "utf8"));
+  const lock = JSON.parse(readFileSync(fileURLToPath(new URL(HOSTS[hostVersion].lock, import.meta.url)), "utf8"));
   const expected = lock.packages[""].dependencies;
   if (manifest.name !== lock.name || manifest.version !== lock.version || manifest.exports?.["./tui"] !== "./dist/tui.js" ||
       Object.keys(manifest.dependencies ?? {}).length !== Object.keys(expected).length) throw new Error("BTW package identity differs");
@@ -38,7 +43,8 @@ export function verifyInstalled(directory, hostVersion) {
 }
 
 export function prepare(sourceDirectory, outputDirectory, hostVersion) {
-  if (hostVersion.replace(/^v/, "") !== "2.2.5") throw new Error("BTW compatibility patch is verified only for OpenCode 2.2.5");
+  hostVersion = hostVersion.replace(/^v/, "");
+  if (!Object.hasOwn(HOSTS, hostVersion)) throw new Error("BTW compatibility patch is verified only for OpenCode 2.2.5 and 2.2.7");
   const source = realpathSync(sourceDirectory);
   const output = resolve(outputDirectory);
   const inside = relative(source, output);
@@ -53,7 +59,7 @@ export function prepare(sourceDirectory, outputDirectory, hostVersion) {
   const patched = original.replace(before, "generateSyntax(context.theme, context.renderer.nativeScene)");
   if (sha256(patched) !== UPSTREAM.patchedSha256) throw new Error("Unexpected compatibility bundle hash");
   const license = readFileSync(join(source, "LICENSE"));
-  const lockfile = readFileSync(fileURLToPath(new URL("./runtime-package-lock.json", import.meta.url)));
+  const lockfile = readFileSync(fileURLToPath(new URL(HOSTS[hostVersion].lock, import.meta.url)));
   const generatedManifest = {
     name: "research-agent-kit-btw-plus-compat",
     version: "0.1.3-kit.1",
@@ -61,12 +67,12 @@ export function prepare(sourceDirectory, outputDirectory, hostVersion) {
     type: "module",
     license: "MIT",
     exports: { "./tui": "./dist/tui.js" },
-    dependencies: { "@opencode/theme": "2.2.5", "string-width": "7.2.0" },
+    dependencies: JSON.parse(lockfile).packages[""].dependencies,
   };
   const provenance = {
     ...UPSTREAM,
-    host: { opencode: "2.2.5", opentui: "0.8.0" },
-    change: "Pass the renderer nativeScene to the OpenCode 2.2.5 theme helper for owned syntax-style resources.",
+    host: { opencode: hostVersion, opentui: HOSTS[hostVersion].opentui },
+    change: "Pass the renderer nativeScene to the OpenCode theme helper for owned syntax-style resources.",
   };
   mkdirSync(join(output, "dist"), { recursive: true });
   writeFileSync(join(output, "dist/tui.js"), patched);

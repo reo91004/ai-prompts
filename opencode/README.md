@@ -65,7 +65,7 @@ Installation and server activation were checked with OpenCode 2.2.5 and upstream
 
 The CLI uses a local compatibility package built from `opencode-btw-plus@0.1.3`, with the built-in `opencode.btw` disabled. `/btw question` saves a new question/answer and `/btw` reopens the session's saved history. It does not import past built-in BTW answers. TUI-host storage is plain JSON and is preserved across kit updates, outside skill cleanup.
 
-The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](plugins/btw-plus-compat/README.md) supplies the syntax-style resource owner and theme 2.2.5. The patched package passed host-matched headless UI checks; full-app/real-model execution is a separate scope. Unknown source hashes or host versions fail before activation.
+The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](plugins/btw-plus-compat/README.md) supplies the syntax-style resource owner and a host-specific theme lockfile for OpenCode 2.2.5 and 2.2.7. The patched package passed host-matched headless UI checks; full-app/real-model execution is a separate scope. Unknown source hashes or host versions fail before activation.
 
 ## Crucible Research Loop
 
