@@ -35,15 +35,16 @@ async def check():
                 # Keep the deadline inside the transport contexts so normal
                 # EOF/terminate process-tree cleanup runs after a timeout.
                 with anyio.fail_after(timeout):
-                    initialized = await session.initialize()
+                    # Protocol aliases stay stable across MCP SDK field-name changes.
+                    server_info = (await session.initialize()).model_dump(by_alias=True)["serverInfo"]
                     result = await session.list_tools()
                     tool = next((item for item in result.tools if item.name == "sequentialthinking"), None)
-                    if tool is None or "thought" not in tool.inputSchema.get("properties", {}):
+                    if tool is None or "thought" not in tool.model_dump(by_alias=True)["inputSchema"].get("properties", {}):
                         raise ValueError("The server did not expose the sequentialthinking tool schema")
                     print(json.dumps({
                         "package": package,
-                        "server_name": initialized.serverInfo.name,
-                        "server_version": initialized.serverInfo.version,
+                        "server_name": server_info["name"],
+                        "server_version": server_info["version"],
                         "tool": tool.name,
                     }))
 

@@ -28,7 +28,7 @@ import time
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool
+from mcp.types import ListToolsResult, PaginatedRequestParams, Tool
 
 mode = Path(sys.argv[1]).read_text().strip()
 if mode == "timeout":
@@ -39,11 +39,19 @@ if mode == "timeout":
 server = Server("fixture-sequential-thinking", version="fixture-server")
 
 
-@server.list_tools()
 async def tools():
     return [Tool(name="missing" if mode == "missing" else "sequentialthinking", inputSchema={
-        "type": "object", "properties": {"thought": {"type": "string"}}
+        "type": "object", "properties": {} if mode == "missing-schema" else {"thought": {"type": "string"}}
     })]
+
+
+if hasattr(server, "list_tools"):
+    server.list_tools()(tools)
+else:
+    async def list_tools(context, params):
+        return ListToolsResult(tools=await tools())
+
+    server.add_request_handler("tools/list", PaginatedRequestParams, list_tools)
 
 
 async def main():
@@ -94,6 +102,9 @@ grep -Fq 'Unsupported Sequential Thinking Node engine requirement' "$WORK/engine
 printf 'missing\n' > "$WORK/mode"
 if (SEQUENTIAL_THINKING_PREPARED=0 prepare_sequential_thinking) > "$WORK/missing-tool.log" 2>&1; then exit 1; fi
 grep -Fq 'did not initialize and expose its tool' "$WORK/missing-tool.log"
+printf 'missing-schema\n' > "$WORK/mode"
+if (SEQUENTIAL_THINKING_PREPARED=0 prepare_sequential_thinking) > "$WORK/missing-schema.log" 2>&1; then exit 1; fi
+grep -Fq 'The server did not expose the sequentialthinking tool schema' "$WORK/missing-schema.log"
 if check_sequential_thinking @modelcontextprotocol/server-sequential-thinking@latest > "$WORK/unpinned.log" 2>&1; then exit 1; fi
 grep -Fq 'requires an exact stable package version' "$WORK/unpinned.log"
 printf 'timeout\n' > "$WORK/mode"
