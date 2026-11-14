@@ -14,3 +14,14 @@ OpenCode discovers shared skills from `~/.agents/skills` and uses its own global
 ## Cooperation
 
 Use an available connector or `scripts/run_codex_agent.sh` for a concrete Codex contribution from Claude. Batch related questions and reuse a useful review. Do not require collaboration at every phase. If the other agent is unavailable, say so once and continue authorized work without claiming it participated.
+
+## Discussion round analysts
+
+Run both analysts on the same `question.md` from the project root and save each answer verbatim. The runner path is `scripts/run_codex_agent.sh` inside this skill's installed directory.
+
+```bash
+claude -p --agent breakthrough-analyst --effort max < records/rounds/<round>/question.md > records/rounds/<round>/claude.md
+<skill-dir>/scripts/run_codex_agent.sh breakthrough_analyst < records/rounds/<round>/question.md > records/rounds/<round>/codex.md
+```
+
+OpenCode runs both commands with its shell tool. Inside Codex, the native `breakthrough_analyst` role with `reasoning_effort = "ultra"` is equivalent to the runner; inside Claude Code, the Agent tool's `breakthrough-analyst` is equivalent to `claude -p`. The runner's `declared_*` header lines stay in `codex.md` as the record of what was requested.

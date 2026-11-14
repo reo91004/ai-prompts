@@ -4,7 +4,7 @@ description: Use when a research task crosses domains or its required evidence i
 ---
 
 ## Use
-Select the domain checks needed for the current claim. Keep reusable procedures in skills and project commands, stages, equipment constants, thresholds, and attempt limits in the Project Overlay.
+Select the domain checks needed for the current claim. Keep reusable procedures in skills and project commands, stages, equipment constants, and thresholds in the Project Overlay.
 
 Use the applicable domain skill directly when the domain is already clear. Read [domain gates](references/domain_gates.md) to resolve overlapping or uncertain requirements. This is not a prerequisite for ordinary code edits.
 

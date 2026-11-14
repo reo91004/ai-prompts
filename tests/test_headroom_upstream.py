@@ -8,7 +8,6 @@ This checks transport/project attribution, not inference or compression quality.
 import argparse
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
 import importlib.metadata
 import json
 import os
@@ -144,7 +143,6 @@ def smoke(codex):
                  "--no-embedding-server", "--no-rate-limit", "--compressor", "smart_crusher"]]
     metadata = {"scope": "real Headroom and optional Codex; synthetic loopback provider responses",
                 "seed": None, "python": sys.version, "platform": platform.platform(),
-                "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "versions": {name: importlib.metadata.version(name) for name in
                              ("headroom-ai", "fastapi", "uvicorn", "websockets")},
                 "commands": commands, "environment": env, "memory": "disabled (no --memory)",

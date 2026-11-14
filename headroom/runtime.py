@@ -37,8 +37,6 @@ DEPLOY = HOME / ".headroom/deploy" / PROFILE
 CONFIG = HOME / ".codex/config.toml"
 START = "# --- Headroom persistent provider ---"
 END = "# --- end Headroom persistent provider ---"
-LEGACY_START = "# --- Headroom proxy (auto-injected by headroom wrap codex) ---"
-LEGACY_END = "# --- end Headroom ---"
 
 
 def fail(message):
@@ -59,6 +57,7 @@ def write_json(path, value):
 
 def select_profile(profile):
     global PROFILE, DEPLOY
+    # Some kit ownership records name the earlier default profile; keep running it.
     if profile not in ("research-agent-kit", "default"):
         fail("Unsupported kit Headroom profile; its configuration was preserved.")
     PROFILE = profile
@@ -76,11 +75,12 @@ def safe_path(path):
 def dependencies(version):
     if importlib.metadata.version("headroom-ai") != version:
         fail(f"Headroom {version} is required in {sys.executable}")
-    for module in ("fastapi", "uvicorn", "httpx", "mcp", "websockets",
-                   "zstandard", "headroom.proxy.server", "headroom.cli.mcp"):
+    # onnxruntime and tree_sitter come from the proxy and code extras; import only, no model download.
+    for module in ("fastapi", "uvicorn", "httpx", "mcp", "websockets", "zstandard", "onnxruntime",
+                   "tree_sitter", "headroom.proxy.server", "headroom.cli.mcp"):
         importlib.import_module(module)
     environment("headroom-ai", version)
-    print(f"Headroom {version}: proxy/MCP imports OK ({sys.executable})")
+    print(f"Headroom {version}: proxy/code/MCP imports OK ({sys.executable})")
 
 
 def installed_version():
@@ -253,196 +253,6 @@ def apply_upstream_defaults():
     manifest()
 
 
-def toml_lines(text):
-    """Yield lines with whether they begin outside TOML strings and containers."""
-    multiline = None
-    depth = 0
-    for line in text.splitlines(keepends=True):
-        outside = multiline is None and depth == 0
-        quote = None
-        index = 0
-        while index < len(line):
-            char = line[index]
-            if multiline:
-                if line.startswith(multiline, index):
-                    index += 3
-                    while index < len(line) and line[index] == multiline[0]:
-                        index += 1
-                    multiline = None
-                    continue
-                if multiline[0] == '"' and char == "\\":
-                    index += 2
-                    continue
-            elif quote:
-                if quote == '"' and char == "\\":
-                    index += 2
-                    continue
-                if char == quote:
-                    quote = None
-            elif char == "#":
-                break
-            elif char in "[{":
-                depth += 1
-            elif char in "]}":
-                depth -= 1
-            elif char in ("'", '"'):
-                if line.startswith(char * 3, index):
-                    multiline = char * 3
-                    index += 3
-                    continue
-                quote = char
-            index += 1
-        yield line, outside
-
-
-def strip_legacy_blocks(text, start, end, owned, preserve_orphan_end=False):
-    """Remove balanced owned spans, preserving strings and unrelated blocks."""
-    kept, block = [], None
-    removed = 0
-    opening_line = None
-    for line_number, (line, outside) in enumerate(toml_lines(text), 1):
-        marker = line.rstrip("\r\n") if outside else ""
-        if marker == start:
-            if block is not None:
-                fail(f"Nested Headroom marker in {CONFIG} at parsed line {line_number}: {start!r}; "
-                     f"the block at line {opening_line} has not ended. Configuration was preserved.")
-            block = [line]
-            opening_line = line_number
-        elif marker == end:
-            if block is None:
-                if preserve_orphan_end:
-                    kept.append(line)
-                    continue
-                fail(f"Unbalanced Headroom marker in {CONFIG} at parsed line {line_number}: {end!r} "
-                     f"has no matching {start!r}. Configuration was preserved.")
-            if owned(tomllib.loads("".join(block[1:]))):
-                removed += 1
-            else:
-                kept.extend(block + [line])
-            block = None
-        elif block is not None:
-            block.append(line)
-        else:
-            kept.append(line)
-    if block is not None:
-        fail(f"Unbalanced Headroom marker in {CONFIG} at parsed line {opening_line}: {start!r} "
-             f"has no matching {end!r}. Configuration was preserved.")
-    return "".join(kept), removed
-
-
-def migrate_legacy():
-    """Undo evidenced kit wrapper/MCP edits without auth, DB or process work."""
-    if not CONFIG.exists():
-        return
-    safe_path(CONFIG)
-    original = CONFIG.read_text()
-    known_commands = {str(KIT / "tooling/bin/headroom"), str(KIT / "tooling/python-venv/bin/headroom")}
-
-    def owned_mcp(values):
-        servers = values.get("mcp_servers", {})
-        return (set(values) == {"mcp_servers"} and isinstance(servers, dict)
-                and set(servers) == {"headroom"} and isinstance(servers["headroom"], dict)
-                and servers["headroom"].get("command") in known_commands)
-
-    # Known duplicate MCP tables must be removed before full TOML parsing.
-    # A custom same-name server is not a candidate for kit replacement.
-    # Upstream wrap can consume an MCP opening comment. Its orphan closing
-    # comment is inert; retain it without treating preceding tables as owned.
-    cleaned, mcp_removed = strip_legacy_blocks(original, "# --- Headroom MCP server ---",
-                                               "# --- end Headroom MCP server ---", owned_mcp,
-                                               preserve_orphan_end=True)
-    current = tomllib.loads(cleaned)
-    remaining = current.get("mcp_servers", {}).get("headroom")
-    if mcp_removed and remaining is not None and remaining.get("command") not in known_commands:
-        fail("Legacy MCP cleanup conflicts with a custom headroom server; Codex configuration was preserved.")
-    tooling_state = KIT / "tooling.state"
-    wrapper = HOME / ".config/headroom/auto-wrap.sh"
-    provider_owned = False
-    if tooling_state.is_file() and wrapper.is_file():
-        state = tooling_state.read_text().splitlines()
-        source = wrapper.read_text()
-        provider_owned = "headroom_wrapper=installed" in state and all(fragment in source for fragment in (
-            "_universal_research_agent_kit_headroom_command() {",
-            'codex() {\n  _universal_research_agent_kit_headroom_command wrap codex -- "$@"\n}',
-        ))
-
-    def owned_provider(values):
-        providers = values.get("model_providers", {})
-        if (set(values) - {"model_provider", "openai_base_url", "model_providers"}
-                or not isinstance(providers, dict) or set(providers) - {"headroom"}
-                or values.get("model_provider", "headroom") != "headroom"
-                or values.get("openai_base_url", BASE_URL + "/v1") != BASE_URL + "/v1"):
-            fail("Legacy Headroom markers contain custom settings; Codex configuration was preserved.")
-        if "headroom" in providers:
-            provider = providers["headroom"]
-            allowed = {"name", "base_url", "supports_websockets", "requires_openai_auth", "env_http_headers"}
-            expected_headers = {"X-Headroom-Project": "HEADROOM_PROJECT",
-                                "X-Headroom-Base-Url": "HEADROOM_CODEX_UPSTREAM_BASE_URL"}
-            headers = provider.get("env_http_headers", {}) if isinstance(provider, dict) else None
-            if (not isinstance(provider, dict) or set(provider) - allowed
-                    or provider.get("name") != "OpenAI via Headroom proxy"
-                    or provider.get("base_url") != BASE_URL + "/v1"
-                    or provider.get("supports_websockets", True) is not True
-                    or provider.get("requires_openai_auth", True) is not True
-                    or not isinstance(headers, dict)
-                    or any(expected_headers.get(key) != value for key, value in headers.items())):
-                fail("The legacy Headroom provider was customized; Codex configuration was preserved.")
-        return True
-
-    removed = 0
-    if provider_owned:
-        cleaned, removed = strip_legacy_blocks(cleaned, LEGACY_START, LEGACY_END, owned_provider)
-    if not removed:
-        if cleaned != original:
-            CONFIG.write_text(cleaned)
-            print("Removed known kit legacy MCP spans; other settings preserved.")
-        return
-    current = tomllib.loads(cleaned)
-    backup_path = CONFIG.with_name(CONFIG.name + ".headroom-backup")
-    backup = None
-
-    def previous(key):
-        nonlocal backup
-        if backup is None:
-            safe_path(backup_path)
-            backup = tomllib.loads(backup_path.read_text()) if backup_path.exists() else {}
-        return backup.get(key)
-
-    root = True
-    restored = []
-    for line, outside in toml_lines(cleaned):
-        if outside and line.lstrip().startswith("["):
-            root = False
-        match = re.match(r"^[ \t]*(model_provider|openai_base_url)[ \t]*=", line) if outside and root else None
-        if match:
-            key = match[1]
-            value = current.get(key)
-            redirected = value == "headroom" if key == "model_provider" else value == BASE_URL + "/v1"
-            if redirected:
-                was = re.search(r"#[ \t]*was:[ \t]*(.*?)\s*$", line)
-                value = tomllib.loads('value = "' + was[1] + '"')["value"] if was else previous(key)
-                if not isinstance(value, str) or not value or value == current.get(key):
-                    fail(f"Cannot safely restore legacy {key}; restore its original root value, then rerun install.sh. Codex configuration was preserved.")
-                line = f"{key} = {json.dumps(value, ensure_ascii=False)}\n"
-        restored.append(line)
-    cleaned = "".join(restored)
-    current = tomllib.loads(cleaned)
-    # Only the two root keys may come from a snapshot. New MCP entries, tables,
-    # model choices and other edits always remain from the current file.
-    for key in ("model_provider", "openai_base_url"):
-        if key not in current:
-            value = previous(key)
-            if value is not None:
-                if not isinstance(value, str) or value in ("headroom", BASE_URL + "/v1"):
-                    fail(f"Ambiguous legacy backup {key}; Codex configuration was preserved.")
-                cleaned = f"{key} = {json.dumps(value, ensure_ascii=False)}\n" + cleaned
-    final = tomllib.loads(cleaned)
-    if final.get("model_provider") == "headroom" or final.get("openai_base_url") == BASE_URL + "/v1":
-        fail("Ambiguous legacy root routing remains; Codex configuration was preserved.")
-    CONFIG.write_text(cleaned)
-    print("Migrated kit legacy Headroom provider; current user settings and backup preserved.")
-
-
 def check_provider():
     config = tomllib.loads(CONFIG.read_text())
     provider = config.get("model_providers", {}).get("headroom", {})
@@ -452,48 +262,6 @@ def check_provider():
         fail("Codex Headroom provider is missing WebSocket support.")
     if bool(provider.get("requires_openai_auth")) != codex_oauth():
         fail("Codex authentication changed since installation. Rerun install.sh, then restart Desktop/daemon.")
-
-
-def adopt_default(record):
-    """Keep the standard deployment and provider; change only kit ownership."""
-    safe_path(Path(record))
-    saved = read_json(Path(record))
-    if not saved.get("adopt_service"):
-        return
-    if saved.get("profile") != "default" or STATE.exists():
-        fail("Default Headroom adoption conflicts with the ownership record.")
-    select_profile("default")
-    for path in (STATE, DEPLOY, service_path(), CONFIG):
-        safe_path(path)
-    if port_open():
-        fail("Default Headroom restarted before adoption; its environment was preserved.")
-    manifest(check_runner=False)
-    safe_path(CONFIG)
-    original = CONFIG.read_text()
-    tomllib.loads(original)
-
-    def standard_provider(values):
-        providers = values.get("model_providers", {})
-        provider = providers.get("headroom", {}) if isinstance(providers, dict) else {}
-        expected = {"model_provider": "headroom", "openai_base_url": BASE_URL + "/v1",
-                    "model_providers": {"headroom": {"name": "Headroom persistent proxy", "base_url": BASE_URL + "/v1",
-                                                     "supports_websockets": True}}}
-        if isinstance(provider, dict) and isinstance(provider.get("requires_openai_auth"), bool):
-            expected["model_providers"]["headroom"]["requires_openai_auth"] = provider["requires_openai_auth"]
-        if values != expected:
-            fail("The default Headroom provider has custom settings; Codex configuration was preserved.")
-        return True
-
-    without_provider, count = strip_legacy_blocks(original, START, END, standard_provider)
-    if count != 1:
-        fail("The default Headroom provider markers are missing or ambiguous; configuration was preserved.")
-    outside = tomllib.loads(without_provider)
-    previous = {key: outside[key] for key in ("model_provider", "openai_base_url") if key in outside}
-    # Upstream does not store pre-install provider values. Do not infer them
-    # from old backups or rewrite/retag existing Codex sessions during adoption.
-    write_json(STATE, {"profile": PROFILE, "port": PORT, "previous_provider": previous,
-                       "python": sys.executable, "version": installed_version(), "adopted_default": True})
-    print("Adopted the existing default Headroom service; provider configuration and sessions preserved.")
 
 
 def install_mcp(agent):
@@ -868,17 +636,13 @@ def launch(tool, args):
 
 def main():
     action, *args = sys.argv[1:]
-    if action not in ("dependencies", "environment", "migrate-legacy", "adopt-default") and STATE.exists():
+    if action not in ("dependencies", "environment") and STATE.exists():
         safe_path(STATE)
         select_profile(read_json(STATE).get("profile"))
     if action == "dependencies":
         dependencies(args[0])
     elif action == "environment":
         environment(*args)
-    elif action == "migrate-legacy":
-        migrate_legacy()
-    elif action == "adopt-default":
-        adopt_default(args[0])
     elif action == "install-mcp":
         install_mcp(args[0])
     elif action == "opencode-config":

@@ -53,11 +53,11 @@ The installer registers `opencode-latex@0.2.0` in `opencode.jsonc`; OpenCode dow
 
 Kitty/SIXEL terminals support graphical output; other terminals use Unicode cells. `/latex-render-mode` selects the output mode. Installation and the command dialog were checked in OpenCode 2.2.5; graphical formula output in a supported terminal has not been visually verified.
 
-## Headroom And Long Work
+## Headroom And Experiments
 
 Headroom's official V2 plugin is read from the installed Python wheel and uses the kit's persistent proxy. Retrieval and the local Headroom MCP are configured through that same deployment. Configuration checks verify directory entrypoints, proxy and MCP paths. OpenAI chat/responses, Anthropic Messages, and the `claude-agent` subprocess are distinct request routes; report only the routes actually tested.
 
-The installer registers [opencode-monitor](https://github.com/rndmcnlly/opencode-monitor) from its `main` branch by default; OpenCode downloads it on startup. Run a native `shell` command with `background: true, monitor: true` to deliver output lines to the agent while the command runs. Filter experiment logs to decisive events such as completion or failure so routine progress does not repeatedly interrupt the agent. Native background jobs also report completion. After a notification, verify the exit status and expected artifacts before continuing dependent work. Keep an experiment separate from any log-watching command whose timeout or cancellation stops its process tree.
+The installer registers [opencode-monitor](https://github.com/rndmcnlly/opencode-monitor) from its `main` branch by default; OpenCode downloads it on startup. Run a native `shell` command with `background: true, monitor: true` to deliver output lines to the agent while the command runs. Filter experiment logs to decisive events such as completion or failure so routine progress does not repeatedly interrupt the agent. Native background jobs also report completion. After a notification, verify the exit status and expected artifacts before continuing dependent work. Experiments start detached with the shared `run_detached.sh`, so a watcher's timeout or cancellation never stops them; watch with `wait_run.sh` as [experiment runs](../skills/resource-aware-orchestration/references/experiment_runs.md) describes.
 
 Installation and server activation were checked with OpenCode 2.2.5 and upstream commit `6bdb284bcf983da82546d08d852e21005256ee80`. The upstream output-delivery tests passed; live experiment notifications have not been verified.
 
@@ -65,15 +65,7 @@ Installation and server activation were checked with OpenCode 2.2.5 and upstream
 
 The CLI uses a local compatibility package built from `opencode-btw-plus@0.1.3`, with the built-in `opencode.btw` disabled. `/btw question` saves a new question/answer and `/btw` reopens the session's saved history. It does not import past built-in BTW answers. TUI-host storage is plain JSON and is preserved across kit updates, outside skill cleanup.
 
-The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](plugins/btw-plus-compat/README.md) supplies the syntax-style resource owner and a host-specific theme lockfile for OpenCode 2.2.5 and 2.2.7. The patched package passed host-matched headless UI checks; full-app/real-model execution is a separate scope. Unknown source hashes or host versions fail before activation.
-
-## Crucible Research Loop
-
-The shared [Crucible skill](../skills/crucible/SKILL.md) connects OpenCode to the separate [Crucible engine](https://github.com/reo91004/Crucible). Default installation reuses a checkout discovered under HOME or downloads it to `~/Crucible`, records its path, and installs the skill. Existing source checkouts are preserved. `CRUCIBLE_ROOT` and an installed CLI remain optional overrides; tooling-skip mode also skips engine setup.
-
-Run the engine's `link-opencode --project <project>` to add its project-local V2 bridge, then reopen that project's session. The native `crucible` tool starts background execution, inspects state and explicitly delivers durable events. Linking does not alter global providers, permissions or other running projects. The engine README documents its configuration and actual validation scope.
-
-After one-time experiment/evaluator/model/budget setup, `start` evaluates each result and automatically requests review for registered anomaly/regression/stagnation/theory-conflict events. To request discussion explicitly, use `/crucible-debate <question>` or the native tool with `action=debate`, `question`, and optional project-relative `evidence`. Manual cases preserve their own snapshots and bounded budgets; they do not start experiments or change an active loop's next decision. External jobs are not automatically discovered.
+The upstream bundle failed with OpenTUI 0.8. The bounded [compatibility patch](plugins/btw-plus-compat/README.md) supplies the syntax-style resource owner and a host-specific theme lockfile for OpenCode 2.2.5 and 2.2.7. The patched package passed host-matched headless UI checks; full-app/real-model execution is a separate scope. Other OpenCode versions skip BTW with a warning and installation continues.
 
 ## Sources
 

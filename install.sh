@@ -35,11 +35,11 @@ main() {
 Usage: sh install.sh [--integrations ponytail|none] [--without-statusline] [--verify | --cleanup-backups]
 Default: update Codex, Claude Code, OpenCode V2, core skills, Humanizer, Ponytail, MCP, Graphify, Headroom and statuslines.
 All three CLIs are checked against their official latest release on every install. Global user skills are replaced after backup.
+Backups support rollback of a failed install; a verified install deletes all kit backups.
 Python 3.13 and pinned uv are provisioned in the kit; no manual pip/system Python setup is needed.
 Kit-owned Headroom services/MCP servers are stopped normally before installation and the service starts afterward.
-Standard existing headroom-default deployments are backed up and adopted in place, retaining their profile and sessions.
 Invalid managed tooling is backed up, cleared and rebuilt automatically; unrelated active jobs block replacement.
-  --integrations none  Remove kit-owned Ponytail and legacy LazyCodex; keep MCP and tooling.
+  --integrations none  Remove kit-owned Ponytail; keep MCP and tooling.
   --without-statusline Preserve existing statuslines and skip their verification.
   --with-statusline    Install both bundled statuslines (default; requires jq).
   --verify             Check source and installed files without installing or changing HOME.
@@ -77,8 +77,7 @@ HELP
   fi
   kit_maintenance_run opencode-idle || kit_die "OpenCode is in use; installation did not change this host."
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
-    if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] ||
-        [ -f "$HOME/.headroom/deploy/default/manifest.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
+    if [ -f "$HOME/.universal-research-agent-kit/headroom.json" ] || ! kit_tooling_idle >/dev/null 2>&1; then
       if ! kit_maintenance_run inspect; then
         # The initial busy check is quiet because recognized Headroom can be
         # paused automatically. On refusal, show the remaining PID so the
@@ -117,13 +116,6 @@ HELP
   fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
     prepare_tooling
-    prepare_crucible
-    kit_require_regular_or_absent "$HOME/.codex/config.toml"
-    kit_backup_path "$HOME/.codex/config.toml" "legacy/config.toml"
-    "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" migrate-legacy || kit_die "Legacy Headroom migration failed."
-    if [ -f "${KIT_MAINTENANCE_RECORD:-}" ]; then
-      "$KIT_HEADROOM_PYTHON" -I -B "$ROOT/headroom/runtime.py" adopt-default "$KIT_MAINTENANCE_RECORD" || kit_die "Default Headroom adoption failed."
-    fi
   fi
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
     if [ "${KIT_TEST_FIXTURES_ONLY:-0}" = 1 ] && [ -n "${KIT_TEST_HUMANIZER_REPOSITORY:-}" ]; then
@@ -136,7 +128,7 @@ HELP
   install_core
   kit_replace_managed_block "$HOME/.config/git/ignore" "$ROOT/global_research_agents.gitignore" git/ignore '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = 1 ]; then
-    kit_write_integrations_state "$PROFILE" skipped_env skipped_env skipped_env skipped_env skipped_env
+    kit_write_integrations_state "$PROFILE" skipped_env skipped_env skipped_env skipped_env
   else
     install_integrations
   fi
@@ -147,14 +139,12 @@ HELP
   fi
   if [ "$WITH_STATUSLINE" -eq 1 ]; then install_statusline; fi
   verify_install
-  # Package manager removals cannot be rolled back by the file journal. Keep
-  # the verified replacement installed if a manager reports a cleanup failure.
+  # The journal cannot restore pruned revisions or deleted backups; keep the verified install.
   trap 'kit_release_lock' EXIT
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" != 1 ]; then
     prune_old_ponytail_revisions
-    cleanup_legacy_clis
   fi
-  kit_cleanup_work
+  cleanup_backups
   echo "Done for the verified scope. Restart Claude Code, Codex and OpenCode sessions."
 }
 [ "${BASH_SOURCE[0]}" != "$0" ] || main "$@"

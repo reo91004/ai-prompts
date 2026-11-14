@@ -40,6 +40,7 @@ class StatuslineTests(unittest.TestCase):
                        UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS="1")
             env.pop("CODEX_HOME", None)
             env.pop("CLAUDE_CONFIG_DIR", None)
+            env.pop("XDG_CONFIG_HOME", None)
             codex = home / ".codex/config.toml"
             claude = home / ".claude/settings.json"
             script = home / ".claude/statusline.sh"
@@ -68,8 +69,7 @@ class StatuslineTests(unittest.TestCase):
             self.assertEqual(claude.stat().st_mode & 0o777, 0o600)
             self.assertEqual(codex.stat().st_mode & 0o777, 0o640)
             self.assertEqual(script.read_bytes(), (ROOT / "claude-code/statusline.sh").read_bytes())
-            backups = home / ".universal-research-agent-kit/backups"
-            self.assertTrue(any(p.read_text() == "old script\n" for p in backups.glob("*/statusline/statusline.sh")))
+            self.assertFalse((home / ".universal-research-agent-kit/backups").exists())
             installed = (codex.read_bytes(), claude.read_bytes(), script.read_bytes())
             run()
             self.assertEqual((codex.read_bytes(), claude.read_bytes(), script.read_bytes()), installed)

@@ -13,9 +13,9 @@ verify_platform_additions() {
   check_same_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
   check_same_dir "$ROOT/opencode/plugins/openai-websocket" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket"
   if [ -n "${HUMANIZER_REVISION:-}" ] && [ "$HUMANIZER_REVISION" != - ]; then
-    verify_humanizer_source "$HUMANIZER_REVISION" "$HUMANIZER_CONTENT_SHA256" "$HUMANIZER_SOURCE" || { echo "Humanizer source provenance failed."; missing=1; }
+    verify_humanizer_source "$HUMANIZER_REVISION" "$HUMANIZER_SOURCE" || { echo "Humanizer source provenance failed."; missing=1; }
     for target in "$HOME/.agents/skills/humanizer" "$HOME/.claude/skills/humanizer"; do
-      verify_humanizer_skill "$target" "$HUMANIZER_CONTENT_SHA256" || { echo "Humanizer content differs: $target"; missing=1; }
+      check_same_dir "$KIT_STATE_ROOT/sources/humanizer/skill" "$target"
     done
   elif [ -f "$STATE_FILE" ] && [ "$(read_state codex_sequential_thinking)" != skipped_env ]; then
     echo "Humanizer installation/provenance is missing."; missing=1
@@ -53,7 +53,11 @@ verify_platform_additions() {
             echo "Scoped verification: preserved OpenCode user overrides differ from kit defaults."; scoped=1
           fi
         else missing=1; fi
-        node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" --check "$KIT_STATE_ROOT/tooling/opencode-btw-plus" "$KIT_OPENCODE_VERSION" || missing=1
+        if [ "$KIT_BTW_VERSION" = skipped_unsupported_opencode ]; then
+          echo "Scoped verification: BTW Plus was skipped for unsupported OpenCode $KIT_OPENCODE_VERSION."; scoped=1
+        else
+          node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" --check "$KIT_STATE_ROOT/tooling/opencode-btw-plus" "$KIT_OPENCODE_VERSION" || missing=1
+        fi
       else missing=1; fi
       rm -rf -- "$verify_dir"
       unset KIT_HEADROOM_FRAGMENT KIT_OPENCODE_CLI_FRAGMENT
@@ -83,7 +87,7 @@ if [ -f "$TOOLING_STATE_FILE" ] && [ ! -L "$TOOLING_STATE_FILE" ]; then
   KIT_OPENCODE_VERSION="$(read_tooling_state opencode_version)"
   HUMANIZER_SOURCE="$(read_tooling_state humanizer_source)"
   HUMANIZER_REVISION="$(read_tooling_state humanizer_revision)"
-  HUMANIZER_CONTENT_SHA256="$(read_tooling_state humanizer_content_sha256)"
+  KIT_BTW_VERSION="$(read_tooling_state btw_version)"
   SEQUENTIAL_THINKING_VERSION="$(read_tooling_state sequential_thinking_version)"
   [ "$KIT_CODEX_VERSION" != - ] || KIT_CODEX_VERSION=""
   [ "$KIT_CLAUDE_VERSION" != - ] || KIT_CLAUDE_VERSION=""
@@ -374,7 +378,7 @@ check_dir "$HOME/.claude/agents"
 check_dir "$HOME/.claude/skills"
 
 if [ "$tooling_status_for_prompt" = installed ]; then
-  kit_context_run check || { echo "Codex context defaults differ from the requested 1M/800k policy."; missing=1; }
+  kit_context_run check || { echo "Codex defaults differ from codex/context.toml."; missing=1; }
 else
 if ! awk '
   /^\[/ { section = ($0 == "[features.context_management]") }
@@ -479,7 +483,6 @@ else
   tooling_status="$(read_tooling_state status)"
   case "$tooling_status" in
     installed)
-  "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" -I -B "$ROOT/skills/crucible/scripts/engine.py" check || missing=1
       graphify_state="$(read_tooling_state graphify)"
       headroom_state="$(read_tooling_state headroom)"
       wrapper_state="$(read_tooling_state headroom_wrapper)"
@@ -510,6 +513,7 @@ else
         "$ROOT/headroom/runtime.py" environment graphifyy "$graphify_version" || missing=1
       check_graphify_skill_layout "$HOME/.claude/skills/graphify"
       check_graphify_skill_layout "$HOME/.codex/skills/graphify"
+      check_graphify_skill_layout "$HOME/.config/opencode/skills/graphify"
       check_same_file "$ROOT/headroom/auto-wrap.sh" "$HOME/.config/headroom/auto-wrap.sh"
       check_same_file "$ROOT/headroom/runtime.py" "$HOME/.config/headroom/runtime.py"
       runtime_python="$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python"
@@ -580,8 +584,6 @@ codex_ponytail_kit_enabled() {
     codex_plugin_exact_enabled ponytail@ponytail "$KIT_PONYTAIL_VERSION" 1 "$KIT_PONYTAIL_PATH"
 }
 codex_ponytail_kit_owned_present() { codex_plugin_installed ponytail@ponytail && codex_plugin_kit_owned ponytail@ponytail; }
-codex_lazycodex_installed() { codex_plugin_installed omo@sisyphuslabs; }
-codex_lazycodex_enabled() { case "$(codex_plugin_status omo@sisyphuslabs)" in *' enabled') return 0;; *) return 1;; esac; }
 claude_ponytail_kit_enabled() { [ -n "$KIT_PONYTAIL_VERSION" ] && claude_plugin_exact_enabled; }
 claude_ponytail_pinned_installed() { claude_plugin_installed && claude_ponytail_marketplace_ownership; }
 claude_ponytail_installed() { claude_plugin_installed; }
@@ -687,41 +689,6 @@ else
       ;;
     *)
       echo "Unknown Claude Ponytail state: $claude_ponytail_state"
-      missing=1
-      ;;
-  esac
-
-  codex_lazycodex_state="$(read_state codex_lazycodex)"
-  case "$codex_lazycodex_state" in
-    installed_kit_owned)
-      echo "State records a kit-installed LazyCodex, which this kit no longer installs; run 'sh install.sh' to remove it."
-      missing=1
-      ;;
-    removed_legacy)
-      if codex_usable && codex_lazycodex_installed; then
-        echo "LazyCodex is still installed but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
-        missing=1
-      else
-        echo "OK Codex integration: LazyCodex removed"
-      fi
-      ;;
-    disabled_legacy|not_requested|user_owned_warned)
-      if codex_usable && codex_lazycodex_enabled; then
-        echo "LazyCodex is enabled but the profile is '$requested_profile'; run 'sh install.sh' to migrate."
-        missing=1
-      else
-        echo "OK Codex integration: LazyCodex $codex_lazycodex_state"
-      fi
-      ;;
-    skipped_env)
-      scoped=1
-      echo "Codex LazyCodex: $codex_lazycodex_state"
-      ;;
-    unverified_no_node)
-      echo "Codex LazyCodex state is unverified"; missing=1
-      ;;
-    *)
-      echo "Unknown Codex LazyCodex state: $codex_lazycodex_state"
       missing=1
       ;;
   esac

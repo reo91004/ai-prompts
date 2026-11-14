@@ -1,30 +1,6 @@
 #!/usr/bin/env bash
 # Sourced by install.sh.
 
-prepare_crucible() {
-  local locator="$ROOT/skills/crucible/scripts/engine.py" source status target stage connection_file
-  if source="$("$KIT_HEADROOM_PYTHON" -I -B "$locator" find)"; then
-    printf 'Reusing Crucible: %s\n' "$source"
-  else
-    status=$?
-    [ "$status" -eq 1 ] || kit_die "Crucible discovery failed; existing checkouts were preserved."
-    target="$HOME/Crucible"
-    [ ! -e "$target" ] && [ ! -L "$target" ] || kit_die "Crucible destination already exists: $target"
-    stage="$KIT_WORK_DIR/crucible-source"
-    git clone --depth 1 https://github.com/reo91004/Crucible.git "$stage" || kit_die "Crucible download failed."
-    "$KIT_HEADROOM_PYTHON" -I -B "$locator" connect "$stage" "$KIT_WORK_DIR/crucible-stage.json" || kit_die "Downloaded Crucible is invalid."
-    mkdir "$target" || kit_die "Crucible destination appeared during installation; preserved it."
-    kit_journal_entry absent "$target"
-    cp -Rp "$stage/." "$target/" || kit_die "Crucible installation failed."
-    source="$target"
-  fi
-  connection_file="$KIT_STATE_ROOT/crucible.json"
-  kit_require_regular_or_absent "$connection_file"
-  kit_backup_path "$connection_file" "crucible/connection.json"
-  "$KIT_HEADROOM_PYTHON" -I -B "$locator" connect "$source" "$KIT_WORK_DIR/crucible.next.json" || kit_die "Crucible connection failed."
-  kit_replace_file "$KIT_WORK_DIR/crucible.next.json" "$connection_file"
-}
-
 prepare_shared_skills() {
   local source name
   KIT_SHARED_SKILLS="$KIT_WORK_DIR/shared-skills.next"
@@ -41,8 +17,8 @@ prepare_shared_skills() {
   fi
 }
 
-# Retire global user-skill paths while retaining CLI-managed builtins.
-reset_legacy_skill_root() {
+# Empty a global user-skill root after backup, retaining CLI-managed builtins.
+reset_skill_root() {
   local target="$1" preserve="${2:-}" label="$3" stage
   [ -e "$target" ] || [ -L "$target" ] || return 0
   stage="$KIT_WORK_DIR/$label.next"
@@ -86,8 +62,8 @@ install_opencode_core() {
   kit_replace_dir "$ROOT/opencode/plugins/research-context" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/context"
   kit_backup_path "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket" "opencode/openai-websocket"
   kit_replace_dir "$ROOT/opencode/plugins/openai-websocket" "$KIT_OPENCODE_CONFIG_DIR/research-agent-kit/openai-websocket"
-  reset_legacy_skill_root "$KIT_OPENCODE_CONFIG_DIR/skills" "" opencode-legacy-skills
-  reset_legacy_skill_root "$HOME/.opencode/skills" "" opencode-v1-legacy-skills
+  reset_skill_root "$KIT_OPENCODE_CONFIG_DIR/skills" "" opencode-skills
+  reset_skill_root "$HOME/.opencode/skills" "" opencode-v1-skills
 }
 
 kit_context_run() {
@@ -110,12 +86,18 @@ opencode_config_run() {
 
 prepare_btw_plugin() {
   local metadata="$KIT_WORK_DIR/btw-latest.json" archive="$KIT_WORK_DIR/btw-upstream.tgz" url source stage
+  if ! node "$ROOT/opencode/plugins/btw-plus-compat/patch.mjs" --supports "$KIT_OPENCODE_VERSION"; then
+    echo "Warning: BTW Plus has no compatibility patch for OpenCode $KIT_OPENCODE_VERSION; skipped BTW Plus."
+    KIT_BTW_VERSION=skipped_unsupported_opencode
+    return 0
+  fi
   KIT_BTW_SOURCE=https://registry.npmjs.org/opencode-btw-plus/latest
   download_file "$KIT_BTW_SOURCE" "$metadata"
   KIT_BTW_VERSION="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(d.name!=="opencode-btw-plus"||!/^\d+\.\d+\.\d+$/.test(d.version)||!/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(d.dist?.integrity||""))process.exit(1);console.log(d.version)' "$metadata")" || kit_die "Invalid BTW Plus release metadata."
   url="$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),u=new URL(d.dist.tarball);if(u.protocol!=="https:"||u.hostname!=="registry.npmjs.org")process.exit(1);console.log(u.href)' "$metadata")" || kit_die "Invalid BTW Plus package source."
   download_file "$url" "$archive"
-  KIT_BTW_ARCHIVE_SHA256="$(node -e 'const fs=require("fs"),c=require("crypto"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8")),b=fs.readFileSync(process.argv[2]);if("sha512-"+c.createHash("sha512").update(b).digest("base64")!==m.dist.integrity)process.exit(1);console.log(c.createHash("sha256").update(b).digest("hex"))' "$metadata" "$archive")" || kit_die "BTW Plus archive integrity mismatch."
+  node -e 'const fs=require("fs"),c=require("crypto"),m=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if("sha512-"+c.createHash("sha512").update(fs.readFileSync(process.argv[2])).digest("base64")!==m.dist.integrity)process.exit(1)' "$metadata" "$archive" ||
+    kit_die "BTW Plus archive integrity mismatch."
   source="$(mktemp -d "$KIT_WORK_DIR/btw-source.XXXXXX")"
   stage="$(mktemp -d "$KIT_WORK_DIR/btw-compatible.XXXXXX")"
   tar -xzf "$archive" -C "$source"
@@ -126,9 +108,6 @@ prepare_btw_plugin() {
   KIT_BTW_DIRECTORY="$KIT_STATE_ROOT/tooling/opencode-btw-plus"
   kit_backup_path "$KIT_BTW_DIRECTORY" "opencode/btw-plugin"
   kit_replace_dir "$stage" "$KIT_BTW_DIRECTORY"
-  KIT_OPENCODE_CLI_FRAGMENT="$KIT_WORK_DIR/opencode-cli-plugins.json"
-  node -e 'require("fs").writeFileSync(process.argv[1],JSON.stringify({plugins:["-opencode.btw",process.argv[2]]})+"\n")' \
-    "$KIT_OPENCODE_CLI_FRAGMENT" "$KIT_BTW_DIRECTORY"
 }
 
 prepare_opencode_fragments() {
@@ -144,6 +123,7 @@ prepare_opencode_fragments() {
     kit_die "Cannot prepare the official Headroom OpenCode integration."
   node -e 'const fs=require("fs"),f=process.argv[1],d=JSON.parse(fs.readFileSync(f,"utf8"));d.mcp.servers["sequential-thinking"]={type:"local",command:[process.argv[2],"-y",process.argv[3]],environment:{}};if(process.argv[4])d.plugins.push(process.argv[4]);fs.writeFileSync(f,JSON.stringify(d)+"\n")' \
     "$KIT_HEADROOM_FRAGMENT" "$npx" "$SEQUENTIAL_THINKING_PACKAGE" "$ponytail"
+  [ "${KIT_BTW_VERSION:-}" != skipped_unsupported_opencode ] || return 0
   KIT_OPENCODE_CLI_FRAGMENT="$output/opencode-cli-plugins.json"
   node -e 'require("fs").writeFileSync(process.argv[1],JSON.stringify({plugins:["-opencode.btw",process.argv[2]]})+"\n")' "$KIT_OPENCODE_CLI_FRAGMENT" "$KIT_STATE_ROOT/tooling/opencode-btw-plus"
 }
@@ -290,6 +270,6 @@ kit_replace_file "$config_next" "$config"
       kit_commit_manifest "$manifest" "$KIT_MANIFEST_ROOT/$platform-$group"
     done
   done
-  reset_legacy_skill_root "$HOME/.codex/skills" .system codex-legacy-user-skills
+  reset_skill_root "$HOME/.codex/skills" .system codex-user-skills
   install_opencode_core
 }

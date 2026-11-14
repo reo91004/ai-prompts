@@ -29,7 +29,7 @@ opencode_fragment = {
 }
 with open(os.environ["TOOLING_TEST_CALLS"], "a") as log:
     log.write("runtime " + " ".join([action, *rest]) + "\n")
-if action in ("environment", "migrate-legacy", "adopt-default", "probe", "inspect", "stop-service", "resume", "opencode-idle"):
+if action in ("environment", "probe", "inspect", "stop-service", "resume", "opencode-idle"):
     pass
 elif action in ("pause", "quiesce"):
     Path(rest[0]).write_text(json.dumps({"profile": "research-agent-kit", "resume_service": state.exists()}))

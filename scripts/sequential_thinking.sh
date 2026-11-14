@@ -61,8 +61,7 @@ prepare_sequential_thinking() {
     download_file "$SEQUENTIAL_THINKING_SOURCE" "$metadata" || kit_die "Could not resolve Sequential Thinking from npm."
     values="$(node - "$metadata" <<'NODE'
 const fs = require('fs'), data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-if (data.name !== '@modelcontextprotocol/server-sequential-thinking' ||
-    !/^\d+\.\d+\.\d+$/.test(data.version) || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(data.dist?.integrity || '')) {
+if (data.name !== '@modelcontextprotocol/server-sequential-thinking' || !/^\d+\.\d+\.\d+$/.test(data.version)) {
   process.exit(1);
 }
 const engine = data.engines?.node || '';
@@ -81,13 +80,11 @@ for (let i = 0; i < 3; i++) {
   }
 }
 console.log(data.version);
-console.log(data.dist.integrity);
 console.log(engine);
 NODE
     )" || kit_die "Invalid or unsupported stable Sequential Thinking npm metadata."
     SEQUENTIAL_THINKING_VERSION="$(printf '%s\n' "$values" | sed -n '1p')"
-    SEQUENTIAL_THINKING_INTEGRITY="$(printf '%s\n' "$values" | sed -n '2p')"
-    SEQUENTIAL_THINKING_NODE_REQUIREMENT="$(printf '%s\n' "$values" | sed -n '3p')"
+    SEQUENTIAL_THINKING_NODE_REQUIREMENT="$(printf '%s\n' "$values" | sed -n '2p')"
     SEQUENTIAL_THINKING_PACKAGE="@modelcontextprotocol/server-sequential-thinking@$SEQUENTIAL_THINKING_VERSION"
     SEQUENTIAL_THINKING_RESOLVED=1
   fi

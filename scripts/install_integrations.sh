@@ -14,63 +14,6 @@ PONYTAIL_SOURCE=""
 PONYTAIL_MARKETPLACE=""
 
 
-repair_duplicate_headroom_mcp() {
-  local config="$HOME/.codex/config.toml"
-  local expected_command="command = \"$HOME/.universal-research-agent-kit/tooling/bin/headroom\""
-  local headroom_sections
-  local managed_block
-  local needs_repair=0
-  local tmp
-
-  [ -f "$config" ] || return 0
-  headroom_sections="$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)"
-  if [ "$headroom_sections" -gt 0 ] && ! awk -v first="$expected_command" \
-      -v second="command = \"$HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" '
-    /^\[/ {
-      if (section && !owned) bad=1
-      section=($0 == "[mcp_servers.headroom]"); owned=0
-    }
-    section && ($0 == first || $0 == second) { owned=1 }
-    END { if (section && !owned) bad=1; exit bad }
-  ' "$config"; then
-    if [ "$headroom_sections" -gt 1 ] || [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING:-0}" != 1 ]; then
-      kit_die "Unowned Headroom MCP configuration was preserved; resolve its name/path conflict before kit installation."
-    fi
-    (cd "$HOME" && codex mcp list >/dev/null 2>&1) || kit_die "Invalid user MCP configuration was preserved."
-    return 0
-  fi
-  if [ "$headroom_sections" -gt 1 ]; then
-    needs_repair=1
-  elif [ "$headroom_sections" -eq 1 ] &&
-       grep -Fqx '# --- Headroom MCP server ---' "$config"; then
-    managed_block="$(sed -n '/^# --- Headroom MCP server ---$/,/^# --- end Headroom MCP server ---$/p' "$config")"
-    printf '%s\n' "$managed_block" | grep -Fqx "$expected_command" || needs_repair=1
-  fi
-
-  if [ "$needs_repair" -eq 0 ]; then
-    (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
-      kit_die "Codex config is invalid and is not a repairable Headroom MCP case: $config"
-    return 0
-  fi
-
-  tmp="$(mktemp "$config.tmp.XXXXXX")"
-  awk '
-    $0 == "# --- Headroom MCP server ---" { next }
-    $0 == "# --- end Headroom MCP server ---" { next }
-    $0 == "[mcp_servers.headroom]" || $0 == "[mcp_servers.headroom.env]" {
-      skip = 1
-      next
-    }
-    skip && /^\[/ { skip = 0 }
-    !skip { print }
-  ' "$config" > "$tmp"
-  mv "$tmp" "$config"
-
-  (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
-    kit_die "Removing duplicate Headroom MCP sections did not produce a valid Codex config: $config"
-  echo "Removed $headroom_sections stale or duplicate Headroom MCP section(s) from ~/.codex/config.toml; Headroom installation will register one canonical entry."
-}
-
 # Sequential Thinking MCP is add-or-repin: a registration under the kit's own
 # name is replaced when it does not carry the kit's @latest package spec, so
 # install alone converges a registration frozen at an older version. A
@@ -166,17 +109,6 @@ codex_plugin_exact_enabled() {
       (!expectedPath || plugin.source.path === expectedPath);
     process.exit(exact && (!requireLocal || local) ? 0 : 1);
   ' "$selector" "$version" "$require_local" "$expected_path"
-}
-
-# Prints "<version> enabled|disabled" for an installed plugin, or "absent".
-codex_plugin_status() {
-  local selector="$1"
-  codex plugin list --json | node -e '
-    const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
-    const plugin = (data.installed || []).find((item) => item.pluginId === process.argv[1]);
-    if (!plugin || plugin.installed !== true) { console.log("absent"); process.exit(0); }
-    console.log((plugin.version || "unknown") + " " + (plugin.enabled === true ? "enabled" : "disabled"));
-  ' "$selector"
 }
 
 claude_plugin_installed() {
@@ -373,156 +305,6 @@ configure_claude_marketplace() {
   fi
 }
 
-# Remove the legacy plugin and only its recorded or lazycodex-* loose agents.
-LAZYCODEX_AGENT_MANIFEST="$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage/.installed-agents.json"
-
-# Missing lazycodex-* registrations can outlive their files; unrelated entries stay.
-broken_codex_agent_registrations() {
-  local config="$HOME/.codex/config.toml"
-
-  [ -f "$config" ] || return 0
-  awk -v home="$HOME" '
-    /^\[agents\./ {
-      name = $0
-      sub(/^\[agents\./, "", name)
-      sub(/\]$/, "", name)
-      gsub(/"/, "", name)
-      if (index(name, ".") > 0) { current = ""; next }
-      current = name
-      next
-    }
-    /^\[/ { current = ""; next }
-    current != "" && /^[ \t]*config_file[ \t]*=/ {
-      path = $0
-      sub(/^[ \t]*config_file[ \t]*=[ \t]*/, "", path)
-      gsub(/^"|"$/, "", path)
-      if (substr(path, 1, 2) == "~/") path = home substr(path, 2)
-      print current "\t" path
-    }
-  ' "$config" | while IFS="$(printf '\t')" read -r name path; do
-    case "$name" in lazycodex-*) ;; *) continue ;; esac
-    [ -e "$path" ] || printf '%s\n' "$name"
-  done
-}
-
-drop_codex_agent_registrations() {
-  local names="$1"
-  local config="$HOME/.codex/config.toml"
-  local tmp
-
-  [ -n "$names" ] || return 0
-  [ -f "$config" ] || return 0
-  kit_require_regular_or_absent "$config"
-  kit_backup_path "$config" "integrations/codex-config-agents.toml"
-
-  tmp="$(mktemp "$config.tmp.XXXXXX")"
-  awk -v names="$names" '
-    BEGIN {
-      count = split(names, list, " ")
-      for (i = 1; i <= count; i++) {
-        drop["[agents." list[i] "]"] = 1
-        drop["[agents.\"" list[i] "\"]"] = 1
-        prefix[i] = "[agents." list[i] "."
-        quoted[i] = "[agents.\"" list[i] "\"."
-      }
-      total = count
-    }
-    /^\[/ {
-      skip = ($0 in drop)
-      if (!skip) {
-        for (i = 1; i <= total; i++) {
-          if (index($0, prefix[i]) == 1 || index($0, quoted[i]) == 1) { skip = 1; break }
-        }
-      }
-      if (skip) next
-    }
-    !skip { print }
-  ' "$config" > "$tmp"
-  mv "$tmp" "$config"
-
-  if command -v codex >/dev/null 2>&1; then
-    (cd "$HOME" && codex mcp list >/dev/null 2>&1) ||
-      kit_die "Removing LazyCodex agent registrations produced an invalid Codex config: $config"
-  fi
-}
-
-remove_lazycodex_planted_agents() {
-  local agents_dir="$HOME/.codex/agents"
-  local removed=0
-  local removed_names=""
-  local broken
-  local name entry planted_agents
-
-  if [ ! -d "$agents_dir" ]; then
-    broken="$(broken_codex_agent_registrations | tr '\n' ' ')"
-    drop_codex_agent_registrations "$broken"
-    [ -z "${broken// /}" ] ||
-      echo "Dropped Codex agent registration(s) pointing at missing files:${broken% }"
-    return 0
-  fi
-
-  if [ -f "$LAZYCODEX_AGENT_MANIFEST" ] && command -v node >/dev/null 2>&1; then
-    planted_agents="$(node -e '
-  const fs = require("fs");
-  const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  for (const p of data.agents || []) console.log(p);
-' "$LAZYCODEX_AGENT_MANIFEST")"
-    while IFS= read -r entry; do
-      case "$entry" in "$agents_dir/"*.toml) ;; *) continue ;; esac
-      name="${entry##*/}"
-      case "$name" in
-        */*|..|.|"") continue ;;
-      esac
-      [ -f "$ROOT/codex/agents/$name" ] && continue
-      [ -f "$agents_dir/$name" ] || continue
-      kit_backup_path "$agents_dir/$name" "integrations/lazycodex-agents/$name"
-      kit_remove_owned_entry "$agents_dir" "$name"
-      removed_names="$removed_names ${name%.toml}"
-      removed=$((removed + 1))
-    done <<EOF
-$planted_agents
-EOF
-  fi
-
-  for entry in "$agents_dir"/lazycodex-*.toml; do
-    [ -f "$entry" ] || continue
-    name="${entry##*/}"
-    kit_backup_path "$entry" "integrations/lazycodex-agents/$name"
-    kit_remove_owned_entry "$agents_dir" "$name"
-    removed_names="$removed_names ${name%.toml}"
-    removed=$((removed + 1))
-  done
-
-  broken="$(broken_codex_agent_registrations | tr '\n' ' ')"
-  drop_codex_agent_registrations "$removed_names $broken"
-  [ "$removed" -eq 0 ] ||
-    echo "Removed $removed LazyCodex-planted agent file(s) from ~/.codex/agents (backed up)."
-  [ -z "${broken// /}" ] ||
-    echo "Dropped Codex agent registration(s) pointing at missing files:${broken% }"
-}
-
-reconcile_codex_lazycodex() {
-  local status version
-
-  status="$(codex_plugin_status "omo@sisyphuslabs")"
-  if [ "$status" = "absent" ]; then
-    remove_lazycodex_planted_agents
-    CODEX_LAZYCODEX_STATE="not_requested"
-    return
-  fi
-  version="${status%% *}"
-  echo "Removing LazyCodex $version; this kit does not install it in any profile."
-  codex plugin remove omo@sisyphuslabs
-  [ "$(codex_plugin_status "omo@sisyphuslabs")" = "absent" ] ||
-    kit_die "Failed to remove LazyCodex."
-  # The sisyphuslabs marketplace exists only to serve LazyCodex, but it is not
-  # kit-owned, so a failure to drop the registration is not an install failure.
-  codex plugin marketplace remove sisyphuslabs 2>/dev/null ||
-    echo "Left the sisyphuslabs marketplace registration in place."
-  remove_lazycodex_planted_agents
-  CODEX_LAZYCODEX_STATE="removed_legacy"
-}
-
 # Profile none removes only kit-owned Ponytail remnants; user-owned
 # marketplaces and plugins are never touched.
 reconcile_codex_ponytail_none() {
@@ -608,7 +390,6 @@ install_integrations() {
   kit_require_real_dir "$HOME/.codex/plugins"
   kit_require_regular_or_absent "$HOME/.codex/config.toml"
   kit_backup_path "$HOME/.codex/config.toml" "integrations/codex-config.toml"
-  repair_duplicate_headroom_mcp
   kit_require_real_dir "$HOME/.claude"
   kit_require_real_dir "$HOME/.claude/plugins"
   kit_require_regular_or_absent "$HOME/.claude.json"
@@ -625,8 +406,6 @@ if [ "$PROFILE" != "none" ]; then
   prepare_ponytail_source
   prepare_ponytail_marketplace
 fi
-
-  reconcile_codex_lazycodex
 
   if [ "$PROFILE" = "none" ]; then
     reconcile_codex_ponytail_none
@@ -685,7 +464,7 @@ fi
 ensure_codex_sequential_thinking
 ensure_claude_sequential_thinking
 
-kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_LAZYCODEX_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
+kit_write_integrations_state "$PROFILE" "$CODEX_PONYTAIL_STATE" "$CLAUDE_PONYTAIL_STATE" "$CODEX_SEQTHINK_STATE" "$CLAUDE_SEQTHINK_STATE"
 echo "Recorded integrations state (profile: $PROFILE)."
 
 }

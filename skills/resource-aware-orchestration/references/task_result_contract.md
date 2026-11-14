@@ -16,4 +16,4 @@ Return status (`PASS`, `FAIL`, `BLOCKED`, or `RESOURCE_*`), findings, relevant c
 
 Read [platform dispatch](platform_dispatch.md) for role/model selection. For concurrent local compute, use the resource gate in [the skill](../SKILL.md); do not run a detector solely to dispatch a remote read-only child.
 
-Long work additionally binds the exact command, expected artifacts, progress probe, checkpoint/resume procedure, and graceful cancellation/cleanup. Use [long-run coordination](long_runs.md); routine progress stays in logs, and elapsed time or a wait timeout alone does not mean failure.
+An experiment additionally binds the exact command, run directory, expected artifacts, and checkpoint/resume procedure. Use [experiment runs](experiment_runs.md); routine progress stays in logs, and elapsed time or a wait timeout alone does not mean failure.

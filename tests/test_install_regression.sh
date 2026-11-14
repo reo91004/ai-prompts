@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REAL_HOME="$HOME"
+# The installer follows XDG_CONFIG_HOME for OpenCode; keep it inside each temporary HOME.
+unset XDG_CONFIG_HOME
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
@@ -68,10 +70,18 @@ printf '%s\n' obsolete-kit >> "$TMP_HOME/.universal-research-agent-kit/manifests
 cksum "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills" | awk '{ print $1 ":" $2 }' > "$TMP_HOME/.universal-research-agent-kit/manifests/codex-skills.cksum"
 mkdir -p "$TMP_HOME/.agents/skills/obsolete-kit"
 printf '%s\n' obsolete > "$TMP_HOME/.agents/skills/obsolete-kit/SKILL.md"
+# A skill removed from the kit (Crucible) disappears from every global skill root.
+stale_skill_roots=".agents/skills .claude/skills .codex/skills .config/opencode/skills .opencode/skills"
+for root in $stale_skill_roots; do
+  mkdir -p "$TMP_HOME/$root/crucible"
+  printf '%s\n' stale > "$TMP_HOME/$root/crucible/SKILL.md"
+done
 echo "Install regression run 2 (repeat install)"
 HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/install.sh" --without-statusline
 
 [ ! -e "$TMP_HOME/.agents/skills/obsolete-kit" ]
+for root in $stale_skill_roots; do [ ! -e "$TMP_HOME/$root/crucible" ]; done
+[ ! -e "$TMP_HOME/.universal-research-agent-kit/backups" ]
 cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
 
 echo "Codex context management config merge regression"
@@ -145,8 +155,6 @@ grep -Fqx 'third-party-claude-agent' "$TMP_HOME/.claude/agents/third-party.md"
 [ ! -e "$TMP_HOME/.codex/skills/legacy-user" ]
 [ ! -e "$TMP_HOME/.config/opencode/skills/legacy-user" ]
 grep -Fqx 'native skill' "$TMP_HOME/.codex/skills/.system/native/SKILL.md"
-grep -Fqx 'third-party-codex-skill' "$TMP_HOME"/.universal-research-agent-kit/backups/run.*/codex/skills/third-party/SKILL.md
-grep -Fqx 'third-party-claude-skill' "$TMP_HOME"/.universal-research-agent-kit/backups/run.*/claude/skills/third-party/SKILL.md
 [ -s "$TMP_HOME/.config/opencode/AGENTS.md" ]
 [ -s "$TMP_HOME/.config/opencode/agents/research-reviewer.md" ]
 
@@ -192,7 +200,7 @@ cmp "$TMP_HOME/drift.toml" "$TMP_HOME/.codex/config.toml"
 cp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
 
 state="$TMP_HOME/.universal-research-agent-kit"
-mkdir "$state/.lock"
+mkdir -p "$state/backups/run.fixture" "$state/.lock"
 if HOME="$TMP_HOME" sh "$ROOT/install.sh" --without-statusline --cleanup-backups > "$TMP_HOME/cleanup-lock.log" 2>&1; then
   echo "cleanup ignored an active install lock" >&2; exit 1
 fi
@@ -214,9 +222,6 @@ HOME="$SYMLINK_CASE/host" bash "$ROOT/install.sh" --without-statusline > "$SYMLI
 [ -s "$SYMLINK_CASE/host/.agents/skills/research-repo-protocol/SKILL.md" ]
 [ ! -e "$SYMLINK_CASE/host/.agents/skills/user-skill" ]
 grep -Fqx 'external evidence' "$SYMLINK_CASE/external/user-skill/SKILL.md"
-for backup_link in "$SYMLINK_CASE/host"/.universal-research-agent-kit/backups/run.*/codex/skills; do
-  [ -L "$backup_link" ] && [ "$(readlink "$backup_link")" = "$SYMLINK_CASE/external" ]
-done
 
 echo "Unit regression: kit_restore_entry must not delete a target without its backup"
 (

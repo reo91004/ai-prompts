@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1
+# The installer follows XDG_CONFIG_HOME for OpenCode; keep it inside each temporary HOME.
+unset XDG_CONFIG_HOME
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export KIT_TEST_PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
@@ -13,9 +15,6 @@ TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/tooling-install.XXXXXX")"
 TMP_HOME="$TMP_ROOT/home"
 MOCK_BIN="$TMP_ROOT/mock-bin"
 CALLS="$TMP_ROOT/calls.log"
-source "$ROOT/tests/fixtures/crucible_engine.sh"
-export CRUCIBLE_ROOT="$TMP_ROOT/crucible-fixture"
-make_crucible_fixture "$CRUCIBLE_ROOT"
 trap 'rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 
 mkdir -p "$TMP_HOME" "$MOCK_BIN"
@@ -89,6 +88,14 @@ case "$*" in
       '    printf "%s\\n" "0.9.82" > "$HOME/.codex/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.codex/skills/graphify/references/README.md"' \
       '    ;;' \
+      '  opencode)' \
+      '    rm -rf "$HOME/.config/opencode/skills/graphify"' \
+      '    mkdir -p "$HOME/.config/opencode/skills/graphify/references" "$HOME/.config/opencode/plugins"' \
+      '    printf "%s\\n" "# graphify" > "$HOME/.config/opencode/skills/graphify/SKILL.md"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.config/opencode/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "reference" > "$HOME/.config/opencode/skills/graphify/references/README.md"' \
+      '    printf "%s\\n" "// graphify" > "$HOME/.config/opencode/plugins/graphify.js"' \
+      '    ;;' \
       '  *) exit 1 ;;' \
       'esac' > "$MOCK_TOOL_BIN/graphify"
     chmod +x "$MOCK_TOOL_BIN/graphify"
@@ -127,15 +134,15 @@ mkdir -p "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills"
 printf '%s\n' '# existing codex skill' > "$TMP_HOME/.codex/skills/graphify/SKILL.md"
 ln -s "$TMP_HOME/.codex/skills/graphify" "$TMP_HOME/.config/opencode/skills/graphify"
 run_tooling
-! find "$TMP_HOME/.universal-research-agent-kit/backups" -type d -name work | grep -q .
+# A verified install deletes its backups, downloads and kit uv cache.
+[ ! -e "$TMP_HOME/.universal-research-agent-kit/backups" ]
 grep -Eq '^uv-cache .*/backups/run\.[^/]+/work/uv-cache copy$' "$CALLS"
-[ -L "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-existing-0 ]
-grep -Fqx '# existing codex skill' "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/graphify-codex-skill/SKILL.md
 
 grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall graphifyy==0.9.82' "$CALLS"
-grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[all]==0.42.0' "$CALLS"
+grep -Fqx 'uv --no-config tool install --managed-python --python 3.13 --reinstall headroom-ai[proxy,code,html,image]==0.42.0' "$CALLS"
 grep -Fqx 'graphify install --platform claude' "$CALLS"
 grep -Fqx 'graphify install --platform codex' "$CALLS"
+grep -Fqx 'graphify install --platform opencode' "$CALLS"
 grep -Fqx 'status=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'graphify=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 grep -Fqx 'headroom=installed' "$TMP_HOME/.universal-research-agent-kit/tooling.state"
@@ -145,11 +152,11 @@ grep -Fqx 'headroom_version=0.42.0' "$TMP_HOME/.universal-research-agent-kit/too
 grep -Fqx "tool_bin_dir=$TMP_HOME/.universal-research-agent-kit/tooling/bin" "$TMP_HOME/.universal-research-agent-kit/tooling.state"
 [ -f "$TMP_HOME/.claude/skills/graphify/SKILL.md" ]
 [ -f "$TMP_HOME/.codex/skills/graphify/SKILL.md" ]
+[ -f "$TMP_HOME/.config/opencode/skills/graphify/SKILL.md" ] && [ ! -L "$TMP_HOME/.config/opencode/skills/graphify" ]
 grep -Fqx '# BEGIN UNIVERSAL RESEARCH AGENT KIT GRAPHIFY' "$TMP_HOME/.codex/AGENTS.md"
 grep -Fqx '# END UNIVERSAL RESEARCH AGENT KIT GRAPHIFY' "$TMP_HOME/.codex/AGENTS.md"
 grep -Fqx '# user-owned zshrc content' "$TMP_HOME/.zshrc"
 grep -Fqx '# user-owned bashrc content' "$TMP_HOME/.bashrc"
-grep -Fqx 'user-owned Claude prompt content' "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/claude/CLAUDE.md
 
 for shell_file in "$TMP_HOME/.zshrc" "$TMP_HOME/.bashrc"; do
   [ "$(grep -Fxc '# BEGIN UNIVERSAL RESEARCH AGENT KIT HEADROOM' "$shell_file")" -eq 1 ]
@@ -367,7 +374,6 @@ for corruption in uv python imports dependencies; do
   [ "$(grep -Fc 'tool install --managed-python' "$CALLS")" -eq "$((before_tools + 2))" ]
   [ ! -e "$MANAGED_ROOT/python-venv" ]
   [ ! -e "$MANAGED_ROOT/keep-if-healthy" ]
-  grep -Fqx "old shared environment: $corruption" "$TMP_HOME/.universal-research-agent-kit/backups/"run.*/tooling/environment/python-venv/bin/old-tool
   grep -Fqx 'external Python' "$TMP_HOME/custom-venv/bin/python"
   grep -Fqx 'external Headroom' "$TMP_HOME/.local/bin/headroom"
   grep -Fqx '{"fixture_token":"keep-codex"}' "$TMP_HOME/.codex/auth.json"

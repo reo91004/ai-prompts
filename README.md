@@ -31,15 +31,15 @@ Statusline은 이 패키지에 담은 현재 Mac의 설정으로 **기본 설치
 
 Claude 스크립트에는 `jq`가 필요합니다. macOS는 `brew install jq`, Ubuntu는 `sudo apt install jq`로 먼저 설치하세요. 없으면 기본 설치는 호스트를 변경하기 전에 중단합니다. Codex에는 모델/추론·fast mode·프로젝트·Git 브랜치·권한·승인 모드·남은 컨텍스트·5시간/주간 한도가 표시됩니다. Claude에는 모델·디렉터리/브랜치·컨텍스트 사용량·effort·Ponytail 모드가 표시됩니다. Claude의 effort는 입력에 있을 때, Ponytail 모드는 해당 plugin의 플래그 파일이 있을 때 표시됩니다. 표시 항목의 지원·입력 데이터는 각 CLI 버전에 따릅니다. 도구 설치를 생략하는 격리 검사에서 statusline을 설치·검증하려면 Python 3.11 이상이 필요합니다.
 
-- Graphify(`graphifyy`), Headroom(`headroom-ai[all]`), uv는 설치할 때마다 PyPI의 최신 릴리스를 사용하고, Python 3.13과 함께 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. `[all]`에는 proxy 의존성이 포함되며, 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
+- Graphify(`graphifyy`), Headroom(`headroom-ai[proxy,code,html,image]`), uv는 설치할 때마다 PyPI의 최신 릴리스를 사용하고, Python 3.13과 함께 키트 전용 경로에 자동 준비합니다. system Python이나 수동 `pip install`은 필요하지 않습니다. 버전뿐 아니라 관리 interpreter와 실제 proxy/MCP imports를 확인해 손상된 환경을 다시 설치합니다. 이 extra 조합은 프록시·MCP와 내용별 압축기(텍스트 압축 모델 ONNX 실행, 코드, HTML, 이미지)만 설치하며, 키트가 끄는 장기 메모리와 torch는 받지 않습니다. 같은 버전이라는 이유만으로 외부 Headroom을 재사용하지 않습니다.
 - Ponytail은 설치 시 확인한 원격 HEAD의 소스를 세 플랫폼에 사용합니다. OpenCode에는 같은 소스의 V2 plugin을 등록하고 진입점과 설정을 검증합니다. 기본 모드는 `full`이며 기존에 저장한 모드나 `off`는 유지하므로, 꺼 둔 경우 `/ponytail full`로 켤 수 있습니다. Codex·Claude의 사용자 소유 marketplace는 보존하면서 설치·활성 상태를 별도로 확인합니다. 누락된 plugin은 설치하고, Claude의 비활성 plugin은 활성화합니다. Codex의 비활성 plugin은 설정에서 활성화해야 한다는 오류로 중단합니다.
 - OpenCode에는 OpenAI Responses의 매 모델 요청마다 새 WebSocket을 여는 플러그인도 기본 등록합니다. 공식 CLI를 유지하면서 요청 전 handshake 헤더를 바꿔 연결을 교체하므로, 소스의 `WEBSOCKET_ROTATE_AFTER_MS = 0`과 같은 재연결 동작을 적용합니다. 적용 범위는 `openai` provider의 `/responses` WebSocket 요청입니다. 연결·전체 이력 재전송 비용이 늘 수 있으며, 응답 하나가 60분을 넘는 경우나 원인 미확정 종료 코드 `1000`의 해결을 보장하지 않습니다. [구현과 검증 범위](opencode/README.md#openai-websocket-lifetime)를 참고하세요.
 - Sequential Thinking은 키트 이름인 Codex `sequential_thinking`, Claude `sequential-thinking`으로 `@modelcontextprotocol/server-sequential-thinking@latest`를 등록합니다. 다른 이름의 사용자 MCP는 변경하지 않습니다.
-- Codex의 `features.context_management.experimental_mode = true` 설정을 병합합니다. 이외의 모델·추론 설정은 유지합니다. 지원하지 않는 TOML 형태는 원본 교체 전에 오류로 중단합니다.
+- Codex의 `features.context_management.experimental_mode = true` 설정을 병합합니다. 오케스트레이터 추론 강도 `model_reasoning_effort = "xhigh"`도 설치 때 맞추며, 모델 선택은 유지합니다. 지원하지 않는 TOML 형태는 원본 교체 전에 오류로 중단합니다.
 - Headroom은 호스트의 `127.0.0.1:8787`에서 상시 실행하며 Codex의 전역 provider와 두 CLI의 셸 분기를 구성합니다. 세션마다 설정 파일을 임시로 바꾸지 않습니다. 아래 사용 표를 참고하세요.
 - Graphify의 전역 안내는 유용한 기존 그래프나 명시적인 Graphify 요청에 적용합니다. 단순 코드 질문을 위해 그래프 구축을 요구하지 않습니다.
 
-Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 새 설치와 전체 kit 검증이 끝난 뒤 현재 npm prefix·홈의 NVM Node 버전별 prefix 및 현재 Homebrew에서 확인된 `@openai/codex`, `@anthropic-ai/claude-code`, `codex`, `claude-code`만 해당 패키지 관리자로 제거합니다. 수동 설치본이나 다른 사용자 디렉터리를 검색해서 지우지는 않습니다. Node.js가 24 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
+Codex는 공식 standalone, Claude Code는 공식 native 설치로 통일합니다. 정상 native 설치는 재사용하고, 실행 파일·필수 명령·관리 launcher가 없거나 깨졌으면 공식 설치기로 복구합니다. 이전 npm·Homebrew 설치본은 정리하지 않으며 kit launcher가 공식 설치본을 선택합니다. Node.js가 24 미만이거나 Node.js·npx가 없거나 실행되지 않으면 공식 Node.js 최신 LTS 아카이브의 SHA256을 확인해 설치합니다. Sequential Thinking은 설치 때 확인한 Node/npx의 절대 경로를 사용하는 작은 launcher로 등록하여 Desktop·daemon에서도 셸 초기화 없이 실행합니다.
 
 처음에는 Git, Bash, curl 또는 wget, 인터넷 연결, 사용자 서비스 관리자가 필요합니다. 로그인·계정 이용 권한·조직 정책·pairing은 각 호스트에서 본인이 완료해야 합니다. 키트는 인증 정보를 복사하지 않습니다. `CLAUDE_CONFIG_DIR`과 기본 `~/.codex` 이외의 `CODEX_HOME`은 지원하지 않으며 설치 전에 거부합니다. Python minor 버전과 최상위 패키지는 고정하지만 운영체제별 wheel·전이 의존성까지 완전히 동일하다는 뜻은 아닙니다.
 
@@ -144,8 +144,6 @@ curl -fsS http://127.0.0.1:8787/health
 
 정상 판정에는 `Status: running`, `Healthy: yes`, `/readyz`, 그리고 health의 `deployment.profile`이 키트 소유 기록과 같은지 함께 확인합니다. 새 설치의 profile은 `research-agent-kit`이며, 기존 표준 설치를 인계한 호스트는 `default`를 유지합니다. 임의의 healthy listener를 키트 서비스로 간주하지 않습니다. 다른 서비스가 8787 포트를 사용하거나 사용자 설정이 표준 설치와 다르면 충돌 위치를 안내합니다.
 
-예전 `headroom-default`도 `sh install.sh` 하나로 인계합니다. 로컬 8787 포트의 표준 Codex persistent-service인지 manifest·runner·OS 서비스 정의로 확인한 뒤 정상 종료하고, 배포·서비스 정의·Codex 설정·소유 기록을 백업합니다. 관리 Python과 의존성을 검사·복구한 뒤 표준 provider 블록을 검증하고 키트 소유로 등록합니다. 기존 서비스 이름과 provider 설정을 유지하고, 실행 설정과 runner만 설치된 Headroom 기준으로 다시 만들므로 별도 제거 스크립트나 Headroom의 `install remove` 명령이 필요하지 않습니다. 인증 방식이 바뀐 경우 기존 키트 설치와 동일하게 provider의 인증 플래그만 갱신하며, 이 인계 과정에서 인증 파일이나 세션 DB를 초기화하거나 세션 분류를 바꾸지 않습니다. 실패하면 파일 복구 후 원래 실행 중이던 서비스를 재개합니다. 사용자 지정 환경변수·proxy 옵션·provider 블록은 자동 인계하지 않습니다.
-
 기존 Headroom MCP의 실행 경로·인수가 키트 설정과 같고 `HEADROOM_PROXY_URL`이 기본 주소 `http://127.0.0.1:8787`이거나 생략되어 있으면 설정을 그대로 재사용합니다. 주소의 명시 여부 때문에 재설치가 중단되지 않으며, 다른 주소·명령·추가 환경변수는 강제로 덮어쓰지 않습니다.
 
 `No module named fastapi`와 같은 오류가 나면 작업을 마치고 `sh install.sh`를 다시 실행합니다. 설치기가 키트 소유 Headroom 서비스·MCP를 정상 종료한 뒤 관리 uv·Python·패키지 버전과 의존성을 검사합니다. 하나라도 실패하면 `~/.universal-research-agent-kit/tooling/`을 백업한 뒤 비우고 새 환경을 자동 설치합니다. 별도 복구 옵션이나 system Python의 수동 pip 작업은 필요하지 않습니다. 정상 환경은 재사용하며, 새 설치도 검증에 실패하면 안전하게 복구할 수 있는 경우 이전 상태로 되돌리고 오류를 알립니다. 중지된 키트 서비스가 예전 interpreter를 가리키는 경우에도 재설치 때 runner를 복구합니다.
@@ -161,13 +159,13 @@ sh install.sh
 
 서비스 로그는 macOS의 `~/.headroom/deploy/research-agent-kit/`, Ubuntu의 해당 디렉터리와 `journalctl --user -u headroom-research-agent-kit.service`에서 확인합니다. 인계한 설치는 경로와 서비스 이름의 `research-agent-kit`을 `default`로 바꿉니다. API 키·pairing code·로그의 인증 정보를 저장소나 공유 보고서에 넣지 마세요.
 
-### 기존 환경 정리
+### Ponytail 제외
 
 ```bash
 sh install.sh --integrations none
 ```
 
-`none`은 **통합 단계 생략이 아닙니다.** 키트 소유 Ponytail과 식별 가능한 LazyCodex 레거시 항목을 정리하고 Sequential Thinking·Graphify·Headroom은 유지합니다. 기본 `ponytail` 프로필도 레거시 항목을 정리합니다. 사용자 소유 agent·MCP와 무관한 설정은 보존하며, 전역 사용자 스킬은 새 정본으로 교체하고, 사용자 `max_threads`를 일괄 변경하지 않습니다.
+`none`은 **통합 단계 생략이 아닙니다.** 키트 소유 Ponytail을 정리하고 Sequential Thinking·Graphify·Headroom은 유지합니다. 사용자 소유 agent·MCP와 무관한 설정은 보존하며, 전역 사용자 스킬은 새 정본으로 교체하고, 사용자 `max_threads`를 일괄 변경하지 않습니다.
 
 등록 경로와 소유권 기록으로 관리 대상을 구분합니다. 같은 키트 항목은 백업 후 갱신하고, 선택에서 제외된 키트 항목만 정리합니다. 통합 결과는 `~/.universal-research-agent-kit/integrations.state`, 도구 결과는 `tooling.state`에 기록하며 검증은 이 상태와 실제 설치를 함께 확인합니다.
 
@@ -186,13 +184,9 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 설치 잠금이 유지되는 동안 새 kit CLI 세션은 시작을 거절합니다. Python/패키지 교체 직전과 환경 rollback 전에도 실행 상태를 다시 확인합니다. 실패 시 설치 중 재시작된 키트 서비스를 다시 중지하고 환경·이전 runner를 복구한 뒤, 설치 전에 실행 중이었던 서비스를 재개합니다. 중지나 복구가 안전하지 않으면 환경·journal·재개 기록을 보존하고 실패를 알립니다. 프로세스 검사는 snapshot에 기반하며 외부에서 직접 시작하는 프로세스까지 원자적으로 막지는 못하므로 설치가 끝날 때까지 관련 클라이언트·서비스를 다시 시작하지 마세요. 종료 도우미는 패키지 의존성이 깨져도 실행할 수 있는 표준 라이브러리만 사용하며, 사용할 수 있는 Python 3.8 이상이 전혀 없으면 직접 중지를 안내합니다.
 
-기존 ai-prompts를 설치한 호스트도 같은 `sh install.sh`로 갱신합니다. 이전 kit wrapper와 설치 상태가 확인되면 Codex의 정확한 legacy Headroom 표식만 제거하고, root provider의 `# was:` 또는 이전 백업의 해당 root 값만 복구합니다. 백업 이후 추가한 MCP·프로젝트·모델 설정은 현재 파일에서 유지합니다. 알려진 kit 경로를 가리키는 중복 Headroom MCP는 정리 후 다시 등록합니다. 재구성 때 kit의 옛 pip fallback venv도 tooling 백업에 보존하고 활성 경로에서는 제거합니다. 이 재구성은 키트 밖에 별도로 설치한 Python·Headroom·Graphify와 로그인 정보를 삭제하지 않습니다. 경로가 symlink여서 관리 범위를 확정할 수 없는 경우에는 자동 삭제를 거절합니다.
-
-과거 Headroom 처리에서 MCP 시작 주석이 없어지고 종료 주석만 남은 경우에는 그 주석과 기존 설정을 그대로 보존하며 진행합니다. 주석 앞의 테이블을 키트 소유로 추정해 삭제하지 않습니다. 끝나지 않은 블록이나 provider 표식의 불균형, 잘못된 TOML은 계속 중단하고 문제의 표식을 알립니다.
-
 소유 기록이 없는 custom provider·동명 MCP·다른 서비스의 8787 포트 사용은 자동 인수하지 않고 충돌 위치를 알립니다. kit 소유 서비스는 앞의 종료 확인 후 필요한 경우 옛 Python runner를 복구합니다. 일반 세션은 프로젝트의 옛 Claude proxy 설정을 세션 범위에서 덮어쓰며, Claude Remote Control은 파일에 남은 proxy 설정의 충돌을 안내합니다. 실행 중인 과거 wrapper가 파일을 쓸 수 있으므로 프로젝트 파일을 일괄 삭제하지 않습니다.
 
-설치 후 새 터미널을 여세요. 이미 열린 셸의 함수·alias는 자식 설치 프로세스가 바꿀 수 없습니다. 직접 만든 `codex`/`claude` alias가 있다면 해당 alias를 해제하고 kit wrapper를 사용해야 합니다. 패키지 정리 권한이 부족하면 검증된 새 native 설치를 유지한 채 오류를 보고하며, 기존 패키지가 정리된 것처럼 성공 처리하지 않습니다. 로그인·인증·세션 디렉터리는 제거 대상이 아닙니다.
+설치 후 새 터미널을 여세요. 이미 열린 셸의 함수·alias는 자식 설치 프로세스가 바꿀 수 없습니다. 직접 만든 `codex`/`claude` alias가 있다면 해당 alias를 해제하고 kit wrapper를 사용해야 합니다. 로그인·인증·세션 디렉터리는 제거 대상이 아닙니다.
 
 설치기는 `~/.universal-research-agent-kit/` 아래 백업·소유 목록·실행 journal을 사용합니다. 동시 설치를 막고, 백업에 성공한 뒤 변경을 기록하며, 실패하면 journal에 등록된 키트 관리 경로를 복구하되, 사용 중인 관리 환경은 덮어쓰지 않고 복구 자료를 보존합니다. 사용자 데이터 손실을 막는 경로 검사·백업·복구·소유 목록은 유지합니다. 외부 CLI가 만드는 캐시와 외부 등록 상태 전체까지 파일 journal로 복구한다고 주장하지 않습니다.
 
@@ -204,11 +198,7 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 [research-repo-protocol](skills/research-repo-protocol/SKILL.md)은 질문·사양·실행·근거·판정·인계를 연결하며 기존 설계 스킬도 통합했습니다. [계층 구조](skills/research-repo-protocol/references/directory-roles.md)와 [공통 연구 원칙](skills/research-domain-router/references/research_principles.md)을 작업에 맞게 참조합니다. [paper-writing](skills/paper-writing/SKILL.md)은 논문 집필을 맡고, 기본 설치·갱신하는 [Humanizer](https://github.com/blader/humanizer)를 문체 편집에 사용합니다. 수치·수식·인용·전문용어·주장 강도는 보존합니다.
 
-## Crucible 연구 루프
-
-장기 실험 실행·평가·조건부 다중 모델 검토는 별도 [Crucible 엔진](https://github.com/reo91004/Crucible)이 맡습니다. 기본 `sh install.sh`는 홈 아래의 기존 엔진을 찾아 재사용하고, 없으면 `~/Crucible`에 내려받아 연결한 뒤 공통 스킬을 설치합니다. 경로는 자동으로 기록하므로 직접 지정할 필요가 없습니다. 기존 저장소는 갱신·덮어쓰기하지 않습니다. 여러 복사본이 있으면 `CRUCIBLE_ROOT`로 선택하며, tooling 생략 모드에서는 엔진 설치도 생략합니다.
-
-엔진의 `bin/crucible init --project <새 디렉터리>`로 합성 예제를 시작할 수 있습니다. 실제 연구에는 프로젝트별 실험·평가 설정을 작성합니다. OpenCode에서는 엔진의 `link-opencode --project <프로젝트>`로 프로젝트 전용 도구를 연결하며, Claude Code에서는 같은 스킬과 CLI를 사용합니다. 키트 설치기가 외부 엔진이나 진행 중인 실험을 자동 갱신하지는 않습니다.
+이상치는 새 연구의 단서로 다룹니다. 돌파구가 필요하면 프로젝트의 `records/rounds/<date>-<id>-<topic>/`에 md로 [토론 라운드](skills/research-repo-protocol/SKILL.md#discussion-rounds)를 남깁니다. 오케스트레이터가 `question.md`에 자기 예측을 먼저 쓰고, Codex `breakthrough_analyst`(Ultra)와 Claude `breakthrough-analyst`(Max)의 독립 답변을 `codex.md`·`claude.md`로, 채택 이유와 다음 실험을 `decision.md`로 남깁니다. 실패한 실험은 원인을 찾아 고친 뒤 계속하며, 시도마다 md/json으로 결과만 짧게 기록하고 실패 시도의 대용량 산출물은 지웁니다. 실험 파일에 SHA-256 같은 해시를 고정하거나 재검증하지 않습니다.
 
 ## 일상 원격 제어
 
@@ -240,10 +230,10 @@ sh codex-remote.sh disable
 | `codex/statusline.toml` | `~/.codex/config.toml`의 `tui.status_line` |
 | `claude-code/statusline.settings.json`, `claude-code/statusline.sh` | `~/.claude/settings.json`의 `statusLine`, `~/.claude/statusline.sh` |
 | `skills/*` | `~/.agents/skills/`, `~/.claude/skills/` |
-| Graphify CLI가 제공하는 스킬 | `~/.codex/skills/graphify/`, `~/.claude/skills/graphify/` |
+| Graphify CLI가 제공하는 스킬 | `~/.codex/skills/graphify/`, `~/.claude/skills/graphify/`, `~/.config/opencode/skills/graphify/`(+ `plugins/graphify.js`) |
 | `headroom/auto-wrap.sh`, `headroom/runtime.py` | `~/.config/headroom/` |
 
-Codex agent 16개와 Claude agent 15개는 **플랫폼별 정의를 유지**합니다. 모델·effort·sandbox/도구 권한을 스킬에 합치지 않습니다. Codex는 역할별 TOML의 Astra 설정, Claude는 역할별 Opus/Sonnet 설정을 사용하며 실제 실행 시 호스트나 환경 override가 있는지 구분합니다. 주 에이전트의 모델을 이 키트가 대신 선택하지 않습니다.
+Codex agent 17개와 Claude agent 16개는 **플랫폼별 정의를 유지**합니다. 모델·effort·sandbox/도구 권한을 스킬에 합치지 않습니다. Codex는 역할별 TOML의 Astra 설정, Claude는 역할별 Opus/Sonnet 설정을 사용하며 실제 실행 시 호스트나 환경 override가 있는지 구분합니다. 주 에이전트의 모델은 선택하지 않으며, Codex 오케스트레이터의 추론 강도만 `xhigh`로 맞춥니다.
 
 위임은 독립 산출물, 큰 탐색의 요약, 중요한 결론의 전문 검토에 사용합니다. 최소 인원과 단계별 상호 호출을 강제하지 않습니다. 병렬 작성은 격리 worktree·소유권·병합 계획을 갖추고 자식은 재위임하지 않습니다. 큰 출력은 파일로, 부모에게는 요약과 근거 위치를 돌려줍니다.
 
@@ -263,13 +253,13 @@ Codex agent 16개와 Claude agent 15개는 **플랫폼별 정의를 유지**합�
 | `review-budget` | 독립 의미 검토의 필요성과 범위를 정할 때 |
 | `adversarial-review` | 중요한 결론을 비판적으로 검토하거나 부정적 결과의 원인을 조사할 때 |
 | `planned-work` | 여러 세션의 복구나 실질적인 인계 기록이 필요할 때 |
-| `resource-aware-orchestration` | 독립 agent 작업, 로컬 동시 연산, 장기 실행을 조정할 때 |
+| `resource-aware-orchestration` | 하위 agent 위임, 로컬 동시 연산, 실험 실행을 조정할 때 |
 | `sequential-thinking-mcp` | 어려운 계획·불명확한 디버깅·비싼 실험 설계·복잡한 결론 판단 |
 | `report-writer` | 근거를 바탕으로 한국어 연구 보고서나 인계 문서를 작성할 때 |
 
 스킬과 참고 문서는 내용의 정확성을 위한 지침입니다. 모든 스킬을 읽는 고정 순서나 빈 템플릿 작성 의무는 없습니다. 문서의 수치·인용·확실성·근거 한계를 문체 때문에 바꾸지 않습니다.
 
-장기 실행의 명령·체크포인트·재개·중단과 플랫폼별 역할 선택은 [위임 스킬](skills/resource-aware-orchestration/SKILL.md)의 필요한 참고 문서에 있습니다. 물리 캡처는 [캡처 스킬](skills/hardware-capture-integrity/SKILL.md)과 해당 장비의 프로젝트 설정을 사용합니다. 특정 PicoScope/MCU 레이아웃과 첫-trigger 복구 절차는 적용 대상일 때 읽으며 다른 장비에 강제하지 않습니다.
+실험은 세션과 분리해 실행합니다. 실행·대기·새 세션에서의 재개와 플랫폼별 역할 선택은 [위임 스킬](skills/resource-aware-orchestration/SKILL.md)의 필요한 참고 문서에 있습니다. 물리 캡처는 [캡처 스킬](skills/hardware-capture-integrity/SKILL.md)과 해당 장비의 프로젝트 설정을 사용합니다. 특정 PicoScope/MCU 레이아웃과 첫-trigger 복구 절차는 적용 대상일 때 읽으며 다른 장비에 강제하지 않습니다.
 
 ## 검증
 
@@ -300,7 +290,7 @@ python3 tests/test_headroom_legacy.py
 - 통합·도구 설치 변경: 가짜 외부 CLI로 등록·보존·정리·실패 경로를 확인합니다. 기본 전체 설치 검사는 skip 없이 최초·반복 설치와 필수 구성 누락을 확인합니다.
 - 연구 주장: 해당 결론에 필요한 실제 근거를 확인합니다. 물리 안전·무결성 검사는 모든 물리 캡처에 적용합니다.
 
-이미 통과한 무관한 검사는 반복하지 않습니다. 구조 검사는 모델 행동이나 실제 외부 서비스 설치 성공의 증거가 아닙니다. 행동을 평가할 때는 작은 수정, 중요한 결론 검토, 장기 실행, 읽기 전용 요청처럼 구분되는 실제 작업에서 범위·근거·완료 동작을 확인합니다.
+이미 통과한 무관한 검사는 반복하지 않습니다. 구조 검사는 모델 행동이나 실제 외부 서비스 설치 성공의 증거가 아닙니다. 행동을 평가할 때는 작은 수정, 중요한 결론 검토, 실험 실행, 읽기 전용 요청처럼 구분되는 실제 작업에서 범위·근거·완료 동작을 확인합니다.
 
 CI는 macOS·Ubuntu의 구조 검사, detector/runner, 격리 설치와 mock 통합을 실행합니다. 원격 CI·실제 Linux/WSL 호스트·물리 장비·모델 행동은 실행 근거가 있을 때만 검증됐다고 보고합니다.
 

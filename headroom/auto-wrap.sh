@@ -1,4 +1,4 @@
-_universal_research_agent_kit_headroom_command() {
+universal_research_agent_kit_headroom_command() {
   local headroom_bin
   local python_headroom_bin
 
@@ -33,39 +33,39 @@ _universal_research_agent_kit_headroom_command() {
 
 claude() {
   local KIT_COMMAND_KIND
-  if _universal_research_agent_kit_direct_command claude "$@"; then
+  if universal_research_agent_kit_direct_command claude "$@"; then
     (
       if [ "$KIT_COMMAND_KIND" = remote ]; then
         unset ANTHROPIC_BASE_URL
         if [ -x "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" ]; then
-          _universal_research_agent_kit_runtime claude-direct-check || exit
+          universal_research_agent_kit_runtime claude-direct-check || exit
         fi
       fi
-      _universal_research_agent_kit_cli claude "$@"
+      universal_research_agent_kit_cli claude "$@"
     )
   elif [ -f "$HOME/.universal-research-agent-kit/headroom.json" ]; then
-    _universal_research_agent_kit_runtime launch claude "$@"
+    universal_research_agent_kit_runtime launch claude "$@"
   else
-    _universal_research_agent_kit_headroom_command wrap claude -- "$@"
+    universal_research_agent_kit_headroom_command wrap claude -- "$@"
   fi
 }
 
 codex() {
   local KIT_COMMAND_KIND
-  if _universal_research_agent_kit_direct_command codex "$@"; then
+  if universal_research_agent_kit_direct_command codex "$@"; then
     if [ "$KIT_COMMAND_KIND" = remote ]; then
-      _universal_research_agent_kit_codex_lifecycle "$@"
+      universal_research_agent_kit_codex_lifecycle "$@"
     else
-      _universal_research_agent_kit_cli codex "$@"
+      universal_research_agent_kit_cli codex "$@"
     fi
   elif [ -f "$HOME/.universal-research-agent-kit/headroom.json" ]; then
-    _universal_research_agent_kit_runtime launch codex "$@"
+    universal_research_agent_kit_runtime launch codex "$@"
   else
-    _universal_research_agent_kit_headroom_command wrap codex -- "$@"
+    universal_research_agent_kit_headroom_command wrap codex -- "$@"
   fi
 }
 
-_universal_research_agent_kit_cli() {
+universal_research_agent_kit_cli() {
   local tool="$1" binary="$HOME/.universal-research-agent-kit/cli/bin/$1"
   shift
   if [ -e "$binary" ] || [ -L "$binary" ]; then
@@ -75,14 +75,14 @@ _universal_research_agent_kit_cli() {
   fi
 }
 
-_universal_research_agent_kit_runtime() {
+universal_research_agent_kit_runtime() {
   command "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" \
     -I -B "$HOME/.config/headroom/runtime.py" "$@"
 }
 
 # Inspect tokens, never the joined command line: a prompt/option value may
 # contain the words remote-control or --rc without requesting that mode.
-_universal_research_agent_kit_direct_command() {
+universal_research_agent_kit_direct_command() {
   local tool="$1" skip=0 positional=0 arg
   shift
   KIT_COMMAND_KIND=admin
@@ -116,23 +116,23 @@ _universal_research_agent_kit_direct_command() {
   return 1
 }
 
-_universal_research_agent_kit_codex_lifecycle() {
+universal_research_agent_kit_codex_lifecycle() {
   local base="${CODEX_HOME:-$HOME/.codex}/packages/standalone/current"
   if [ -x "$base/bin/codex" ]; then
     command "$base/bin/codex" "$@"
   elif [ -x "$base/codex" ]; then
     command "$base/codex" "$@"
   else
-    _universal_research_agent_kit_cli codex "$@"
+    universal_research_agent_kit_cli codex "$@"
   fi
 }
 
 claude_raw() {
-  _universal_research_agent_kit_cli claude "$@"
+  universal_research_agent_kit_cli claude "$@"
 }
 
 codex_raw() {
-  _universal_research_agent_kit_cli codex "$@"
+  universal_research_agent_kit_cli codex "$@"
 }
 
 # Raw means only shell-dispatch bypass. Codex still reads its persistent provider.

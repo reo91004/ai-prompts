@@ -103,16 +103,6 @@ class StartupTests(unittest.TestCase):
         self.assertFalse(any(call[0] == "sudo" or "disable-linger" in call for call in self.calls))
 
     @patch.object(startup.sys, "platform", "linux")
-    def test_manual_registration_is_adopted_for_the_default_profile(self):
-        self.state.write_text('{"profile":"default"}')
-        path = startup.startup_path(self.home)
-        path.parent.mkdir(parents=True)
-        path.write_text(startup.unit_text(startup.LAYOUTS[0], "default", legacy=True))
-        startup.install(self.home, self.binary)
-        self.assertEqual(path.read_text(), startup.unit_text(startup.LAYOUTS[0], "default"))
-        self.assertEqual(path.stat().st_mode & 0o777, 0o644)
-
-    @patch.object(startup.sys, "platform", "linux")
     def test_linger_denial_does_not_claim_boot_success_or_run_sudo(self):
         self.deny_linger = True
         with self.assertRaisesRegex(RuntimeError, "login-free boot startup still needs linger"):

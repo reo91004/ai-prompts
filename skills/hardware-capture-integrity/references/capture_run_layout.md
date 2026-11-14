@@ -24,7 +24,7 @@ runs/<YYYYMMDD-HHMMSS>-<slug>/
 ├── capture_diagnostic.png     # traces visualization (see below)
 ├── blocked.json               # ONLY on failure, instead of a fake-success manifest
 ├── config.yaml                # the exact config used (copied, not hashed)
-├── queries/queries.json       # prepared inputs, bound by sha256 in provenance
+├── queries/queries.json       # prepared inputs, referenced by path in provenance
 ├── logs/
 │   ├── capture.log            # scope settings (before→after), per-attempt events
 │   ├── prepare_queries.log
@@ -40,8 +40,8 @@ runs/<YYYYMMDD-HHMMSS>-<slug>/
 
 A run is complete only when `traces.npy`, `manifest.json`, `capture_summary.json`,
 and `capture_diagnostic.png` all exist and the manifest lists them. A failed
-capture writes `blocked.json` and stops; it never writes a partial manifest that
-reads as success.
+capture writes a brief `blocked.json` (cause and fix attempted), deletes its
+partial traces, and never writes a partial manifest that reads as success.
 
 ## manifest.json
 
@@ -56,24 +56,20 @@ Top level:
 - `artifact_roles[]` — one entry per artifact:
   `{filename, role, shape, dtype, claim_scope}`
 - `provenance{}` — everything that binds the measurement to what produced it:
-  - `firmware`: `hex` / `elf` / `lss` / `build_manifest`, each `{path, sha256}`
-  - `host`: `so` / `build_signature`, each `{path, sha256}`
-  - `prepared_queries`: `{schema, path, sha256, query_count, helper{params, required_symbols, sha256}}`
+  - `firmware`: `hex` / `elf` / `lss` / `build_manifest`, each `{path}`, plus the
+    git commit the firmware was built from
+  - `host`: `so` / `build_signature`, each `{path}`
+  - `prepared_queries`: `{schema, path, query_count, helper{params, required_symbols}}`
   - `target_board`, `command_route`, `tool_versions`
     (`chipwhisperer`, `picosdk`, `numpy`, `python`, …)
 
-### Hash inputs, not outputs
+### Identify inputs without hashes
 
-Hash only what went *into* the capture: firmware, host library, and prepared
-queries. Those catch a real and silent mistake — you edit the firmware, forget to
-flash it, capture 2048 traces, and the run reads as v2 while the board ran v1.
-Nothing in the rig tells you; the hash does.
-
-Do not hash what the run just produced. A `sha256` of `traces.npy` computed
-seconds after writing it proves only that nobody tampered with the file
-afterward, which is a custody claim for a third party, not a mistake this
-researcher can make. `git_commit` covers the code, and `config.yaml` is copied
-into the run directory, so neither needs a separate digest.
+Record each input's path and the git commit it was built from. The stale-firmware
+mistake (edit the firmware, forget to flash it, and capture v1 while the run reads
+as v2) is caught by programming and reading back the firmware at session start,
+not by hashing files. Do not hash inputs or outputs: `git_commit` covers the code,
+and `config.yaml` is copied into the run directory.
 
 `shape` and `dtype` stay in `artifact_roles` because they *do* catch mistakes: a
 capture that died at trace 1997 of 2048 shows up immediately. `role` and
@@ -141,8 +137,6 @@ can keep them consistent (the reference project uses `p2mlab/io.py` and
 `p2mlab/plots.py`). These function signatures are examples, not extra APIs to
 implement for a single script. The recorded evidence is the contract:
 
-- `sha256_file(path) -> "sha256:…"` — for provenance inputs only (firmware, host
-  library, prepared queries)
 - `write_json(path, data)` — `indent=2, sort_keys=True`, trailing newline
 - `save_np(path, arr)`
 - `start_manifest(config, config_path, out_dir, status=…)` — seeds run_id / scheme

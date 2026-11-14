@@ -136,7 +136,6 @@ install_standalone_codex() {
   kit_backup_path "$HOME/.codex/packages/standalone" "bootstrap/codex-payload-$KIT_CLI_UPDATE_INDEX"
   kit_backup_path "$KIT_STATE_ROOT/cli/bin/codex" "bootstrap/codex-vendor-launcher-$KIT_CLI_UPDATE_INDEX"
   download_file https://chatgpt.com/codex/install.sh "$KIT_WORK_DIR/install-codex.sh" || kit_die "Could not download the Codex installer."
-  # Package-manager cleanup follows verification of all replacements.
   CODEX_INSTALL_DIR="$KIT_STATE_ROOT/cli/bin" CODEX_NON_INTERACTIVE=1 \
     sh "$KIT_WORK_DIR/install-codex.sh" --release "$KIT_CODEX_VERSION" || kit_die "Codex standalone installation failed."
   binary="$(managed_codex)" && cli_usable codex "$binary" &&
@@ -213,9 +212,9 @@ install_native_opencode() {
     const u=new URL(d.dist.tarball);if(u.protocol!=="https:"||u.hostname!=="registry.npmjs.org")process.exit(1);console.log(u.href);' \
     "$metadata" "@opencode/cli-$target" "$KIT_OPENCODE_VERSION")" || kit_die "Invalid OpenCode platform package metadata."
   download_file "$url" "$archive" || kit_die "Could not download the OpenCode platform package."
-  KIT_OPENCODE_ARCHIVE_SHA256="$(node -e 'const fs=require("fs"),c=require("crypto"),d=JSON.parse(fs.readFileSync(process.argv[1],"utf8")),b=fs.readFileSync(process.argv[2]);
-    if("sha512-"+c.createHash("sha512").update(b).digest("base64")!==d.dist.integrity)process.exit(1);
-    console.log(c.createHash("sha256").update(b).digest("hex"));' "$metadata" "$archive")" || kit_die "OpenCode archive integrity mismatch."
+  node -e 'const fs=require("fs"),c=require("crypto"),d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+    if("sha512-"+c.createHash("sha512").update(fs.readFileSync(process.argv[2])).digest("base64")!==d.dist.integrity)process.exit(1);' \
+    "$metadata" "$archive" || kit_die "OpenCode archive integrity mismatch."
   tar -xzf "$archive" -C "$stage"
   cli_usable opencode "$stage/package/bin/opencode" &&
     [ "$(cli_version "$stage/package/bin/opencode")" = "$KIT_OPENCODE_VERSION" ] || kit_die "OpenCode package did not provide V2 $KIT_OPENCODE_VERSION."
@@ -224,62 +223,6 @@ install_native_opencode() {
   kit_backup_path "$binary" "bootstrap/opencode-native-binary-$KIT_CLI_UPDATE_INDEX"
   kit_replace_file "$stage/package/bin/opencode" "$binary"
   set_cli_launcher opencode "$binary"
-}
-
-cleanup_legacy_clis() {
-  local directory manager root prefix package kind name native_target
-  local managers=() seen=':'
-  verify_native_clis || kit_die "Legacy packages were preserved because native CLI verification failed."
-  native_target="$(node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "$HOME/.local/bin/claude")"
-  manager="$(command -v npm || true)"
-  [ -z "$manager" ] || managers+=("$manager")
-  for directory in "$HOME"/.nvm/versions/node/*/bin; do
-    [ ! -x "$directory/npm" ] || managers+=("$directory/npm")
-  done
-  for manager in "${managers[@]}"; do
-    directory="$(dirname "$manager")"
-    root="$(PATH="$directory:$PATH" "$manager" root --global)" || kit_die "Cannot inspect npm packages with $manager."
-    case "$root" in /*/lib/node_modules) prefix="${root%/lib/node_modules}" ;; *) continue ;; esac
-    case "$seen" in *":$root:"*) continue ;; esac
-    seen="$seen$root:"
-    for package in @openai/codex @anthropic-ai/claude-code; do
-      [ -f "$root/$package/package.json" ] || continue
-      node -e 'if(require(process.argv[1]).name!==process.argv[2])process.exit(1)' "$root/$package/package.json" "$package" ||
-        kit_die "Unexpected package identity at $root/$package; preserved."
-      echo "Removing legacy npm package $package from $prefix (native replacement verified)."
-      local remove_status=0
-      PATH="$directory:$PATH" "$manager" uninstall --global --prefix "$prefix" "$package" || remove_status=$?
-      # npm with prefix ~/.local can unlink the newly installed native launcher.
-      if [ ! -e "$HOME/.local/bin/claude" ] && [ ! -L "$HOME/.local/bin/claude" ]; then
-        ln -s "$native_target" "$HOME/.local/bin/claude"
-      fi
-      [ "$remove_status" -eq 0 ] || kit_die "Native CLIs are installed, but legacy npm cleanup failed for $prefix/$package."
-    done
-  done
-  managers=()
-  manager="$(command -v brew || true)"
-  [ -z "$manager" ] || managers+=("$manager")
-  seen=':'
-  for manager in "${managers[@]}"; do
-    prefix="$("$manager" --prefix)" || kit_die "Cannot inspect Homebrew prefix with $manager."
-    case "$seen" in *":$prefix:"*) continue ;; esac
-    seen="$seen$prefix:"
-    for kind in cask formula; do
-      local installed
-      # Name-only listing avoids loading unrelated cask definitions and taps.
-      installed="$("$manager" list "--$kind" -1)" || kit_die "Cannot inspect Homebrew $kind packages."
-      for name in codex claude-code; do
-        printf '%s\n' "$installed" | grep -Fqx "$name" || continue
-        echo "Removing legacy Homebrew $kind $name (native replacement verified)."
-        "$manager" uninstall "--$kind" "$name" || kit_die "Native CLIs are installed, but Homebrew cleanup failed for $name."
-      done
-    done
-  done
-  # npm with prefix ~/.local can unlink the new native launcher during removal.
-  if [ ! -e "$HOME/.local/bin/claude" ] && [ ! -L "$HOME/.local/bin/claude" ]; then
-    ln -s "$native_target" "$HOME/.local/bin/claude"
-  fi
-  verify_native_clis || kit_die "Native CLI verification failed after legacy package cleanup."
 }
 
 verify_native_clis() {

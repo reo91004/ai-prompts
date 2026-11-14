@@ -1,6 +1,6 @@
 ---
 name: review-budget
-description: Use before a semantic acceptance review to choose its scope and stop repeated verdicts without limiting evidence-driven result analysis.
+description: Use only before a final semantic acceptance review of a material claim or change, to choose its scope and stop repeated verdicts.
 ---
 
 ## Review Necessity Gate
@@ -29,6 +29,6 @@ Do not rerun an unaffected passing suite after a narrow delta. Recheck the chang
 
 Provide the claim or requested behavior, artifact slice, and relevant deterministic evidence. Add prior fixes or domain context only when needed. A separate packet document is optional.
 
-State what is supported first, then categorize concrete findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`. Omit empty categories. Missing experiments beyond the claim are optional; wrong numbers, unsupported inferences, and needless implementation complexity require fixes.
+State what is supported first, then categorize concrete findings as `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, or `Do Not Change`. Omit empty categories. Missing experiments beyond the claim are optional; wrong numbers, unsupported inferences, and needless implementation complexity require fixes. A code defect is a required fix only when it has a realistic trigger in the workflow the code serves; hypothetical edge cases, defensive hardening, and content hashing are not.
 
 The round limit applies to repeated acceptance verdicts on the same artifact. It does not cap causal analysis of a negative result: a new testable explanation or new evidence can justify further investigation. Use `adversarial-review` to investigate causes and remedies. A useful Codex review obtained during Claude collaboration counts as the applicable review, not a second approval chain.

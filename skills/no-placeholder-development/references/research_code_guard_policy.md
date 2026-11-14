@@ -7,7 +7,7 @@ Research code should be clear enough to audit and complete enough to support the
 Use fail-fast checks when accepting bad state would create fake science, fake confidence, or unreproducible evidence:
 
 - synthetic and measured data must not be confused;
-- dataset, trace, target, model, bitstream, config, seed, git commit, and run ID should be bound to outputs when they affect the claim — one commit hash for the code, not a per-artifact hash manifest;
+- dataset, trace, target, model, bitstream, config, seed, git commit, and run ID should be bound to outputs when they affect the claim — identified by path, git commit, and config, without content hashes;
 - missing logs, metrics, checkpoints, plots, tables, or raw artifacts must not be silently replaced with fake values;
 - `claim_scope` must distinguish the conclusions relevant to the domain, including simulation versus measurement and component versus system claims; use leakage/recovery categories only for claims that need them;
 - random seeds and important config values must be recorded when they affect reported numbers;
@@ -28,7 +28,7 @@ Do not introduce the following without a concrete need. Remove them within the r
 - DoS or resource caps for single-user offline scripts;
 - TOCTOU defenses for non-destructive local experiment reads;
 - complex exception hierarchies where a plain error is clearer;
-- per-output hash manifests, custody chains, or artifact sealing without a concrete reproducibility need; keep input identity and installed-file ownership records that prevent stale inputs or user-data loss;
+- content hashes (SHA-256) of inputs, outputs, or attempts, hash manifests, custody chains, or artifact sealing;
 - generic plugin registries, manifest validators, config migration systems, or framework machinery;
 - broad defensive wrappers that make the experiment protocol harder to read.
 

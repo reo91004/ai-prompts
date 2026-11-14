@@ -1,6 +1,5 @@
 """Daily Remote Control commands against isolated CLI and service fixtures."""
 
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -101,7 +100,7 @@ esac
 
     def snapshot(self):
         return {str(path.relative_to(self.home)): ("link", os.readlink(path)) if path.is_symlink()
-                else ("file", hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_mode)
+                else ("file", path.read_bytes(), path.stat().st_mode)
                 if path.is_file() else ("directory", path.stat().st_mode)
                 for path in self.home.rglob("*")}
 

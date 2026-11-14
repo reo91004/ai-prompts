@@ -31,6 +31,7 @@ def fail(message):
 
 def select_profile(profile):
     global PROFILE, SERVICE, LABEL, DEPLOY
+    # Some kit ownership records name the earlier default profile; keep running it.
     if profile not in ("research-agent-kit", "default"):
         fail("Unsupported kit Headroom profile; its service was preserved.")
     PROFILE = profile
@@ -111,11 +112,8 @@ def owned_mcp(arguments):
     # Match complete known invocation prefixes, including HOME with spaces.
     # Never interpret -c source, arbitrary Python jobs, or external Headroom.
     for root in {KIT / "tooling", KIT.resolve() / "tooling"}:
-        entries = [root / "bin/headroom", root / "uv-tools/headroom-ai/bin/headroom",
-                   root / "python-venv/bin/headroom"]
-        interpreters = [directory / name
-                        for directory in (root / "uv-tools/headroom-ai/bin", root / "python-venv/bin")
-                        for name in ("python", "python3", "python3.13", "Python")]
+        entries = [root / "bin/headroom", root / "uv-tools/headroom-ai/bin/headroom"]
+        interpreters = [root / "uv-tools/headroom-ai/bin" / name for name in ("python", "python3", "python3.13", "Python")]
         interpreters += list((root / "python").glob("cpython-*/bin/python3*"))
         prefixes = [(str(entry), [entry.parent]) for entry in entries]
         prefixes += [(str(python) + " " + str(entry), [python.parent, entry.parent])
@@ -145,12 +143,11 @@ def owned_service():
     state = KIT / "headroom.json"
     for path in (state, DEPLOY, service_path()):
         safe_path(path)
-    adopting = not state.exists() and PROFILE == "default"
-    if not state.exists() and not adopting:
+    if not state.exists():
         if DEPLOY.exists() or service_path().exists():
             fail("The Headroom service has no kit ownership record; it was preserved.")
         return False
-    if state.exists() and json.loads(state.read_text()).get("profile") != PROFILE:
+    if json.loads(state.read_text()).get("profile") != PROFILE:
         fail("The Headroom ownership record does not identify the kit service.")
     expected = {"profile": PROFILE, "port": PORT, "host": "127.0.0.1",
                 "preset": "persistent-service", "runtime_kind": "python",
@@ -161,17 +158,6 @@ def owned_service():
     manifest = json.loads(manifest_path.read_text())
     if any(manifest.get(key) != value for key, value in expected.items()):
         fail("The Headroom deployment was customized; automatic service stop was refused.")
-    if adopting:
-        expected_env = {"HEADROOM_PORT": str(PORT), "HEADROOM_HOST": "127.0.0.1", "HEADROOM_MODE": "cache",
-                        "HEADROOM_BACKEND": "anthropic", "HEADROOM_TELEMETRY": "off"}
-        standard = {"backend": "anthropic", "anyllm_provider": None, "region": None,
-                    "proxy_mode": "cache", "memory_enabled": False, "telemetry_enabled": False,
-                    "base_env": expected_env, "tool_envs": {"codex": {"OPENAI_BASE_URL": "http://127.0.0.1:8787/v1"}},
-                    "proxy_args": ["--host", "127.0.0.1", "--port", "8787", "--mode", "cache", "--backend", "anthropic", "--no-telemetry"],
-                    "mutations": [{"target": "codex", "kind": "toml-block", "path": str(HOME / ".codex/config.toml"), "data": {}}]}
-        if any(manifest.get(key) != value for key, value in standard.items()):
-            fail("The default Headroom deployment has custom runtime/provider settings. "
-                 "Preserved " + str(manifest_path) + "; automatic adoption requires the standard local Codex deployment.")
     runner = str(DEPLOY / "run-headroom.sh")
     safe_path(Path(runner))
     lines = Path(runner).read_text().splitlines()
@@ -186,8 +172,6 @@ def owned_service():
         if assignment[1] in exports:
             fail("The Headroom runner has duplicate exports; automatic service stop was refused.")
         exports[assignment[1]] = values[0]
-    if adopting and exports != expected_env:
-        fail("The default Headroom runner has custom environment settings; it was preserved.")
     invocation = shlex.split(lines[-1])
     prefix = invocation[1:-5]
     module = (len(prefix) == 3 and re.fullmatch(r"[Pp]ython[0-9.]*", Path(prefix[0]).name)
@@ -202,27 +186,18 @@ def owned_service():
         if (definition.get("Label") != LABEL or definition.get("ProgramArguments") != [runner]
                 or definition.get("Program", runner) != runner):
             fail("The launchd definition does not run the kit runner; it was preserved.")
-        if adopting and definition != {"Label": LABEL, "ProgramArguments": [runner], "RunAtLoad": True, "KeepAlive": True}:
-            fail("The default launchd definition has custom service settings; it was preserved.")
     else:
         definition = configparser.ConfigParser(interpolation=None)
         definition.read_string(service_path().read_text())
         service = definition["Service"]
         if service.get("ExecStart") != runner or any(key in service for key in ("ExecStop", "ExecStopPost")):
             fail("The systemd definition was customized; automatic service stop was refused.")
-        if adopting:
-            standard_unit = {"Unit": {"description": "Headroom (default)", "after": "network-online.target"},
-                             "Service": {"type": "simple", "execstart": runner, "restart": "on-failure", "restartsec": "5"},
-                             "Install": {"wantedby": "default.target"}}
-            if definition.defaults() or {name: dict(definition[name]) for name in definition.sections()} != standard_unit:
-                fail("The default systemd definition has custom service settings; it was preserved.")
     return True
 
 
 def service_state():
     """Return registration and activity, checking the loaded service identity."""
     runner = str(DEPLOY / "run-headroom.sh")
-    adopting = PROFILE == "default" and not (KIT / "headroom.json").exists()
     if sys.platform == "darwin":
         result = command(["launchctl", "print", DOMAIN + "/" + LABEL])
         if result.returncode in (3, 113) and "Could not find service" in result.stderr:
@@ -234,22 +209,8 @@ def service_state():
         loaded_args = [line.strip() for line in arguments[1].splitlines() if line.strip()] if arguments else []
         if fields.get("path") != str(service_path()) or fields.get("program") != runner or loaded_args != [runner]:
             fail("The loaded launchd job does not match the kit runner; it was preserved.")
-        if adopting:
-            for kind, block in re.findall(r"^\s*(inherited environment|default environment|environment) = \{\s*\n(.*?)^\s*\}", result.stdout, re.M | re.S):
-                for line in block.splitlines():
-                    if not line.strip():
-                        continue
-                    key, separator, value = line.strip().partition(" => ")
-                    injected = (key == "XPC_SERVICE_NAME" and value == LABEL) or (key == "OSLogRateLimit" and value.isdigit())
-                    if (not separator or (kind == "environment" and not injected)
-                            or key.startswith(("HEADROOM_", "PYTHON", "DYLD_")) or key == "LD_PRELOAD"):
-                        fail("The loaded default launchd job has custom runtime environment; it was preserved.")
         return True, fields.get("state") in ("running", "spawn scheduled")
     properties = ["LoadState", "ActiveState", "FragmentPath", "ExecStart", "ExecStop", "ExecStopPost", "DropInPaths"]
-    custom_properties = ["Environment", "EnvironmentFiles", "PassEnvironment", "UnsetEnvironment",
-                         "ExecStartPre", "ExecStartPost", "ExecCondition", "ExecReload", "RootDirectory", "RootImage", "PAMName"]
-    if adopting:
-        properties += custom_properties + ["WorkingDirectory"]
     result = command(["systemctl", "--user", "show", SERVICE, *[arg for name in properties for arg in ("-p", name)]])
     if result.returncode:
         fail("Cannot inspect the kit systemd service; service stop was refused.")
@@ -261,9 +222,6 @@ def service_state():
             or "argv[]=" + runner + " ;" not in fields.get("ExecStart", "")
             or any(fields.get(key) for key in ("ExecStop", "ExecStopPost", "DropInPaths"))):
         fail("The loaded systemd service does not match the kit runner; it was preserved.")
-    if adopting and (any(fields.get(key) for key in custom_properties)
-                     or fields.get("WorkingDirectory", "") not in ("", str(HOME), "!" + str(HOME), "-" + str(HOME))):
-        fail("The loaded default systemd service has custom runtime settings; it was preserved.")
     return True, fields.get("ActiveState") not in ("inactive", "failed")
 
 
@@ -282,12 +240,7 @@ def inspect(require_owned=True):
             fail(name + " points outside the kit paths; no process was stopped.")
     state = KIT / "headroom.json"
     safe_path(state)
-    if state.exists():
-        select_profile(json.loads(state.read_text()).get("profile"))
-    elif (HOME / ".headroom/deploy/default/manifest.json").exists():
-        select_profile("default")
-    else:
-        select_profile("research-agent-kit")
+    select_profile(json.loads(state.read_text()).get("profile") if state.exists() else "research-agent-kit")
     for path in sorted((HOME / ".headroom/deploy").glob("*/manifest.json")):
         if path.parent != DEPLOY and json.loads(path.read_text()).get("port") == PORT:
             fail("Port " + str(PORT) + " is reserved by another Headroom deployment: "
@@ -326,9 +279,7 @@ def pause(record, allow_idle=False):
     _, _, active, mcps = inspect(require_owned=not allow_idle)
     record = Path(record)
     safe_path(record)
-    record.write_text(json.dumps({"profile": PROFILE, "resume_service": active,
-                                  "adopt_service": PROFILE == "default" and not (KIT / "headroom.json").exists(),
-                                  "mcp_pids": sorted(mcps)}) + "\n")
+    record.write_text(json.dumps({"profile": PROFILE, "resume_service": active, "mcp_pids": sorted(mcps)}) + "\n")
     record.chmod(0o600)
     stop_service()
     for pid, identity in mcps.items():

@@ -65,9 +65,8 @@ grep -Fq 'only available to explicit local fixtures' "$WORK/override.log"
 KIT_TEST_FIXTURES_ONLY=1
 prepare_humanizer --fixture-repository "$fixture"
 first_revision="$HUMANIZER_REVISION"
-first_hash="$HUMANIZER_CONTENT_SHA256"
 [ "$first_revision" = "$(git -C "$fixture" rev-parse HEAD)" ]
-verify_humanizer_source "$first_revision" "$first_hash" "$fixture"
+verify_humanizer_source "$first_revision" "$fixture"
 cmp "$fixture/LICENSE" "$HUMANIZER_SKILL_SOURCE/LICENSE"
 cmp "$fixture/references/rules.md" "$HUMANIZER_SKILL_SOURCE/references/rules.md"
 [ -x "$HUMANIZER_SKILL_SOURCE/scripts/check.sh" ]
@@ -82,44 +81,34 @@ prepare_humanizer --fixture-repository "$fixture"
 HUMANIZER_PREPARED=0
 prepare_humanizer --fixture-repository "$fixture"
 second_revision="$HUMANIZER_REVISION"
-second_hash="$HUMANIZER_CONTENT_SHA256"
-[ "$second_revision" != "$first_revision" ] && [ "$second_hash" != "$first_hash" ]
-verify_humanizer_source "$second_revision" "$second_hash" "$fixture"
-node - "$KIT_STATE_ROOT/sources/humanizer/source.json" "$fixture" "$second_revision" "$second_hash" <<'NODE'
-const assert = require('assert'), fs = require('fs'), [file, source, revision, hash] = process.argv.slice(2);
-assert.deepStrictEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {source, revision, content_sha256: hash, license: 'MIT'});
+[ "$second_revision" != "$first_revision" ]
+verify_humanizer_source "$second_revision" "$fixture"
+cmp "$fixture/references/rules.md" "$HUMANIZER_SKILL_SOURCE/references/rules.md"
+node - "$KIT_STATE_ROOT/sources/humanizer/source.json" "$fixture" "$second_revision" <<'NODE'
+const assert = require('assert'), fs = require('fs'), [file, source, revision] = process.argv.slice(2);
+assert.deepStrictEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {source, revision, license: 'MIT'});
 NODE
+if verify_humanizer_source "$first_revision" "$fixture"; then exit 1; fi
 cp -Rp "$HUMANIZER_SKILL_SOURCE" "$WORK/installed"
-verify_humanizer_skill "$WORK/installed" "$second_hash"
-printf '\nChanged after installation.\n' >> "$WORK/installed/SKILL.md"
-if verify_humanizer_skill "$WORK/installed" "$second_hash"; then exit 1; fi
-if verify_humanizer_source "$first_revision" "$second_hash" "$fixture"; then exit 1; fi
-
-# Cached content is revalidated; the next install repairs it from the pinned commit.
-printf '\nChanged cache.\n' >> "$HUMANIZER_SKILL_SOURCE/SKILL.md"
-if verify_humanizer_source "$second_revision" "$second_hash" "$fixture"; then exit 1; fi
-HUMANIZER_PREPARED=0
-prepare_humanizer --fixture-repository "$fixture"
-verify_humanizer_source "$second_revision" "$second_hash" "$fixture"
 
 cp "$fixture/SKILL.md" "$WORK/good-skill"
 printf '%s\n' '---' 'name: another-skill' '---' 'Wrong bundle.' > "$fixture/SKILL.md"
 commit_fixture wrong-name
 if (HUMANIZER_PREPARED=0 prepare_humanizer --fixture-repository "$fixture") > "$WORK/name.log" 2>&1; then exit 1; fi
 grep -Fq 'must declare name: humanizer' "$WORK/name.log"
-verify_humanizer_source "$second_revision" "$second_hash" "$fixture"
+verify_humanizer_source "$second_revision" "$fixture"
 cp "$WORK/good-skill" "$fixture/SKILL.md"
 printf '%s\n' 'MIT License' 'Additional restrictions apply.' > "$fixture/LICENSE"
 commit_fixture wrong-license
 if (HUMANIZER_PREPARED=0 prepare_humanizer --fixture-repository "$fixture") > "$WORK/license.log" 2>&1; then exit 1; fi
 grep -Fq 'must retain the MIT LICENSE' "$WORK/license.log"
-verify_humanizer_source "$second_revision" "$second_hash" "$fixture"
+verify_humanizer_source "$second_revision" "$fixture"
 cp "$HUMANIZER_SKILL_SOURCE/LICENSE" "$fixture/LICENSE"
 ln -s "$WORK/installed" "$fixture/external"
 commit_fixture external-link
 if (HUMANIZER_PREPARED=0 prepare_humanizer --fixture-repository "$fixture") > "$WORK/link.log" 2>&1; then exit 1; fi
 grep -Fq 'contains a symlink or submodule' "$WORK/link.log"
-verify_humanizer_source "$second_revision" "$second_hash" "$fixture"
+verify_humanizer_source "$second_revision" "$fixture"
 kit_rollback_run
 [ ! -e "$KIT_STATE_ROOT/sources/humanizer" ]
 echo 'Humanizer preparation, update, provenance, rejection, and rollback tests passed.'

@@ -16,9 +16,6 @@ export KIT_TEST_JSONC_PARSER="${KIT_TEST_JSONC_PARSER:-$ROOT/scripts/opencode-co
 }
 KIT_TEST_FIXTURES_ONLY=1 source "$ROOT/tests/test_integration_migration.sh"
 export KIT_TEST_FIXTURES_ONLY=1
-source "$ROOT/tests/fixtures/crucible_engine.sh"
-export CRUCIBLE_ROOT="$WORK/crucible-fixture"
-make_crucible_fixture "$CRUCIBLE_ROOT"
 unset UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING
 export HOME="$WORK/full-home" CODEX_MOCK_STATE="$WORK/codex" CLAUDE_MOCK_STATE="$WORK/claude"
 JQ_BIN="$(command -v jq)"
@@ -48,6 +45,7 @@ cat > "$MOCK_BIN/node" <<'MOCK'
 #!/bin/bash
 case "${1:-}" in
   */opencode/plugins/btw-plus-compat/patch.mjs)
+    [ "${2:-}" != --supports ] || exec "$KIT_TEST_REAL_NODE" "$@"
     shift
     exec "$KIT_TEST_PYTHON" "$KIT_TEST_BTW_ADAPTER" patch "$@"
     ;;
@@ -104,6 +102,14 @@ case "$*" in
       '    printf "%s\\n" "# graphify" > "$HOME/.codex/skills/graphify/SKILL.md"' \
       '    printf "%s\\n" "0.9.82" > "$HOME/.codex/skills/graphify/.graphify_version"' \
       '    printf "%s\\n" "reference" > "$HOME/.codex/skills/graphify/references/README.md"' \
+      '    ;;' \
+      '  opencode)' \
+      '    rm -rf "$HOME/.config/opencode/skills/graphify"' \
+      '    mkdir -p "$HOME/.config/opencode/skills/graphify/references" "$HOME/.config/opencode/plugins"' \
+      '    printf "%s\\n" "# graphify" > "$HOME/.config/opencode/skills/graphify/SKILL.md"' \
+      '    printf "%s\\n" "0.9.82" > "$HOME/.config/opencode/skills/graphify/.graphify_version"' \
+      '    printf "%s\\n" "reference" > "$HOME/.config/opencode/skills/graphify/references/README.md"' \
+      '    printf "%s\\n" "// graphify" > "$HOME/.config/opencode/plugins/graphify.js"' \
       '    ;;' \
       '  *) exit 1 ;;' \
       'esac' > "$MOCK_TOOL_BIN/graphify"
@@ -196,8 +202,8 @@ assert_defaults() {
   [ -x "$HOME/.opencode/bin/opencode" ]
   [ "$("$HOME/.opencode/bin/opencode" --version)" = 2.2.5 ]
   [ "$(find "$HOME/.config/opencode/agents" -name '*.md' | wc -l | tr -d ' ')" = 2 ]
-  [ "$(find "$HOME/.codex/agents" -name '*.toml' | wc -l | tr -d ' ')" = 16 ]
-  [ "$(find "$HOME/.claude/agents" -name '*.md' | wc -l | tr -d ' ')" = 15 ]
+  [ "$(find "$HOME/.codex/agents" -name '*.toml' | wc -l)" -eq "$(find "$ROOT/codex/agents" -name '*.toml' | wc -l)" ]
+  [ "$(find "$HOME/.claude/agents" -name '*.md' | wc -l)" -eq "$(find "$ROOT/claude-code/agents" -name '*.md' | wc -l)" ]
   for target in "$HOME/.agents/skills" "$HOME/.claude/skills"; do
     for skill in "$ROOT/skills"/*; do [ ! -d "$skill" ] || diff -qr "$skill" "$target/${skill##*/}"; done
     cmp "$KIT_TEST_HUMANIZER_REPOSITORY/SKILL.md" "$target/humanizer/SKILL.md"
@@ -296,14 +302,21 @@ mv "$ponytail_entrypoint" "$WORK/ponytail-entrypoint.js"
 expect_failure bash "$ROOT/install.sh" --verify
 grep -Fq 'Missing OpenCode Ponytail entrypoint' "$WORK/expected-failure.log"
 mv "$WORK/ponytail-entrypoint.js" "$ponytail_entrypoint"
-# A stale external manifest must not delete a just-installed current core role.
-mkdir -p "$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage"
-printf '{"agents":["%s/.codex/agents/implementation_engineer.toml"]}\n' "$HOME" > "$HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage/.installed-agents.json"
 readonly_before="$(find "$HOME" -type f -exec cksum {} + | sort)"
 bash "$ROOT/install.sh" --verify > "$WORK/readonly-verify.log"
 [ "$readonly_before" = "$(find "$HOME" -type f -exec cksum {} + | sort)" ]
-echo 'Full default repeat with stale legacy metadata'
+echo 'Full default repeat'
 bash "$ROOT/install.sh"
+assert_defaults
+echo 'An OpenCode version without a BTW lockfile skips BTW Plus and still verifies'
+KIT_TEST_OPENCODE_VERSION=2.2.99 bash "$ROOT/install.sh" > "$WORK/unknown-opencode.log"
+grep -Fq 'Warning: BTW Plus has no compatibility patch for OpenCode 2.2.99' "$WORK/unknown-opencode.log"
+grep -Fqx 'btw_version=skipped_unsupported_opencode' "$HOME/.universal-research-agent-kit/tooling.state"
+if grep -Fq opencode-btw-plus "$HOME/.config/opencode/cli.json"; then exit 1; fi
+KIT_TEST_OPENCODE_VERSION=2.2.99 bash "$ROOT/install.sh" --verify > "$WORK/unknown-opencode-verify.log"
+grep -Fq 'BTW Plus was skipped for unsupported OpenCode 2.2.99' "$WORK/unknown-opencode-verify.log"
+bash "$ROOT/install.sh"
+grep -Fq opencode-btw-plus "$HOME/.config/opencode/cli.json"
 assert_defaults
 for state in integrations tooling; do
   mv "$HOME/.universal-research-agent-kit/$state.state" "$WORK/$state.state"

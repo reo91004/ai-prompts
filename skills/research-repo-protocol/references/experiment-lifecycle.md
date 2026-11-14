@@ -4,7 +4,7 @@
 
 Use one stable experiment ID to connect its card or equivalent specification, code, configuration, attempts, raw outputs, analysis, and judgment. Reuse the repository's naming, output-path helper, and template when present; a supplied example's ID or paths are not defaults.
 
-Before substantive implementation or execution, record:
+Before a registered experiment, record:
 
 - Why the experiment matters and which decision it could change.
 - Mechanism hypotheses and controls that distinguish them.
@@ -13,7 +13,7 @@ Before substantive implementation or execution, record:
 - Contrasts, metrics and units, uncertainty and multiplicity, and positive/negative/unresolved reading rules.
 - Resource limits, missing/duplicate/non-finite input handling, expected artifacts, and resume/attempt rules.
 
-Keep design status (registered, exploratory, post-hoc), evidence origin (analytical, synthetic, simulated, measured), and evidence purpose (diagnostic, claim-bearing) distinct. Reuse local field names. Fix registered criteria before outcomes. Exploration can start lighter, but record what was observed and what was added afterward.
+Keep design status (registered, exploratory, post-hoc), evidence origin (analytical, synthetic, simulated, measured), and evidence purpose (diagnostic, claim-bearing) distinct. Reuse local field names. Fix registered criteria before outcomes. An exploratory or anomaly run needs only its question, hypothesis, and the result that would change the next step; record what was observed and what was added afterward.
 
 ## Implement And Validate
 
@@ -23,11 +23,11 @@ Fix code, configuration, inputs, environment, and decision rules for the run. Re
 
 ## Execute And Recover
 
-Use the repository's durable execution and monitoring mechanism. Record command and working directory, process/job identity and start time, code/configuration/input versions, persistent logs, output locations, checkpoints, and dependent stages that stop on failure. Use the applicable platform procedure in `resource-aware-orchestration`. An external event file and an event delivered to the active agent are different capabilities.
+Launch every experiment detached and wait for it as `resource-aware-orchestration/references/experiment_runs.md` describes, so they survive the agent session. Record command and working directory, process/job identity and start time, code/configuration/input versions, persistent logs, output locations, checkpoints, and dependent stages that stop on failure. Use the applicable platform procedure in `resource-aware-orchestration`. An external event file and an event delivered to the active agent are different capabilities.
 
-Do not modify a running experiment's code, support modules, or environment. A wait timeout does not authorize cancellation, duplicate execution, or an undeclared retry. Apply physical acquisition safety and attempt limits on every physical attempt.
+Do not modify a running experiment's code, support modules, or environment. A wait timeout does not authorize cancellation or duplicate execution. Apply physical acquisition safety on every physical attempt.
 
-Distinguish implementation/input defects, interruption/resource failures, insufficient evidence, and supported negative findings. Choose a new attempt or resume under the recorded rule, preserving original outputs and failure history.
+Distinguish implementation/input defects, interruption/resource failures, insufficient evidence, and supported negative findings. After a failure, find and fix the cause, then start a new attempt or resume; continue until the experiment answers its question. Record each failed attempt in the card or an `attempts.json` (what ran, configuration, error, observation, fix) and delete its bulky outputs such as traces, checkpoints, and large logs. Keep the outputs of the attempts whose results are reported.
 
 ## Verify And Judge
 

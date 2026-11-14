@@ -1,4 +1,4 @@
-"""Prepare or check Codex context defaults while preserving the user's TOML.
+"""Prepare or check Codex root defaults while preserving the user's TOML.
 
 Codex 0.166 normalizes an explicit empty fallback prompt to None. It prevents
 model-owned fallback defaults and adds no fallback buffer, even when a positive
@@ -19,23 +19,8 @@ ROOT_KEYS = (
     "model_auto_compact_token_limit",
     "model_auto_compact_token_limit_scope",
     "model_post_turn_compact_threshold_percent",
+    "model_reasoning_effort",
 )
-
-
-def read_defaults(path):
-    defaults = tomllib.loads(Path(path).read_text())
-    if set(defaults) != {*ROOT_KEYS, "features"}:
-        raise ValueError("Context template must contain only the context defaults and feature options")
-    window, limit, _, post_turn = (defaults[key] for key in ROOT_KEYS)
-    if (type(window) is not int or type(limit) is not int or type(post_turn) is not int
-            or not 0 < limit <= window or post_turn != 0
-            or defaults[ROOT_KEYS[2]] != "total"):
-        raise ValueError("Context template needs a positive total-token limit within its window and no post-turn threshold")
-    if (defaults["features"] != {"context_management": {"experimental_mode": True},
-                                "token_budget": {"auto_compact_fallback_prompt": ""}}
-            or defaults["features"]["context_management"]["experimental_mode"] is not True):
-        raise ValueError("Context template needs experimental context management and an explicit empty fallback prompt")
-    return defaults
 
 
 def feature_table(features, name):
@@ -103,7 +88,7 @@ def main():
     if action not in ("prepare", "check") or len(args) != (3 if action == "prepare" else 2):
         raise ValueError("Usage: context_defaults.py prepare <template> <config> <output> | check <template> <config>")
     template, config = map(Path, args[:2])
-    defaults = read_defaults(template)
+    defaults = tomllib.loads(template.read_text())
     text = config.read_text() if config.exists() else ""
     if action == "check":
         check_config(text, defaults)

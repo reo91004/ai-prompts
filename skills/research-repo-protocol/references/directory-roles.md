@@ -1,6 +1,6 @@
 # Research Repository Hierarchy
 
-Use this topology when creating or restructuring a research repository. Preserve the parent/child relationships: supplied materials are under docs/, detailed records under records/, executable experiment code under experiments/, and active recovery state under .plans/. For an established repository, map these responsibilities to its actual conventions before changing paths. Create the branches the current work needs.
+Follow this layout exactly in research repositories: supplied materials under docs/, detailed records under records/, executable experiment code under experiments/, and active recovery state under .plans/. Create the branches the current work needs; do not add parallel top-level folders or another record system. When a project AGENTS.md maps a responsibility to an existing path, use that path.
 
 ```text
 research-repository/
@@ -52,19 +52,19 @@ research-repository/
 
 AGENTS.md links required documents, environments, commands, equipment/resource limits, disclosure rules, and important boundaries. Keep the entry short.
 
-docs/00-overview.md explains the question and why it matters; docs/01-timeline.md gives the scientific chronology; docs/02-progress.md summarizes supported results, open issues, and next experiments. docs/idea/ preserves supplied ideas and proposals. docs/lit/ tracks prior literature, bibliography, source locations, and comparisons. docs/ref-code/ preserves supplied implementations, while docs/ref-paper/ preserves provided manuscripts. A supplied manuscript and our new draft are different artifacts. Ported reference code needs source, revision, license, changes, and validation scope.
+docs/00-overview.md explains the question and why it matters; docs/01-timeline.md gives the scientific chronology; docs/02-progress.md summarizes supported results, open issues, and next experiments. docs/idea/ preserves supplied ideas and proposals. docs/lit/ is where agents organize the literature: bibliography, paper notes, source locations, and comparisons. docs/ref-code/ and docs/ref-paper/ hold code and papers supplied by the user or the professor; agents read them but never add, edit, move, or delete files there. Code ported from ref-code/ lives under experiments/ with its source, revision, license, changes, and validation scope noted. A supplied manuscript and our new draft are different artifacts.
 
 ## Detailed Research Records
 
 records/conventions.md owns project rules, naming, execution/reporting/commit boundaries, and evidence criteria. records/research-guide.md carries research attitude and anomaly-to-hypothesis-to-experiment guidance. records/next-experiments.md owns next questions and priorities. The project selects one authoritative claim map, such as claims-evidence.md, evidence-map.md, or claims-scope.md; do not create three competing maps. risks.md records concrete scientific/operational risks and glossary.md defines local terminology.
 
-records/experiments/ holds cards linking question, specification, code, configuration, raw outputs, judgment, and corrections. records/rounds/ holds independent prompts, original responses, parent decisions, and adoption reasons. records/journal/ records dated events and links to cards or discussions. records/archive/ preserves earlier systems and completed ledgers without treating them as current state. These are children of records/, not parallel top-level folders.
+records/experiments/ holds cards linking question, specification, code, configuration, raw outputs, judgment, and corrections. records/rounds/<date>-<id>-<topic>/ holds one discussion round as Markdown: question.md, codex.md, claude.md, an optional second exchange, and decision.md. records/journal/ records dated events and links to cards or discussions. records/archive/ preserves earlier systems and completed ledgers without treating them as current state. These are children of records/, not parallel top-level folders.
 
 ## Executable Code And Evidence
 
 experiments/registered/ holds code whose criteria were fixed before outcomes. experiments/explore/ holds exploratory, post-hoc, or anomaly analyses. experiments/<domain>/ groups a concrete domain when useful: llm/ is appropriate for real LLM work, sca/ for a side-channel workflow, and neither name establishes evidence grade. experiments/lib/ holds functions, data access, and path helpers shared by actual callers. experiments/early/ preserves earlier implementations needed for history or reproduction. Read [incremental structure guidance](repository-structure.md) before adding packaging or workflow machinery.
 
-configs/ holds execution/evaluation settings worth separating from code. private_work/ holds untracked raw inputs, subject-level output, models, logs, and large artifacts under local retention and access rules. private_work/experiments/<experiment>/a<N>/ separates execution attempts. results/ holds only shareable aggregates, tables, and figures permitted by the repository, linked to generation code. A private_work directory name does not determine statistical public/private roles or a DP guarantee.
+configs/ holds execution/evaluation settings worth separating from code. private_work/ holds untracked raw inputs, subject-level output, models, logs, and large artifacts under local retention and access rules. private_work/experiments/<experiment>/a<N>/ separates execution attempts; once a failed attempt is recorded in its card or attempts.json, delete its bulky outputs. results/ holds only shareable aggregates, tables, and figures permitted by the repository, linked to generation code. A private_work directory name does not determine statistical public/private roles or a DP guarantee.
 
 registry/ contains derived experiment/discussion/output indexes and path mappings. Generate it from authoritative records; do not maintain it as another manual source of truth. scripts/ contains repository-wide indexing, search, execution-status, or event tools. tests/ checks real structure, paths, input contracts, and analysis behavior.
 
@@ -77,7 +77,7 @@ configs/x154m_gradient_difference.json
 private_work/experiments/2026-11-03-x154m-gradient-difference-reuse/a3/
 ```
 
-This supplied example illustrates the connection, not a universal ID or DP experiment requirement. The date is the first-record date; the stable ID links card, code, config, and outputs; the topic describes the question; a<N> identifies an execution attempt. In this naming convention, executable filenames omit the date because the card owns chronology. Use the current project's output helper, such as experiments.lib.paths.out_dir when it exists, to maintain the card-to-output relationship. Reuse another established naming convention rather than imposing this example on existing work.
+Use this naming: the date is the first-record date; the stable ID links card, code, config, and outputs; the topic describes the question; a<N> identifies an execution attempt. Executable filenames omit the date because the card owns chronology. Use the project's output helper, such as experiments.lib.paths.out_dir when it exists, to maintain the card-to-output relationship. The x154m ID and its DP topic are only an example.
 
 ## Active Recovery State And Units
 

@@ -12,7 +12,11 @@ WRAPPER = Path(__file__).resolve().parents[1] / "headroom/auto-wrap.sh"
 
 
 class DispatchTests(unittest.TestCase):
-    def test_install_lock_blocks_legacy_wrap_fallback(self):
+    def test_wrapper_functions_survive_shell_snapshots(self):
+        # Claude Code's shell snapshot drops functions whose names start with "_".
+        self.assertNotRegex(WRAPPER.read_text(), r"(?m)^_\w*\s*\(\)")
+
+    def test_install_lock_blocks_wrap_fallback(self):
         for shell in ("bash", "zsh"):
             if not shutil.which(shell):
                 continue

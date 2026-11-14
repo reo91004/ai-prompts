@@ -19,7 +19,7 @@ case "$url" in
   https://downloads.claude.ai/claude-code-releases/latest)
     printf '2.1.0\n' > "$output"; exit 0 ;;
   https://opencode.ai/update/api/latest/cli/npm)
-    printf '{"version":"2.2.5","metadata":{"package":"@opencode/cli"},"active":true}\n' > "$output"; exit 0 ;;
+    printf '{"version":"%s","metadata":{"package":"@opencode/cli"},"active":true}\n' "${KIT_TEST_OPENCODE_VERSION:-2.2.5}" > "$output"; exit 0 ;;
   https://registry.npmjs.org/@modelcontextprotocol%2fserver-sequential-thinking/latest)
     printf '{"name":"@modelcontextprotocol/server-sequential-thinking","version":"2.0.0","engines":{"node":">=24"},"dist":{"integrity":"sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}}\n' > "$output"; exit 0 ;;
   https://registry.npmjs.org/opencode-btw-plus/latest)

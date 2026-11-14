@@ -31,7 +31,7 @@ class BusyInstallTests(unittest.TestCase):
         self.env = {**os.environ, "HOME": str(self.home), "PATH": str(self.bin) + ":" + os.environ["PATH"],
                     "GUARD_SNAPSHOTS": str(self.snapshots), "GUARD_COUNTER": str(self.counter),
                     "GUARD_EVENTS": str(self.events)}
-        for key in ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "HEADROOM_WORKSPACE_DIR", "HEADROOM_CONFIG_DIR",
+        for key in ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "HEADROOM_WORKSPACE_DIR", "HEADROOM_CONFIG_DIR", "XDG_CONFIG_HOME",
                     "UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS", "UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING"):
             self.env.pop(key, None)
         self.executable(self.bin / "ps", f"#!{sys.executable}\n" + '''import json, os, pathlib, sys
@@ -213,15 +213,17 @@ main
         self.assertEqual(self.events.read_text().splitlines(), ["opencode-idle", "inspect", "opencode-idle", "pause", "resume"])
         self.assertFalse((self.kit / "tooling").exists())
 
-    def test_stopped_default_is_inspected_backed_up_and_resumed_on_failure(self):
+    def test_recorded_default_is_inspected_backed_up_and_resumed_on_failure(self):
         deployment = self.home / ".headroom/deploy/default"
         deployment.mkdir(parents=True)
         manifest = deployment / "manifest.json"
         manifest.write_text('{"profile":"default","port":8787}')
+        self.kit.mkdir()
+        (self.kit / "headroom.json").write_text('{"profile":"default"}')
         result = self.run_shell('''kit_maintenance_run() {
   echo "$1" >> "$GUARD_EVENTS"
   case "$1" in
-    pause) echo '{"profile":"default","adopt_service":true}' > "$2" ;;
+    pause) echo '{"profile":"default"}' > "$2" ;;
     profile) echo default ;;
   esac
 }
@@ -235,7 +237,7 @@ main
         self.assertEqual(result.returncode, 42)
         self.assertEqual(self.events.read_text().splitlines(), ["opencode-idle", "inspect", "opencode-idle", "pause", "profile", "bootstrap", "resume"])
         self.assertEqual(manifest.read_text(), '{"profile":"default","port":8787}')
-        self.assertFalse((self.kit / "headroom.json").exists())
+        self.assertEqual((self.kit / "headroom.json").read_text(), '{"profile":"default"}')
 
     def test_restarted_service_stops_before_rollback_and_resumes_after_restore(self):
         for stop_fails in (False, True):
@@ -267,40 +269,6 @@ exit 99
                 self.assertEqual(sentinel.read_text(), "new\n" if stop_fails else "original")
                 if stop_fails:
                     self.assertTrue(list((self.kit / "backups").glob("run.*/journal.tsv")))
-
-    def test_failed_default_activation_restores_unowned_record_and_old_runner(self):
-        deployment = self.home / ".headroom/deploy/default"
-        deployment.mkdir(parents=True)
-        runner = deployment / "run-headroom.sh"
-        runner.write_text("old-runner")
-        result = self.run_shell('''kit_init_state
-kit_enable_rollback
-KIT_MAINTENANCE_RECORD="$KIT_BACKUP_DIR/headroom-maintenance.json"
-echo '{"profile":"default","adopt_service":true,"resume_service":true}' > "$KIT_MAINTENANCE_RECORD"
-kit_backup_path "$KIT_STATE_ROOT/headroom.json" maintenance/ownership
-kit_backup_path "$HOME/.headroom/deploy/default" maintenance/deployment
-echo '{"profile":"default"}' > "$KIT_STATE_ROOT/headroom.json"
-echo new-runner > "$HOME/.headroom/deploy/default/run-headroom.sh"
-KIT_HEADROOM_ACTIVATION_STARTED=1
-KIT_HEADROOM_CREATED=0
-kit_maintenance_run() {
-  echo "$1" >> "$GUARD_EVENTS"
-  if [ "$1" = quiesce ]; then
-    test -f "$KIT_STATE_ROOT/headroom.json" || exit 91
-    test "$(cat "$HOME/.headroom/deploy/default/run-headroom.sh")" = new-runner || exit 92
-  elif [ "$1" = resume ]; then
-    test ! -e "$KIT_STATE_ROOT/headroom.json" || exit 93
-    test "$(cat "$HOME/.headroom/deploy/default/run-headroom.sh")" = old-runner || exit 94
-  else
-    exit 95
-  fi
-}
-exit 42
-''')
-        self.assertEqual(result.returncode, 42)
-        self.assertEqual(self.events.read_text().splitlines(), ["quiesce", "resume"])
-        self.assertFalse((self.kit / "headroom.json").exists())
-        self.assertEqual(runner.read_text(), "old-runner")
 
     def test_checks_precede_tool_root_python_and_package_mutations(self):
         uv = self.bin / "uv"

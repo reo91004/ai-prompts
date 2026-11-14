@@ -4,11 +4,11 @@ One writer owns a checkout. Parallel read-only investigation is useful; implemen
 
 Keep each fact in one authoritative location and link summaries to it. Update only the records affected by an event:
 
-- Start/resume: process/job, logs, checkpoint, and next waiting action.
+- Start/resume: the run directory in the `Running` list of `.plans/HANDOVER.md` and its `wait_run.sh` command (see `resource-aware-orchestration/references/experiment_runs.md`).
 - Judgment: card, event journal, next experiment, and human summary as required locally.
 - Claim-scope change: the existing claim/evidence map.
 - New concrete risk: the risk record.
-- Discussion: original response, parent decisions, and adoption/rejection reasons.
+- Discussion: the round's files under `records/rounds/`.
 
 Make these recoverable on transfer:
 
@@ -16,7 +16,7 @@ Make these recoverable on transfer:
 2. Code, configurations, checks, and commits.
 3. Parent decisions and evidence.
 4. Departures from the plan.
-5. Running work and exact safe resume/wait commands.
+5. Running work: each run directory and its `wait_run.sh` command.
 6. Unknowns and genuine pending user decisions.
 7. Unmerged worktrees and changes.
 8. The next owner's first action.

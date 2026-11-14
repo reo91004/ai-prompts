@@ -3,9 +3,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KIT_FIXTURE_SETUP_ONLY="${KIT_TEST_FIXTURES_ONLY:-0}"
+# The installer follows XDG_CONFIG_HOME for OpenCode; keep it inside each temporary HOME.
+unset XDG_CONFIG_HOME
 command -v node >/dev/null 2>&1 || { echo "node is required for the migration tests" >&2; exit 1; }
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/harness-migration.XXXXXX")"
+# macOS TMPDIR ends in "/"; the installer normalizes paths that later assertions compare.
+tmp_root="${TMPDIR:-/tmp}"
+WORK="$(mktemp -d "${tmp_root%/}/harness-migration.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 
 PONYTAIL_REVISION="0a4dd63ad4541f4f655c4108a295916f3c1d8fda"
@@ -28,7 +32,7 @@ ln -s "$(command -v node)" "$MOCK_BIN/node"
 cat > "$MOCK_BIN/opencode" <<'MOCK'
 #!/bin/sh
 case "$*" in
-  --version) echo 2.2.5 ;;
+  --version) echo "${KIT_TEST_OPENCODE_VERSION:-2.2.5}" ;;
   *--help) : ;;
   *) echo "Unexpected OpenCode fixture command: $*" >&2; exit 99 ;;
 esac
@@ -74,7 +78,7 @@ case "$cmd" in
   "plugin marketplace list --json")
     cat "$STATE/marketplaces.json"
     ;;
-  "plugin remove ponytail@ponytail" | "plugin remove omo@sisyphuslabs")
+  "plugin remove ponytail@ponytail")
     node -e '
       const fs = require("fs");
       const path = process.argv[1] + "/plugins.json";
@@ -83,14 +87,6 @@ case "$cmd" in
       data.installed = (data.installed || []).filter((p) => p.pluginId !== target);
       fs.writeFileSync(path, JSON.stringify(data));
     ' "$STATE" "${cmd##* }"
-    ;;
-  "plugin marketplace remove sisyphuslabs")
-    node -e '
-      const fs = require("fs");
-      const path = process.argv[1] + "/marketplaces.json";
-      const data = JSON.parse(fs.readFileSync(path, "utf8"));
-      fs.writeFileSync(path, JSON.stringify(data.filter((m) => m.name !== "sisyphuslabs")));
-    ' "$STATE"
     ;;
   "plugin marketplace remove ponytail")
     node -e '
@@ -111,10 +107,6 @@ case "$cmd" in
     package="${cmd##* }"
     [[ "$package" =~ ^@modelcontextprotocol/server-sequential-thinking@(latest|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 99
     printf 'command: %s\nargs: -y %s\n' "$HOME/.universal-research-agent-kit/cli/bin/kit-npx" "$package" > "$STATE/mcp_sequential"
-    ;;
-  "mcp list")
-    config="$HOME/.codex/config.toml"
-    [ ! -f "$config" ] || [ "$(grep -Fxc '[mcp_servers.headroom]' "$config" || true)" -le 1 ]
     ;;
   *)
     echo "codex mock: unhandled command: $cmd" >&2
@@ -197,7 +189,7 @@ seed_codex_mock_state() {
   fi
   node -e '
     const fs = require("fs");
-    const [dir, pluginPath, marketPath, withLazy] = process.argv.slice(1);
+    const [dir, pluginPath, marketPath] = process.argv.slice(1);
     const plugins = {
       installed: [
         {
@@ -209,18 +201,9 @@ seed_codex_mock_state() {
         },
       ],
     };
-    if (withLazy === "1") {
-      plugins.installed.push({
-        pluginId: "omo@sisyphuslabs",
-        version: "4.19.4",
-        installed: true,
-        enabled: true,
-        source: { source: "npm" },
-      });
-    }
     fs.writeFileSync(dir + "/plugins.json", JSON.stringify(plugins));
     fs.writeFileSync(dir + "/marketplaces.json", JSON.stringify([{ name: "ponytail", path: marketPath }]));
-  ' "$state_dir" "$kit_plugin_path" "$market_path" "$([ "$ownership" = "kit" ] && echo 1 || echo 0)"
+  ' "$state_dir" "$kit_plugin_path" "$market_path"
 }
 
 seed_claude_mock_state() {
@@ -267,7 +250,6 @@ seed_native_clis() {
 cat > "$MOCK_BIN/npm" <<'MOCK'
 #!/bin/sh
 case "$*" in
-  'root --global') echo "$HOME/empty-npm/lib/node_modules" ;;
   --version) echo 10.0.0 ;;
   'ci --prefix '*)
     case "$3" in "$HOME/.universal-research-agent-kit/"*) ;; *) exit 99 ;; esac
@@ -288,15 +270,7 @@ case "$*" in
   *) exit 99 ;;
 esac
 MOCK
-cat > "$MOCK_BIN/brew" <<'MOCK'
-#!/bin/sh
-case "$*" in
-  --prefix) echo "$HOME/empty-brew" ;;
-  'list --cask -1'|'list --formula -1') : ;;
-  *) exit 99 ;;
-esac
-MOCK
-chmod +x "$MOCK_BIN/npm" "$MOCK_BIN/brew"
+chmod +x "$MOCK_BIN/npm"
 
 run_kit() {
   local home="$1"
@@ -312,7 +286,7 @@ run_kit() {
 
 [ "$KIT_FIXTURE_SETUP_ONLY" != 1 ] || return 0
 
-echo "Scenario A: legacy kit integrations reconcile to profile none"
+echo "Scenario A: kit-owned Ponytail is removed for profile none"
 A_HOME="$WORK/home-a"
 A_CODEX="$WORK/mock-a-codex"
 A_CLAUDE="$WORK/mock-a-claude"
@@ -321,8 +295,6 @@ seed_codex_mock_state "$A_CODEX" "$A_HOME" kit
 seed_claude_mock_state "$A_CLAUDE" "$A_HOME" kit
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 
-grep -Fqx 'codex plugin remove omo@sisyphuslabs' "$A_CODEX/calls.log" || {
-  echo "legacy LazyCodex was not removed" >&2; exit 1; }
 grep -Fqx 'codex plugin remove ponytail@ponytail' "$A_CODEX/calls.log" || {
   echo "kit-owned Codex Ponytail plugin was not removed" >&2; exit 1; }
 grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {
@@ -330,7 +302,6 @@ grep -Fqx 'codex plugin marketplace remove ponytail' "$A_CODEX/calls.log" || {
 grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.log" || {
   echo "kit-owned Claude Ponytail plugin was not removed" >&2; exit 1; }
 [ "$(state_value "$A_HOME" requested_profile)" = "none" ]
-[ "$(state_value "$A_HOME" codex_lazycodex)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" codex_ponytail)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" claude_ponytail)" = "removed_legacy" ]
 [ "$(state_value "$A_HOME" codex_sequential_thinking)" = "registered_kit" ]
@@ -339,7 +310,6 @@ grep -Fqx 'claude plugin uninstall ponytail@ponytail -s user' "$A_CLAUDE/calls.l
 echo "Scenario A repeat: converged state stays converged and verifies"
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 # Removal converges to absence: the second run finds nothing to remove.
-[ "$(state_value "$A_HOME" codex_lazycodex)" = "not_requested" ]
 [ "$(state_value "$A_HOME" codex_sequential_thinking)" = "preexisting" ]
 [ "$(state_value "$A_HOME" claude_sequential_thinking)" = "preexisting" ]
 run_kit "$A_HOME" "$A_CODEX" "$A_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null
@@ -379,7 +349,6 @@ fi
 [ "$(state_value "$B_HOME" requested_profile)" = "ponytail" ]
 [ "$(state_value "$B_HOME" codex_ponytail)" = "preserved_user_owned" ]
 [ "$(state_value "$B_HOME" claude_ponytail)" = "preserved_user_owned" ]
-[ "$(state_value "$B_HOME" codex_lazycodex)" = "not_requested" ]
 run_kit "$B_HOME" "$B_CODEX" "$B_CLAUDE" bash "$ROOT/install.sh" --verify >/dev/null
 
 echo "Scenario A follow-up: a user-installed non-pinned Ponytail after removal still verifies"
@@ -408,191 +377,9 @@ seed_claude_mock_state "$C_CLAUDE" "$C_HOME" empty
 run_kit "$C_HOME" "$C_CODEX" "$C_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
 [ "$(state_value "$C_HOME" requested_profile)" = "none" ]
 [ "$(state_value "$C_HOME" codex_ponytail)" = "not_requested" ]
-[ "$(state_value "$C_HOME" codex_lazycodex)" = "not_requested" ]
 [ "$(state_value "$C_HOME" claude_ponytail)" = "not_requested" ]
 [ "$(state_value "$C_HOME" codex_sequential_thinking)" = "registered_kit" ]
 [ "$(state_value "$C_HOME" claude_sequential_thinking)" = "registered_kit" ]
-
-echo "Scenario D: any-version LazyCodex is removed and user max_threads is preserved"
-D_HOME="$WORK/home-d"
-D_CODEX="$WORK/mock-d-codex"
-D_CLAUDE="$WORK/mock-d-claude"
-mkdir -p "$D_HOME/.codex/plugins" "$D_HOME/.claude/plugins"
-printf '%s\n' \
-  '[agents]' \
-  'max_threads = 1000' \
-  '' \
-  '[agents.lazycodex-worker-high]' \
-  'config_file = "/home/u/.codex/agents/lazycodex-worker-high.toml"' \
-  '' \
-  '[agents.lazycodex-worker-high.env]' \
-  'FOO = "bar"' \
-  '' \
-  '[agents.metis]' \
-  'config_file = "/home/u/.codex/agents/metis.toml"' \
-  '' \
-  '[agents.my-own-agent]' \
-  "config_file = \"$D_HOME/.codex/agents/my-own-agent.toml\"" \
-  '' \
-  '[plugins."omo@sisyphuslabs"]' \
-  'enabled = true' > "$D_HOME/.codex/config.toml"
-mkdir -p "$D_CODEX" "$D_CLAUDE"
-: > "$D_CODEX/calls.log"
-: > "$D_CLAUDE/calls.log"
-node -e '
-  const fs = require("fs");
-  const dir = process.argv[1];
-  fs.writeFileSync(dir + "/plugins.json", JSON.stringify({
-    installed: [{
-      pluginId: "omo@sisyphuslabs",
-      version: "4.16.1",
-      installed: true,
-      enabled: true,
-      source: { source: "npm" },
-    }],
-  }));
-  fs.writeFileSync(dir + "/marketplaces.json", "[]");
-' "$D_CODEX"
-printf '%s\n' '[]' > "$D_CLAUDE/plugins.json"
-printf '%s\n' '[]' > "$D_CLAUDE/marketplaces.json"
-# LazyCodex copies loose agent TOMLs into ~/.codex/agents and records them in
-# its own manifest. Codex reads that directory whether or not the plugin is
-# registered, so removing the plugin alone leaves the roles dispatchable.
-D_AGENTS="$D_HOME/.codex/agents"
-D_OMO_DATA="$D_HOME/.codex/plugins/data/omo-sisyphuslabs/bootstrap/agents-stage"
-mkdir -p "$D_AGENTS" "$D_OMO_DATA"
-for planted in lazycodex-worker-high lazycodex-code-reviewer explorer metis; do
-  printf 'name = "%s"\n' "$planted" > "$D_AGENTS/$planted.toml"
-done
-printf 'name = "lazycodex-executor"\n' > "$D_AGENTS/lazycodex-executor.toml"
-printf 'name = "my-own-agent"\n' > "$D_AGENTS/my-own-agent.toml"
-node -e '
-  const fs = require("fs");
-  const [file, dir] = process.argv.slice(1);
-  fs.writeFileSync(file, JSON.stringify({
-    agents: ["lazycodex-worker-high", "lazycodex-code-reviewer", "explorer", "metis"]
-      .map((n) => dir + "/" + n + ".toml"),
-  }));
-' "$D_OMO_DATA/.installed-agents.json" "$D_AGENTS"
-run_kit "$D_HOME" "$D_CODEX" "$D_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
-
-for gone in lazycodex-worker-high lazycodex-code-reviewer lazycodex-executor explorer metis; do
-  [ ! -e "$D_AGENTS/$gone.toml" ] || {
-    echo "LazyCodex-planted agent survived removal: $gone" >&2; exit 1; }
-done
-[ -f "$D_AGENTS/my-own-agent.toml" ] || {
-  echo "a user-owned Codex agent was deleted" >&2; exit 1; }
-# A registration pointing at a deleted file makes Codex warn on every start.
-for stale in '[agents.lazycodex-worker-high]' '[agents.lazycodex-worker-high.env]' '[agents.metis]'; do
-  grep -Fqx "$stale" "$D_HOME/.codex/config.toml" && {
-    echo "stale Codex agent registration survived: $stale" >&2; exit 1; }
-done
-grep -Fqx '[agents.my-own-agent]' "$D_HOME/.codex/config.toml" || {
-  echo "a user-owned Codex agent registration was deleted" >&2; exit 1; }
-grep -Fqx 'FOO = "bar"' "$D_HOME/.codex/config.toml" && {
-  echo "a dropped agent subsection left its body behind" >&2; exit 1; }
-d_threads_check="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$d_threads_check" = "max_threads = 1000" ] || {
-  echo "the [agents] table was damaged by the registration cleanup" >&2; exit 1; }
-
-[ "$(state_value "$D_HOME" codex_lazycodex)" = "removed_legacy" ]
-[ "$(state_value "$D_HOME" codex_ponytail)" = "not_requested" ]
-grep -Fqx 'codex plugin remove omo@sisyphuslabs' "$D_CODEX/calls.log" || {
-  echo "non-pinned LazyCodex was not removed" >&2; exit 1; }
-node -e '
-  const fs = require("fs");
-  const data = JSON.parse(fs.readFileSync(process.argv[1] + "/plugins.json", "utf8"));
-  process.exit((data.installed || []).some((p) => p.pluginId === "omo@sisyphuslabs") ? 1 : 0);
-' "$D_CODEX" || { echo "LazyCodex is still installed after removal" >&2; exit 1; }
-d_threads_line="$(grep -A1 '^\[agents\]$' "$D_HOME/.codex/config.toml" | sed -n '2p')"
-[ "$d_threads_line" = "max_threads = 1000" ] || {
-  echo "user agents.max_threads was changed" >&2; exit 1; }
-
-echo "Scenario D2: a host that already deleted the files still loses the stale registrations"
-D2_HOME="$WORK/home-d2"
-D2_CODEX="$WORK/mock-d2-codex"
-D2_CLAUDE="$WORK/mock-d2-claude"
-mkdir -p "$D2_HOME/.codex/agents" "$D2_HOME/.claude/plugins"
-seed_codex_mock_state "$D2_CODEX" "$D2_HOME" empty
-seed_claude_mock_state "$D2_CLAUDE" "$D2_HOME" empty
-# No lazycodex-*.toml on disk and no omo manifest: only the registrations remain.
-printf 'name = "my-own-agent"\n' > "$D2_HOME/.codex/agents/my-own-agent.toml"
-printf '%s\n' \
-  '[agents]' \
-  'max_threads = 6' \
-  '' \
-  '[agents.lazycodex-worker-high]' \
-  "config_file = \"$D2_HOME/.codex/agents/lazycodex-worker-high.toml\"" \
-  '' \
-  '[agents.momus]' \
-  "config_file = \"$D2_HOME/.codex/agents/momus.toml\"" \
-  '' \
-  '[agents.my-own-agent]' \
-  "config_file = \"$D2_HOME/.codex/agents/my-own-agent.toml\"" > "$D2_HOME/.codex/config.toml"
-run_kit "$D2_HOME" "$D2_CODEX" "$D2_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
-
-for stale in '[agents.lazycodex-worker-high]'; do
-  grep -Fqx "$stale" "$D2_HOME/.codex/config.toml" && {
-    echo "a registration pointing at a missing file survived: $stale" >&2; exit 1; }
-done
-grep -Fqx '[agents.my-own-agent]' "$D2_HOME/.codex/config.toml" || {
-  echo "a registration pointing at an existing file was deleted" >&2; exit 1; }
-
-grep -Fqx '[agents.momus]' "$D2_HOME/.codex/config.toml" || { echo "unrelated missing agent registration was deleted" >&2; exit 1; }
-
-echo "Scenario E: duplicate Headroom MCP sections are repaired before Codex CLI use"
-E_HOME="$WORK/home-e"
-E_CODEX="$WORK/mock-e-codex"
-E_CLAUDE="$WORK/mock-e-claude"
-mkdir -p "$E_HOME/.codex/plugins" "$E_HOME/.claude/plugins"
-seed_codex_mock_state "$E_CODEX" "$E_HOME" empty
-seed_claude_mock_state "$E_CLAUDE" "$E_HOME" empty
-printf '%s\n' \
-  'model = "gpt-6-astra"' \
-  '' \
-  '# --- Headroom MCP server ---' \
-  '[mcp_servers.headroom]' \
-  "command = \"$E_HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" \
-  'args = ["mcp", "serve"]' \
-  '# --- end Headroom MCP server ---' \
-  '' \
-  '[mcp_servers.zotero]' \
-  'command = "zotero-mcp"' \
-  '' \
-  '# --- Headroom MCP server ---' \
-  '[mcp_servers.headroom]' \
-  "command = \"$E_HOME/.universal-research-agent-kit/tooling/bin/headroom\"" \
-  'args = ["mcp", "serve"]' \
-  '' \
-  '[mcp_servers.headroom.env]' \
-  'HEADROOM_PROXY_URL = "http://127.0.0.1:8787"' \
-  '# --- end Headroom MCP server ---' > "$E_HOME/.codex/config.toml"
-run_kit "$E_HOME" "$E_CODEX" "$E_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
-
-[ "$(grep -Fxc '[mcp_servers.headroom]' "$E_HOME/.codex/config.toml" || true)" -eq 0 ]
-grep -Fqx 'model = "gpt-6-astra"' "$E_HOME/.codex/config.toml"
-grep -Fqx '[mcp_servers.zotero]' "$E_HOME/.codex/config.toml"
-grep -Fqx 'command = "zotero-mcp"' "$E_HOME/.codex/config.toml"
-
-echo "Scenario F: a stale Headroom-managed command is removed for canonical re-registration"
-F_HOME="$WORK/home-f"
-F_CODEX="$WORK/mock-f-codex"
-F_CLAUDE="$WORK/mock-f-claude"
-mkdir -p "$F_HOME/.codex/plugins" "$F_HOME/.claude/plugins"
-seed_codex_mock_state "$F_CODEX" "$F_HOME" empty
-seed_claude_mock_state "$F_CLAUDE" "$F_HOME" empty
-printf '%s\n' \
-  'model = "gpt-6-astra"' \
-  '' \
-  '# --- Headroom MCP server ---' \
-  '[mcp_servers.headroom]' \
-  "command = \"$F_HOME/.universal-research-agent-kit/tooling/python-venv/bin/headroom\"" \
-  'args = ["mcp", "serve"]' \
-  '# --- end Headroom MCP server ---' > "$F_HOME/.codex/config.toml"
-run_kit "$F_HOME" "$F_CODEX" "$F_CLAUDE" bash "$ROOT/install.sh" --integrations none >/dev/null
-
-[ "$(grep -Fxc '[mcp_servers.headroom]' "$F_HOME/.codex/config.toml" || true)" -eq 0 ]
-grep -Fqx 'model = "gpt-6-astra"' "$F_HOME/.codex/config.toml"
 
 echo "Scenario G: an MCP registration frozen at an old version is re-registered at latest"
 G_HOME="$WORK/home-g"
@@ -620,4 +407,4 @@ run_kit "$G_HOME" "$G_CODEX" "$G_CLAUDE" bash "$ROOT/install.sh" --integrations 
 [ "$(state_value "$G_HOME" codex_sequential_thinking)" = "preexisting" ]
 [ "$(state_value "$G_HOME" claude_sequential_thinking)" = "preexisting" ]
 
-echo "Integration migration tests passed."
+echo "Integration profile tests passed."

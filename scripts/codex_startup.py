@@ -32,16 +32,15 @@ def startup_path(home):
     raise RuntimeError("Codex automatic startup supports macOS and Linux only.")
 
 
-def unit_text(layout, profile, legacy=False):
-    # Adopt the standard manual unit; managed registrations pin CODEX_HOME.
-    environment = "" if legacy else "Environment=CODEX_HOME=%h/.codex\n"
+def unit_text(layout, profile):
     return f"""[Unit]
 Description=Codex managed daemon boot startup
 Wants=headroom-{profile}.service
 After=headroom-{profile}.service
 
 [Service]
-{environment}Type=oneshot
+Environment=CODEX_HOME=%h/.codex
+Type=oneshot
 RemainAfterExit=yes
 ExecStart=%h/{layout} app-server daemon start
 ExecStop=%h/{layout} app-server daemon stop
@@ -80,8 +79,7 @@ def owned_file(home):
         data = plistlib.loads(path.read_bytes())
         owned = any(data == launch_agent(home, layout) for layout in LAYOUTS)
     else:
-        owned = path.read_text() in {unit_text(layout, profile, legacy) for layout in LAYOUTS
-                                    for profile in PROFILES for legacy in (False, True)}
+        owned = path.read_text() in {unit_text(layout, profile) for layout in LAYOUTS for profile in PROFILES}
     if not owned:
         raise RuntimeError(f"The existing Codex startup file was customized; it was preserved: {path}")
     return True
@@ -180,7 +178,7 @@ def verify(home, binary):
     if path.stat().st_mode & 0o022:
         raise RuntimeError("Codex startup file is writable by other users; run sh codex-remote.sh enable to repair its permissions.")
     if sys.platform == "linux":
-        if path.read_text() not in {unit_text(layout, headroom_profile(home), legacy) for legacy in (False, True)}:
+        if path.read_text() != unit_text(layout, headroom_profile(home)):
             raise RuntimeError("Codex startup uses an older executable or Headroom profile; run sh codex-remote.sh enable.")
         if command("systemctl", "--user", "is-enabled", UNIT) != "enabled":
             raise RuntimeError("Codex automatic startup is not enabled.")

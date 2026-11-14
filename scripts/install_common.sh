@@ -140,7 +140,6 @@ kit_maintenance_run() {
   # into an environment that is still in use.
   for candidate in \
     "$HOME/.universal-research-agent-kit/tooling/uv-tools/headroom-ai/bin/python" \
-    "$HOME/.universal-research-agent-kit/tooling/python-venv/bin/python" \
     "$(command -v python3 2>/dev/null || true)" \
     "$HOME/.universal-research-agent-kit/tooling/python"/cpython-*/bin/python3; do
     [ -x "$candidate" ] || continue
@@ -173,22 +172,13 @@ kit_init_state() {
   mkdir "$KIT_WORK_DIR"
 }
 
-# Installed runtimes and journaled backups outlive the disposable build/downloads.
-kit_cleanup_work() {
-  [ "$KIT_WORK_DIR" = "$KIT_BACKUP_DIR/work" ] && [ ! -L "$KIT_WORK_DIR" ] ||
-    kit_die "Refusing to clean an unexpected installation workspace."
-  rm -rf -- "$KIT_WORK_DIR"
-  echo "Removed installation downloads, staging files and kit uv cache. Backups: $KIT_BACKUP_DIR"
-}
-
 # Record per-host outcomes for verification, including explicit skips.
 kit_write_integrations_state() {
   local profile="$1"
   local codex_ponytail="$2"
   local claude_ponytail="$3"
-  local codex_lazycodex="$4"
-  local codex_seqthink="$5"
-  local claude_seqthink="$6"
+  local codex_seqthink="$4"
+  local claude_seqthink="$5"
   local state_file="$KIT_STATE_ROOT/integrations.state"
   local tmp
 
@@ -199,7 +189,6 @@ kit_write_integrations_state() {
     printf 'requested_profile=%s\n' "$profile"
     printf 'codex_ponytail=%s\n' "$codex_ponytail"
     printf 'claude_ponytail=%s\n' "$claude_ponytail"
-    printf 'codex_lazycodex=%s\n' "$codex_lazycodex"
     printf 'codex_sequential_thinking=%s\n' "$codex_seqthink"
     printf 'claude_sequential_thinking=%s\n' "$claude_seqthink"
   } > "$tmp"
@@ -234,17 +223,13 @@ kit_write_tooling_state() {
     printf 'codex_source=%s\n' "${KIT_CODEX_SOURCE:--}"
     printf 'claude_source=%s\n' "${KIT_CLAUDE_SOURCE:--}"
     printf 'opencode_source=%s\n' "${KIT_OPENCODE_SOURCE:--}"
-    printf 'opencode_archive_sha256=%s\n' "${KIT_OPENCODE_ARCHIVE_SHA256:--}"
     printf 'node_dir=%s\n' "${KIT_NODE_DIR:--}"
     printf 'humanizer_source=%s\n' "${HUMANIZER_SOURCE:--}"
     printf 'humanizer_revision=%s\n' "${HUMANIZER_REVISION:--}"
-    printf 'humanizer_content_sha256=%s\n' "${HUMANIZER_CONTENT_SHA256:--}"
     printf 'humanizer_license=%s\n' "${HUMANIZER_LICENSE:--}"
     printf 'sequential_thinking_version=%s\n' "${SEQUENTIAL_THINKING_VERSION:--}"
-    printf 'sequential_thinking_integrity=%s\n' "${SEQUENTIAL_THINKING_INTEGRITY:--}"
     printf 'btw_version=%s\n' "${KIT_BTW_VERSION:--}"
     printf 'btw_source=%s\n' "${KIT_BTW_SOURCE:--}"
-    printf 'btw_archive_sha256=%s\n' "${KIT_BTW_ARCHIVE_SHA256:--}"
   } > "$tmp"
   mv "$tmp" "$state_file"
 }
@@ -660,8 +645,9 @@ if [ -L "$STATE_ROOT" ] || [ -L "$BACKUP_ROOT" ]; then
   exit 1
 fi
 
-# An active install depends on its run journal for automatic rollback.
-if [ -d "$STATE_ROOT/.lock" ]; then
+# An active install depends on its run journal for automatic rollback; the
+# lock owner calls this only after its install and verification succeeded.
+if [ -d "$STATE_ROOT/.lock" ] && [ "${KIT_LOCK_OWNED:-0}" != 1 ]; then
   echo "Refusing to clean backups while an install holds the kit lock: $STATE_ROOT/.lock" >&2
   exit 1
 fi

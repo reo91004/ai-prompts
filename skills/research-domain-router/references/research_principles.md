@@ -16,9 +16,9 @@ Treat code, equations, assumptions, and measurements as objects to verify. Use t
 
 Separate analytical, synthetic, simulated, and measured evidence. Preserve the relevant implementation, inputs, configuration, seeds, environment, raw outputs, units, and uncertainty. Never invent novelty, SOTA, utility, statistical significance, or a privacy guarantee.
 
-## 4. Investigate good and bad anomalies
+## 4. Treat anomalies as leads
 
-Record an unexpected finding and develop at least three plausible mechanism hypotheses, including implementation or measurement explanations when justified. Attach the smallest discriminating exploration the same day within the authorized resources and acquisition limits. If that is blocked, record the reason and next executable check; do not fabricate hypotheses or report an unrun check as completed. Revisit weaknesses that prior work treats as inevitable or leaves to future work.
+An unexpected finding, good or bad, is a primary source of new research; several successful results began as anomalies. Record it, rule out an implementation or measurement error with the cheapest decisive check, and develop at least three plausible mechanism hypotheses. Attach the smallest discriminating exploration the same day within the authorized resources, and keep pursuing the most promising mechanism while it yields information. If that is blocked, record the reason and next executable check; do not fabricate hypotheses or report an unrun check as completed. Revisit weaknesses that prior work treats as inevitable or leaves to future work.
 
 ## 5. Preserve promising alternatives
 
@@ -30,7 +30,7 @@ Existing prior work is a starting point for comparison. Acknowledge reused compo
 
 ## 7. Reuse literature and accumulated evidence
 
-Consult saved literature, completed experiments, and failure lessons before duplicating work. Check the primary paper and relevant author implementation before making a novelty or reproduction claim. Record the source, edition or revision, available content hash, and applicable license for external artifacts actually used. Distinguish a source that was read from one merely discovered.
+Consult saved literature, completed experiments, and failure lessons before duplicating work. Check the primary paper and relevant author implementation before making a novelty or reproduction claim. Record the source, edition or revision, and applicable license for external artifacts actually used. Distinguish a source that was read from one merely discovered.
 
 ## 8. Use rigor to identify the claim
 
@@ -46,13 +46,13 @@ Use the strongest relevant simple baseline, including regularization or public-o
 
 ## 11. Collaborate independently and retain judgment
 
-For an important design or interpretation, record the parent's position and predictions before reading an independent assessment. Compare the response with the authoritative text, code, and evidence, then record why material suggestions were adopted or rejected. Use multiple perspectives for consequential decisions without creating a review at every step or a reciprocal approval chain. If the user specifies Astra or another model, verify that exact model's execution; inherited-model review is not a substitute. Report actual role, model, effort, and execution scope separately from declarations.
+For an important design or interpretation, or when a breakthrough is needed, run a discussion round under `records/rounds/` as `research-repo-protocol` describes: record the parent's position and predictions first, collect independent answers from Codex `breakthrough_analyst` (Ultra) and Claude `breakthrough-analyst` (Max), compare them with the authoritative text, code, and evidence, and record why material suggestions were adopted or rejected. Do not create a review at every step or a reciprocal approval chain. If the user specifies a model, verify that exact model's execution; inherited-model review is not a substitute. Report actual role, model, effort, and execution scope separately from declarations.
 
 ## 12. Continue through analysis and preserve recoverability
 
-Connect completed work to analysis, judgment, and the next useful experiment. Monitor every execution, preserve failure evidence, and prioritize decisive checks and enabling pilots over filling available cores. A timeout of a waiting tool alone is not permission to cancel an experiment. Respect a user's request to organize work before agreeing on resumption.
+Connect completed work to analysis, judgment, and the next useful experiment. Monitor every execution; when one fails, find the cause, fix it, and continue toward the goal instead of stopping at an attempt count. Record each failure briefly in Markdown or JSON and delete its bulky outputs. Prioritize decisive checks and enabling pilots over filling available cores. A timeout of a waiting tool alone is not permission to cancel an experiment. Respect a user's request to organize work before agreeing on resumption.
 
-Keep the running code and research environment fixed unless a change is authorized. Use one writer per checkout, or isolated worktrees with a merge plan. Keep every physical acquisition attempt and its safety and capture-integrity evidence. Respect the project's existing card, journal, and handover responsibilities and filenames; introduce no duplicate record system. Preserve user-data privacy and distinguish cross-fitting from a DP guarantee, a single release from the full selection/accounting cost, and repeatability from generalization. Write clear Korean unless another language is requested. Commit meaningful authorized changes; retain the user's boundaries for pushes, environment changes, and external reporting.
+Keep the running code and research environment fixed unless a change is authorized. Use one writer per checkout, or isolated worktrees with a merge plan. Keep physical safety and capture integrity on every acquisition, with a brief record of each attempt. Respect the project's existing card, journal, and handover responsibilities and filenames; introduce no duplicate record system. Preserve user-data privacy and distinguish cross-fitting from a DP guarantee, a single release from the full selection/accounting cost, and repeatability from generalization. Write clear Korean unless another language is requested. Commit meaningful authorized changes; retain the user's boundaries for pushes, environment changes, and external reporting.
 
 ## Project-specific instructions
 

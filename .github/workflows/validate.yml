@@ -18,6 +18,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      # The installer requires Node 24; the mock installer suites skip (exit 77) without these packages.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test dependencies
+        run: |
+          python -m pip install tomlkit mcp
+          npm ci --prefix scripts/opencode-config --ignore-scripts --no-audit --no-fund
       - name: Check POSIX shell entry point
         if: runner.os == 'Linux'
         run: dash install.sh --help
@@ -27,10 +35,10 @@ jobs:
         run: bash tests/test_resource_detector.sh
       - name: Test explicit Codex agent dispatch
         run: bash tests/test_codex_agent_runner.sh
-      - name: Test Crucible skill launcher
+      - name: Test detached experiment runs and Codex context defaults
         run: |
-          bash tests/test_crucible_skill.sh
-          python3 tests/test_crucible_engine.py
+          bash tests/test_detached_run.sh
+          python3 tests/test_context_defaults.py
       - name: Exercise the live resource detector
         shell: bash
         run: |
@@ -59,7 +67,7 @@ jobs:
         run: |
           bash tests/test_install_regression.sh
           python3 tests/test_statusline.py
-      - name: Test integration migration with mock CLIs
+      - name: Test integration profiles with mock CLIs
         run: bash tests/test_integration_migration.sh
       - name: Test tooling installation with mock CLIs
         run: bash tests/test_tooling_install.sh
@@ -80,7 +88,6 @@ jobs:
           python3 tests/test_headroom_dispatch.py
           python3 tests/test_headroom_runtime.py
           python3 tests/test_headroom_readiness.py
-          python3 tests/test_headroom_legacy.py
       - name: Check patch whitespace
         run: |
           if git rev-parse --verify HEAD^ >/dev/null 2>&1; then

@@ -2,7 +2,7 @@
 
 The official `opencode-btw-plus@0.1.3` package uses `@opencode/theme@2.0.11` and calls `generateSyntax(theme)` without a resource owner. OpenTUI 0.8, used by OpenCode 2.2.5 and 2.2.7, requires a renderer-owned syntax style. The original package can load but fails when displaying stored answers.
 
-`patch.mjs` accepts only the verified upstream version and bundle SHA256, applies one call-site change to pass `context.renderer.nativeScene`, and creates a local TUI package using the theme version and dependency lockfile for the selected host below. It copies the upstream MIT license and records source/hash/host provenance in `UPSTREAM.json`. Run `npm ci --ignore-scripts --no-audit --no-fund --prefix /path/to/staging` before registering the local package. It does not declare the old OpenTUI peer dependencies.
+`patch.mjs` accepts the upstream version below, applies one call-site change to pass `context.renderer.nativeScene` (refusing if that call does not occur exactly once), and creates a local TUI package using the theme version and dependency lockfile for the selected host below. It copies the upstream MIT license and records the source and host versions in `UPSTREAM.json`. Run `npm ci --ignore-scripts --no-audit --no-fund --prefix /path/to/staging` before registering the local package. It does not declare the old OpenTUI peer dependencies.
 
 ```sh
 node patch.mjs /path/to/verified/upstream/package /path/to/empty/staging 2.2.7
@@ -10,7 +10,7 @@ node patch.mjs /path/to/verified/upstream/package /path/to/empty/staging 2.2.7
 
 Register the generated local directory in `cli.json` after `-opencode.btw`. Do not register the upstream package and patched package together. Keep its plugin ID `btw-plus` and OpenCode's plugin storage location stable during updates: history belongs to the TUI storage service and is not part of this configuration or skill directory. The patch does not import old built-in `/btw` exchanges.
 
-Unknown upstream bundles and untested host versions fail before staging. A new release needs its own compatibility evidence rather than a blind textual patch.
+For an OpenCode version not in the table, the installer prints a warning, skips BTW Plus, and continues; add a row with its lockfile to support it.
 
 Both combinations below were tested on Linux x86_64 with Bun 1.4.4, Solid 1.9.17, the actual patched npm bundle, and the host's runtime-module initialization. On 2026-11-13, the upstream `test/plugin.test.tsx` suite passed 18 tests and 955 assertions for each combination, including saved-answer reopening, session isolation, search, concurrent questions, errors, focus, scrolling, and resizing. `session.generate` and storage use the upstream controlled fixture; this is not a real model call or full OpenCode application test.
 

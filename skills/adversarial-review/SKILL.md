@@ -11,7 +11,7 @@ For unexpectedly good or negative results, or pessimistic assessments, use `refe
 
 Use the optional templates only when a structured written review helps. Existing artifacts and evidence pointers are sufficient input. Report `Required Fixes`, `Research-Sufficient`, `Optional Hardening`, and `Do Not Change` as relevant. Do not require every heading or invent a fault to fill one.
 
-- A concrete wrong result, unsupported inference, failed relevant test, placeholder, or needless implementation complexity is a required fix.
+- A concrete wrong result, unsupported inference, failed relevant test, placeholder, or needless implementation complexity is a required fix. A code defect needs a realistic trigger to qualify.
 - Missing production polish or experiments beyond the current claim are optional.
 - When a claim is too broad, identify the narrower supported finding as well as the evidence needed to extend it.
 - One semantic reviewer and at most one targeted delta re-review are the default. New evidence or a new causal hypothesis can justify further investigation under the user's task scope.

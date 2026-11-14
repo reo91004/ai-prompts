@@ -21,13 +21,14 @@ spec.loader.exec_module(context)
 
 class ContextDefaultsTests(unittest.TestCase):
     def setUp(self):
-        self.defaults = context.read_defaults(TEMPLATE)
+        self.defaults = tomllib.loads(TEMPLATE.read_text())
 
-    def test_bundled_policy_is_one_million_with_an_800k_total_boundary(self):
+    def test_bundled_policy_is_one_million_with_an_800k_total_boundary_and_xhigh_effort(self):
         self.assertEqual(self.defaults["model_context_window"], 1_000_000)
         self.assertEqual(self.defaults["model_auto_compact_token_limit"], 800_000)
         self.assertEqual(self.defaults["model_auto_compact_token_limit_scope"], "total")
         self.assertEqual(self.defaults["model_post_turn_compact_threshold_percent"], 0)
+        self.assertEqual(self.defaults["model_reasoning_effort"], "xhigh")
         self.assertEqual(self.defaults["features"]["token_budget"], {"auto_compact_fallback_prompt": ""})
 
     def test_empty_config_and_repeated_merge(self):
@@ -42,6 +43,7 @@ model_context_window = 200000 # window comment
 model_auto_compact_token_limit = 150000
 model_auto_compact_token_limit_scope = "input"
 model_post_turn_compact_threshold_percent = 90
+model_reasoning_effort = "low" # effort comment
 notes = """Do not interpret this as a header:
 [features.token_budget]
 auto_compact_fallback_prompt = "inside notes"
@@ -79,7 +81,8 @@ max_threads = 4
         self.assertTrue(after["features"]["user_feature"])
         expected_budget = {**before["features"]["token_budget"], "auto_compact_fallback_prompt": ""}
         self.assertEqual(after["features"]["token_budget"], expected_budget)
-        for comment in ("# account comment", "# window comment", "# context preference", "# token budget comment", "# prompt comment"):
+        self.assertEqual(after["model_reasoning_effort"], "xhigh")
+        for comment in ("# account comment", "# window comment", "# effort comment", "# context preference", "# token budget comment", "# prompt comment"):
             self.assertIn(comment, updated)
         self.assertEqual(updated, context.merge_config(updated, self.defaults))
         context.check_config(updated, self.defaults)
@@ -162,25 +165,11 @@ max_threads = 4
             valid.replace('model_auto_compact_token_limit = 800000', 'model_auto_compact_token_limit = 800001'),
             valid.replace('model_post_turn_compact_threshold_percent = 0', 'model_post_turn_compact_threshold_percent = false'),
             valid.replace('model_post_turn_compact_threshold_percent = 0', 'model_post_turn_compact_threshold_percent = 80'),
+            valid.replace('model_reasoning_effort = "xhigh"', 'model_reasoning_effort = "high"'),
         ]
         for text in invalid:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 context.check_config(text, self.defaults)
-
-    def test_template_rejects_invalid_types_and_unrelated_fields(self):
-        original = TEMPLATE.read_text()
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "template.toml"
-            for text in (
-                original.replace('1000000', '"1000000"'),
-                original.replace('800000', '1200000'),
-                original.replace('experimental_mode = true', 'experimental_mode = 1'),
-                original.replace('auto_compact_fallback_prompt = ""', 'auto_compact_fallback_prompt = "notes"'),
-                'model_provider = "PRIVATE_ACCOUNT_SENTINEL"\n' + original,
-            ):
-                path.write_text(text)
-                with self.subTest(text=text), self.assertRaises(ValueError):
-                    context.read_defaults(path)
 
     def test_cli_stages_without_touching_source_and_check_is_read_only(self):
         with tempfile.TemporaryDirectory() as directory:

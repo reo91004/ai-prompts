@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Sourced by install.sh after its lock, journal, and Node runtime are ready.
 
-humanizer_content_hash() {
+validate_humanizer_bundle() {
   node - "$1" <<'NODE'
-const fs = require('fs'), path = require('path'), crypto = require('crypto');
+const fs = require('fs'), path = require('path');
 const root = process.argv[2];
 const fail = message => { console.error(message); process.exit(1); };
 if (!fs.lstatSync(root).isDirectory()) fail('Humanizer bundle must be a regular directory.');
@@ -37,55 +37,23 @@ const normalize = value => value.replace(/\s+/g, ' ').trim();
 const license = fs.readFileSync(path.join(root, 'LICENSE'), 'utf8')
   .split(/\r?\n/).filter(line => !/^Copyright\b/i.test(line)).join('\n');
 if (normalize(license) !== normalize(mit)) fail('Humanizer must retain the MIT LICENSE.');
-const hash = crypto.createHash('sha256');
-function walk(relative) {
-  for (const name of fs.readdirSync(path.join(root, relative)).sort()) {
-    if (name === '.git') fail('Humanizer skill bundle must not contain .git.');
-    const child = path.join(relative, name), full = path.join(root, child), stat = fs.lstatSync(full);
-    if (stat.isDirectory()) {
-      hash.update(`D\0${child}\0`);
-      walk(child);
-    } else if (stat.isFile()) {
-      const data = fs.readFileSync(full);
-      hash.update(`F\0${child}\0${stat.mode & 0o111 ? '755' : '644'}\0${data.length}\0`);
-      hash.update(data);
-    } else fail(`Unsupported Humanizer bundle entry: ${child}`);
-  }
-}
-walk('');
-console.log(hash.digest('hex'));
 NODE
 }
 
-humanizer_record_hash() {
-  node - "$1" "$2" "$3" <<'NODE'
-const fs = require('fs');
-const [file, source, revision] = process.argv.slice(2), record = JSON.parse(fs.readFileSync(file, 'utf8'));
-if (record.source !== source || record.revision !== revision || !/^[0-9a-f]{40}$/.test(revision) || record.license !== 'MIT' ||
-    !/^[0-9a-f]{64}$/.test(record.content_sha256)) process.exit(1);
-console.log(record.content_sha256);
-NODE
-}
-
-verify_humanizer_skill() {
-  local actual
-  actual="$(humanizer_content_hash "$1")" || return 1
-  [ "$actual" = "$2" ]
-}
-
+# source.json names the source and revision of the cached bundle.
 verify_humanizer_source() {
-  local revision="$1" expected="$2" source="${3:-https://github.com/blader/humanizer.git}" recorded
+  local revision="$1" source="${2:-https://github.com/blader/humanizer.git}"
   local cache="$KIT_STATE_ROOT/sources/humanizer"
   [ ! -L "$KIT_STATE_ROOT/sources" ] && [ ! -L "$cache" ] || return 1
   if [ "$source" != https://github.com/blader/humanizer.git ]; then
     [ "${KIT_TEST_FIXTURES_ONLY:-0}" = 1 ] && [ -d "$source/.git" ] || return 1
   fi
-  recorded="$(humanizer_record_hash "$cache/source.json" "$source" "$revision")" || return 1
-  [ "$recorded" = "$expected" ] && verify_humanizer_skill "$cache/skill" "$expected"
+  node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.source===process.argv[2]&&r.revision===process.argv[3]&&r.license==="MIT"?0:1)' \
+    "$cache/source.json" "$source" "$revision" && validate_humanizer_bundle "$cache/skill"
 }
 
 prepare_humanizer() {
-  local remote=https://github.com/blader/humanizer.git revision cached_hash stage checkout prepared
+  local remote=https://github.com/blader/humanizer.git revision stage checkout prepared
   local cache="$KIT_STATE_ROOT/sources/humanizer"
   if [ "$#" -ne 0 ]; then
     [ "$#" -eq 2 ] && [ "$1" = --fixture-repository ] && [ "${KIT_TEST_FIXTURES_ONLY:-0}" = 1 ] ||
@@ -95,9 +63,7 @@ prepare_humanizer() {
     remote="$2"
   fi
   if [ "${HUMANIZER_PREPARED:-0}" = 1 ]; then
-    [ "$remote" = "$HUMANIZER_SOURCE" ] &&
-      verify_humanizer_source "$HUMANIZER_REVISION" "$HUMANIZER_CONTENT_SHA256" "$remote" ||
-      kit_die "Prepared Humanizer source changed during this install."
+    [ "$remote" = "$HUMANIZER_SOURCE" ] || kit_die "Prepared Humanizer source changed during this install."
     return 0
   fi
   revision="$(git ls-remote --exit-code "$remote" HEAD | awk '$2 == "HEAD" {print $1}')" ||
@@ -107,9 +73,7 @@ prepare_humanizer() {
   HUMANIZER_REVISION="$revision"
   HUMANIZER_LICENSE=MIT
   HUMANIZER_SKILL_SOURCE="$cache/skill"
-  if cached_hash="$(humanizer_record_hash "$cache/source.json" "$remote" "$revision" 2>/dev/null)" &&
-      verify_humanizer_source "$revision" "$cached_hash" "$remote" 2>/dev/null; then
-    HUMANIZER_CONTENT_SHA256="$cached_hash"
+  if verify_humanizer_source "$revision" "$remote" 2>/dev/null; then
     HUMANIZER_PREPARED=1
     return 0
   fi
@@ -125,16 +89,15 @@ prepare_humanizer() {
     kit_die "Humanizer source contains a symlink or submodule; its complete bundle was not installed."
   git -C "$checkout" archive --format=tar "$revision" > "$stage/source.tar" || kit_die "Could not archive the Humanizer revision."
   tar -xf "$stage/source.tar" -C "$prepared/skill" || kit_die "Could not extract the complete Humanizer bundle."
-  HUMANIZER_CONTENT_SHA256="$(humanizer_content_hash "$prepared/skill")" || kit_die "Humanizer source validation failed."
-  node - "$prepared/source.json" "$remote" "$revision" "$HUMANIZER_CONTENT_SHA256" <<'NODE' || kit_die "Could not record Humanizer provenance."
-const fs = require('fs'), [file, source, revision, content_sha256] = process.argv.slice(2);
-fs.writeFileSync(file, JSON.stringify({source, revision, content_sha256, license: 'MIT'}, null, 2) + '\n');
+  validate_humanizer_bundle "$prepared/skill" || kit_die "Humanizer source validation failed."
+  node - "$prepared/source.json" "$remote" "$revision" <<'NODE' || kit_die "Could not record Humanizer provenance."
+const fs = require('fs'), [file, source, revision] = process.argv.slice(2);
+fs.writeFileSync(file, JSON.stringify({source, revision, license: 'MIT'}, null, 2) + '\n');
 NODE
   kit_require_real_dir "$KIT_STATE_ROOT/sources"
   [ ! -L "$cache" ] || kit_die "Refusing a symlinked Humanizer source cache."
   KIT_HUMANIZER_BACKUP_INDEX=$((${KIT_HUMANIZER_BACKUP_INDEX:-0} + 1))
   kit_backup_path "$cache" "humanizer/source-$KIT_HUMANIZER_BACKUP_INDEX"
   kit_replace_dir "$prepared" "$cache"
-  verify_humanizer_source "$revision" "$HUMANIZER_CONTENT_SHA256" "$remote" || kit_die "Prepared Humanizer source verification failed."
   HUMANIZER_PREPARED=1
 }

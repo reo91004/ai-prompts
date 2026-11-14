@@ -79,8 +79,8 @@ inputs are fixed in advance and never conditioned on the label, key, query ID,
 target output, swing, or capture result.
 
 - Every discarded capture is a trigger-high physical execution: count it in the
-  ledger and physical budget. Never hide warm-up / rejected / abandoned attempts
-  to keep only successes.
+  attempt record. Never hide warm-up / rejected / abandoned attempts to report
+  only successes.
 - Record the session-start warm-up row as `eligible=false`,
   `reason=first_arm_warmup`, preserving attempt index, command/query identity, ACK
   result, observed trigger swing, power/trigger quality, and overflow regardless
@@ -93,11 +93,11 @@ target output, swing, or capture result.
   results.
 - A native command that consumes prepared query or session state must not be
   silently resent through `capture_quality_retries`; a needed re-run appears as a
-  separate physical execution under the attempt policy.
+  separate physical execution in the attempt record.
 - Fixed order: `open → audit-only warm-up → reset/prezero → prepare actual query →
-  eligible capture`. Implementations that skip this order or loop until a trace
-  passes are forbidden. If warm-up/re-warm exhausts the cap, fail the block/session
-  rather than hiding attempts.
+  eligible capture`. Implementations that skip this order or loop blind retries
+  until a trace passes are forbidden. If warm-up does not clear the miss, diagnose
+  it with §1–3 and fix the cause before capturing again.
 
 ### Full-window coverage is a separate gate
 
@@ -109,32 +109,30 @@ inside the buffer, and record the real interval, sample count, and duration in
 provenance. Warm-up closes first-arm miss and physical accounting; window coverage
 closes full-operation coverage — they are different problems.
 
-## 6. Continue / stop rules
+## 6. Continue rules
 
 - If hardware capture and acceptance evidence both PASS, continue to the planned
   next implementation, measurement, analysis, and documentation without waiting
   for re-approval.
-- Fix trivial, non-semantic errors (formatting, lint, path) and continue; these do
-  not count as hardware retries.
-- On a major logical error that threatens experiment validity or claim integrity,
-  stop immediately and preserve the error and artifacts — do not reclassify it as
-  trivial or route around it with a retry.
-- On a hardware capture quality failure, preserve the failed artifact and ledger
-  row first; allow at most the one pre-declared retry, recorded as a separate
-  attempt through reset/prezero and query re-prep.
-- Two consecutive quality failures → stop immediately. Never loop until success or
-  hide a native resend inside `capture_quality_retries`.
+- On any failure (formatting/path, logic, or capture quality), record it briefly,
+  find the cause, fix it, and run again through reset/prezero and query re-prep.
+  Data captured under wrong logic is not used. Keep going until the planned data
+  is collected or the user stops the work; an attempt count is not a stop
+  condition.
+- Each rerun follows a diagnosis or a change. Do not lower a quality gate or hide
+  a native resend inside `capture_quality_retries` to make a capture pass.
+- Stop only for an equipment-safety risk.
 
 ## 7. Common wrong fixes
 
 - lowering the trigger-swing gate (accepts a noise-only auto-trigger buffer);
 - increasing auto-trigger time (a missed edge never returns; only failure is
   delayed);
-- unbounded retries (hides physical budget and failure rate);
+- blind retries without a diagnosis (hide the failure cause and rate);
 - resending a state-consuming native command as a quality retry (hides
   query/session consumption);
-- saving only successful traces (erases the real physical-execution count and rig
-  instability);
+- reporting only successful attempts (erases the real failure count and rig
+  instability); a brief record of each failed attempt is enough, its traces can go;
 - reading a separate-CLI sequence as a state experiment (close/open/reflash is not
   a same-session comparison);
 - blaming LLM permissions when open/program/fetch already succeeded.
@@ -161,14 +159,12 @@ accounting; or reading a short diagnostic run as leakage/recovery evidence.
 - [ ] compared the trigger-channel raw swing against a normal run;
 - [ ] ran a retry 0/1 (or warm-up off/on) toggle with the same payload;
 - [ ] tested order effects in one rig session, not separate processes;
-- [ ] recorded rejected/warm-up attempts in the physical ledger;
+- [ ] recorded rejected/warm-up attempts in the attempt record;
 - [ ] applied the fixed one-shot warm-up at session start and after
       reconnect/reconfigure/flash, independent of results;
 - [ ] did a deterministic reset/prezero after warm-up before the real query;
 - [ ] used no hidden `capture_quality_retries` for a state-consuming native command;
-- [ ] kept hardware quality retries ≤ the pre-declared one, preserving each failed
-      artifact;
-- [ ] stopped on two consecutive quality failures and on any major logical error;
-- [ ] fixed only trivial non-semantic errors before continuing;
+- [ ] recorded each failed capture briefly, then diagnosed and fixed it before
+      rerunning;
 - [ ] fixed the threshold unit and confirmed the actual SDK argument;
 - [ ] limited the success claim to health/acquisition scope.

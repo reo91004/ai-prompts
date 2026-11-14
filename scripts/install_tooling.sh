@@ -86,7 +86,7 @@ GRAPHIFY_VERSION="$(latest_pypi_version graphifyy)"
 HEADROOM_VERSION="$(latest_pypi_version headroom-ai)"
 KIT_UV_VERSION="$(latest_pypi_version uv)"
 GRAPHIFY_PACKAGE="graphifyy==$GRAPHIFY_VERSION"
-HEADROOM_PACKAGE="headroom-ai[all]==$HEADROOM_VERSION"
+HEADROOM_PACKAGE="headroom-ai[proxy,code,html,image]==$HEADROOM_VERSION"
 TOOL_ROOT="$KIT_STATE_ROOT/tooling"
 TOOL_BIN_DIR="$TOOL_ROOT/bin"
 TOOL_UV_DIR="$TOOL_ROOT/uv-tools"
@@ -263,6 +263,8 @@ kit_replace_managed_block "$HOME/.bashrc" "$SHELL_BLOCK" "shell/bashrc" '# BEGIN
 
 "$GRAPHIFY_BIN" install --platform claude || kit_die "Graphify Claude global installation failed."
 "$GRAPHIFY_BIN" install --platform codex || kit_die "Graphify Codex global installation failed."
+# shortcut: Graphify always writes ~/.config/opencode and ignores XDG_CONFIG_HOME; a custom XDG OpenCode dir will not see it.
+"$GRAPHIFY_BIN" install --platform opencode || kit_die "Graphify OpenCode global installation failed."
 
 # Install shared MCP configuration once; normal sessions never rewrite it.
 kit_backup_path "$HOME/.codex/config.toml" "tooling/headroom-codex-config"

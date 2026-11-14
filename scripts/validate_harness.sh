@@ -21,8 +21,8 @@ count_files() {
   find "$1" -maxdepth 1 -type f -name "$2" | wc -l | awk '{ print $1 }'
 }
 
-[ "$(count_files "$ROOT/codex/agents" '*.toml')" -eq 16 ] || fail "Codex agent count must be 16"
-[ "$(count_files "$ROOT/claude-code/agents" '*.md')" -eq 15 ] || fail "Claude agent count must be 15"
+[ "$(count_files "$ROOT/codex/agents" '*.toml')" -eq 17 ] || fail "Codex agent count must be 17"
+[ "$(count_files "$ROOT/claude-code/agents" '*.md')" -eq 16 ] || fail "Claude agent count must be 16"
 
 while IFS='|' read -r file name model effort sandbox; do
   path="$ROOT/codex/agents/$file"
@@ -37,6 +37,7 @@ while IFS='|' read -r file name model effort sandbox; do
   grep -Fq 'Do not delegate or spawn child agents.' "$path" || fail "$file permits nested delegation"
 done <<'CODEX_AGENTS'
 adversarial_reviewer.toml|adversarial_reviewer|gpt-6-astra|high|read-only
+breakthrough_analyst.toml|breakthrough_analyst|gpt-6-astra|ultra|read-only
 code_comment_hygiene_reviewer.toml|code_comment_hygiene_reviewer|gpt-6-astra|low|read-only
 context_explorer.toml|context_explorer|gpt-6-astra|medium|read-only
 data_ml_experiment_reviewer.toml|data_ml_experiment_reviewer|gpt-6-astra|high|read-only
@@ -73,6 +74,7 @@ while IFS='|' read -r file name model effort tools denied permission turns; do
   fi
 done <<'CLAUDE_AGENTS'
 adversarial-reviewer.md|adversarial-reviewer|opus|high|[Read, Grep, Glob, Bash]|[Write, Edit, Agent]|plan|12
+breakthrough-analyst.md|breakthrough-analyst|opus|max|[Read, Grep, Glob, Bash]|[Write, Edit, Agent]|plan|20
 code-comment-hygiene-reviewer.md|code-comment-hygiene-reviewer|sonnet|low|[Read, Grep, Glob]|[Write, Edit, Bash, Agent]|plan|8
 context-explorer.md|context-explorer|sonnet|medium|[Read, Grep, Glob, Bash]|[Write, Edit, Agent]|plan|10
 data-ml-experiment-reviewer.md|data-ml-experiment-reviewer|sonnet|high|[Read, Grep, Glob, Bash]|[Write, Edit, Agent]|plan|14
@@ -110,7 +112,7 @@ for skill in "$ROOT/skills"/*; do
   [ "$name" = "${skill##*/}" ] || fail "skill name mismatch: $skill"
 done
 [ "$skill_count" -gt 0 ] || fail "shared skills are empty"
-for required in research-repo-protocol paper-writing side-channel-analysis crucible; do
+for required in research-repo-protocol paper-writing side-channel-analysis; do
   [ -s "$ROOT/skills/$required/SKILL.md" ] || fail "missing required skill: $required"
 done
 [ ! -e "$ROOT/skills/research-repo-design" ] || fail "retired research-repo-design skill remains"
@@ -122,7 +124,7 @@ for platform in codex/AGENTS.md claude-code/CLAUDE.md opencode/AGENTS.md; do
     [ "$reference_core" = "$core" ] || fail "global research principles differ: $platform"
   fi
 done
-for command in install.sh codex-remote.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh skills/crucible/scripts/crucible.sh; do
+for command in install.sh codex-remote.sh skills/resource-aware-orchestration/scripts/detect_resources.sh skills/resource-aware-orchestration/scripts/run_codex_agent.sh skills/resource-aware-orchestration/scripts/run_detached.sh skills/resource-aware-orchestration/scripts/wait_run.sh; do
   [ -x "$ROOT/$command" ] || fail "missing executable: $command"
   bash -n "$ROOT/$command" || fail "shell syntax: $command"
 done
