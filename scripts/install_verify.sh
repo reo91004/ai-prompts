@@ -357,6 +357,7 @@ check_manifest() {
 
   for source in "$source_dir"/*"$suffix"; do
     [ -e "$source" ] || continue
+    [ "$source_dir" != "$ROOT/skills" ] || [ -s "$source/SKILL.md" ] || continue
     name="${source##*/}"
     if ! grep -Fqx "$name" "$manifest"; then
       echo "Missing manifest entry in $manifest: $name"
@@ -417,11 +418,11 @@ for source in "$ROOT/codex/agents"/*.toml; do
 done
 
 for source in "$ROOT/skills"/*; do
-  [ -d "$source" ] || continue
+  [ -s "$source/SKILL.md" ] || continue
   check_same_dir "$source" "$HOME/.claude/skills/${source##*/}"
 done
 for source in "$ROOT/skills"/*; do
-  [ -d "$source" ] || continue
+  [ -s "$source/SKILL.md" ] || continue
   check_same_dir "$source" "$HOME/.agents/skills/${source##*/}"
 done
 

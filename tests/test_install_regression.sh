@@ -11,7 +11,8 @@ TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-install.XXXXXX")"
 ROLLBACK_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-rollback.XXXXXX")"
 CONFIG_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-config.XXXXXX")"
 VALIDATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/harness-validation.XXXXXX")"
-trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME" "$VALIDATION_ROOT" "$CONFIG_HOME"' EXIT HUP INT TERM
+LEFTOVER_HOME="$(mktemp -d "${TMPDIR:-/tmp}/harness-leftover.XXXXXX")"
+trap 'rm -rf "$TMP_HOME" "$ROLLBACK_HOME" "$VALIDATION_ROOT" "$CONFIG_HOME" "$LEFTOVER_HOME"' EXIT HUP INT TERM
 
 home_prompt_signature() {
   for path in "$REAL_HOME/.codex/AGENTS.md" "$REAL_HOME/.claude/CLAUDE.md"; do
@@ -81,6 +82,15 @@ HOME="$TMP_HOME" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$ROOT/in
 
 [ ! -e "$TMP_HOME/.agents/skills/obsolete-kit" ]
 for root in $stale_skill_roots; do [ ! -e "$TMP_HOME/$root/crucible" ]; done
+
+echo "Install regression: git pull leaves a removed skill's cache folder behind"
+LEFTOVER_ROOT="$LEFTOVER_HOME/source"
+mkdir -p "$LEFTOVER_ROOT"
+tar -C "$ROOT" --exclude=.git --exclude=.serena --exclude=.agent_tmp --exclude=node_modules -cf - . | tar -C "$LEFTOVER_ROOT" -xf -
+mkdir -p "$LEFTOVER_ROOT/skills/crucible/scripts/__pycache__" "$LEFTOVER_HOME/home"
+printf '%s\n' cache > "$LEFTOVER_ROOT/skills/crucible/scripts/__pycache__/engine.cpython-311.pyc"
+HOME="$LEFTOVER_HOME/home" UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS=1 bash "$LEFTOVER_ROOT/install.sh" --without-statusline > "$LEFTOVER_HOME/install.log"
+[ ! -e "$LEFTOVER_HOME/home/.agents/skills/crucible" ] && [ ! -e "$LEFTOVER_HOME/home/.claude/skills/crucible" ]
 [ ! -e "$TMP_HOME/.universal-research-agent-kit/backups" ]
 cmp "$TMP_HOME/expected-config.toml" "$TMP_HOME/.codex/config.toml"
 

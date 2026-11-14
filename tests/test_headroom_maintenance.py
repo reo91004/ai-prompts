@@ -7,6 +7,7 @@ import plistlib
 import signal
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -378,6 +379,9 @@ class MaintenanceTests(unittest.TestCase):
 REAL_PROCESSES = maintenance.processes
 
 
+# A macOS framework Python re-executes as Python.app, so ps shows that path instead of the kit
+# interpreter; the kit itself always runs uv's standalone Python.
+@unittest.skipIf(sysconfig.get_config_var("PYTHONFRAMEWORK"), "framework Python hides the kit interpreter path")
 class RealMcpProcessTest(unittest.TestCase):
     def test_sigterm_of_test_owned_mcp_process(self):
         with tempfile.TemporaryDirectory() as temporary:

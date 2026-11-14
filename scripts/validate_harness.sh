@@ -105,9 +105,9 @@ claude_names="$(sed -n 's/^name: \(.*\)$/\1/p' "$ROOT"/claude-code/agents/*.md)"
 [ ! -e "$ROOT/codex/skills" ] && [ ! -e "$ROOT/claude-code/skills" ] || fail "duplicate skill trees"
 skill_count=0
 for skill in "$ROOT/skills"/*; do
-  [ -d "$skill" ] || continue
+  # Folders without SKILL.md (caches left when git pull removes a skill) are not skills; the installer skips them too.
+  [ -s "$skill/SKILL.md" ] || continue
   skill_count=$((skill_count + 1))
-  [ -s "$skill/SKILL.md" ] || { fail "missing skill instructions: $skill"; continue; }
   name="$(sed -n 's/^name: //p' "$skill/SKILL.md" | head -n 1)"
   [ "$name" = "${skill##*/}" ] || fail "skill name mismatch: $skill"
 done

@@ -7,7 +7,8 @@ prepare_shared_skills() {
   kit_require_real_dir "$KIT_SHARED_SKILLS"
   for source in "$ROOT/skills"/*; do
     [ -d "$source" ] || continue
-    [ -s "$source/SKILL.md" ] || kit_die "Missing source skill: $source"
+    # A folder without SKILL.md (e.g. caches left behind when git pull removes a skill) is not a skill.
+    [ -s "$source/SKILL.md" ] || continue
     name="${source##*/}"
     kit_safe_name "$name"
     kit_replace_dir "$source" "$KIT_SHARED_SKILLS/$name"

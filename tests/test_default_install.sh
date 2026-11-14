@@ -205,7 +205,7 @@ assert_defaults() {
   [ "$(find "$HOME/.codex/agents" -name '*.toml' | wc -l)" -eq "$(find "$ROOT/codex/agents" -name '*.toml' | wc -l)" ]
   [ "$(find "$HOME/.claude/agents" -name '*.md' | wc -l)" -eq "$(find "$ROOT/claude-code/agents" -name '*.md' | wc -l)" ]
   for target in "$HOME/.agents/skills" "$HOME/.claude/skills"; do
-    for skill in "$ROOT/skills"/*; do [ ! -d "$skill" ] || diff -qr "$skill" "$target/${skill##*/}"; done
+    for skill in "$ROOT/skills"/*; do [ ! -s "$skill/SKILL.md" ] || diff -qr "$skill" "$target/${skill##*/}"; done
     cmp "$KIT_TEST_HUMANIZER_REPOSITORY/SKILL.md" "$target/humanizer/SKILL.md"
     cmp "$KIT_TEST_HUMANIZER_REPOSITORY/LICENSE" "$target/humanizer/LICENSE"
     diff -qr "$HOME/.universal-research-agent-kit/sources/humanizer/skill" "$target/humanizer"
