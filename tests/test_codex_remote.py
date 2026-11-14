@@ -194,7 +194,7 @@ while True:
             self.assertEqual(owner.pid, child.pid)
             self.assertEqual(owner.uid, os.getuid())
             self.assertEqual(owner.argv[1:3], ("-u", "-c"))
-            self.assertEqual(Path(owner.executable), Path(sys.executable).resolve())
+            self.assertEqual(owner.executable, rc.process(os.getpid()).executable)
             with patch.object(rc, "process", return_value=replace(owner, uid=owner.uid + 1)):
                 with self.assertRaisesRegex(RuntimeError, "another user"):
                     rc.socket_owner(path)
