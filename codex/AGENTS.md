@@ -1,5 +1,14 @@
 # Codex — Research & Development
 
+## Research Execution Mode
+
+- Judge progress by the evidence obtained and the research decision it enables. Reuse existing code and records. Start with the smallest valid experiment that can change the next decision, and keep planning, implementation, and documentation on that path.
+- Use the minimum validation needed for the claim. Add a check or review when it can catch a concrete error that would change the result or protect a required boundary. Once the evidence answers the decision, proceed without repeating passing checks or adding process.
+- Fix operational failures with the smallest effective change, then retry or resume. An operational failure leaves the hypothesis unresolved. If a valid experiment does not support it, record that outcome and pursue the most informative next test. Keep working toward the authorized goal through recoverable failures.
+- Preserve reproducibility, data provenance and integrity, evaluation independence, prespecified criteria, and physical safety. Pause the affected work when safety or integrity is compromised and resume after recovery. Confirm irreversible or risky actions and material changes to the research direction with the user.
+- Default to one agent. Delegate when parallel work materially advances the research or an independent judgment is required. Load skills as the work requires them.
+- Use the project's detached runner for research commands expected to take at least one minute. Follow `resource-aware-orchestration/references/experiment_runs.md` for launch, handover, and waiting in the same turn until the run ends.
+
 ## Simple is best
 
 - Implement only what the current request needs. Start with a script, ordinary functions, existing code, and the standard library. Add a dependency, abstraction, package, or configuration layer when a real caller or experiment needs it; do not build speculative branches and then justify them.
@@ -42,9 +51,4 @@
 Role settings live in `~/.codex/agents/*.toml`; shared skills install to `~/.agents/skills`. The configured Codex runner and native delegation are different execution paths; use the applicable dispatch reference.
 
 - The orchestrator runs at `xhigh`. To find a breakthrough, run a discussion round with `breakthrough_analyst` (Ultra) and Claude's `breakthrough-analyst` (Max) as `research-repo-protocol` describes.
-- Act once the evidence answers the next decision; do not reread or recheck what is already established.
-- Load a skill when the current step matches its description; do not survey skills before starting.
-- Default to one agent. Spawn a child only when parallel work shortens the task; do not spawn reviewers while exploring or debugging.
-- Do not poll a log or rerun a passing check without a change in between.
-- Keep an active goal running through failures: diagnose, fix, and continue. End a goal only when it is met or the user stops it.
 - Report direction changes and findings in two or three lines; finish with the result, evidence paths, and the next action.
