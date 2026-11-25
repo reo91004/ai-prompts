@@ -127,6 +127,10 @@ HELP
   kit_maintenance_run opencode-idle || kit_die "OpenCode became active before skill replacement."
   install_core
   kit_replace_managed_block "$HOME/.config/git/ignore" "$ROOT/global_research_agents.gitignore" git/ignore '# BEGIN UNIVERSAL RESEARCH AGENT KIT' '# END UNIVERSAL RESEARCH AGENT KIT'
+  # One tmux configuration for every host; it must load on the oldest supported tmux (3.2a).
+  kit_require_regular_or_absent "$HOME/.tmux.conf"
+  kit_backup_path "$HOME/.tmux.conf" tmux/tmux.conf
+  kit_replace_file "$ROOT/tmux/tmux.conf" "$HOME/.tmux.conf"
   if [ "${UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_INTEGRATIONS:-0}" = 1 ]; then
     kit_write_integrations_state "$PROFILE" skipped_env skipped_env skipped_env skipped_env
   else

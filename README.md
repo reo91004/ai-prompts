@@ -25,7 +25,7 @@ sh install.sh --cleanup-backups     # 키트 설치 백업만 명시적으로 �
 sh install.sh --help
 ```
 
-기본 설치는 세 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, Ponytail, Sequential Thinking MCP, Graphify, Headroom, Codex·Claude Code statusline을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다.
+기본 설치는 세 플랫폼의 전역 지침·agent·공통 스킬, 키트 gitignore 블록, 모든 호스트 공통 tmux 설정(`~/.tmux.conf`), Ponytail, Sequential Thinking MCP, Graphify, Headroom, Codex·Claude Code statusline을 구성한 뒤 검증합니다. MCP·도구 설치는 유지하고, 사용 여부는 작업의 필요에 맞게 판단합니다. tmux 설정은 [`tmux/tmux.conf`](tmux/tmux.conf)로 덮어쓰고 이전 파일은 백업하며, 가장 오래된 지원 버전인 tmux 3.2a에서도 오류 없이 로드되는지 검증합니다. 실행 중인 tmux에는 `Ctrl-b r`로 다시 불러옵니다.
 
 Statusline은 이 패키지에 담은 현재 Mac의 설정으로 **기본 설치·재설치 때 덮어씁니다.** Codex는 `tui.status_line`만 병합하고, Claude Code는 `statusLine` 설정과 `~/.claude/statusline.sh`를 설치합니다. 그 밖의 설정과 인증 정보는 복사하지 않습니다. 변경 전 설정·스크립트는 기존 설치 백업에 보존하며 실패하면 journal로 복구합니다. 기존 statusline을 유지하려면 `--without-statusline`을 지정하세요. 이 옵션은 statusline 검증도 생략합니다.
 

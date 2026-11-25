@@ -442,6 +442,16 @@ check_manifest "$ROOT/skills" "" "$HOME/.universal-research-agent-kit/manifests/
 check_file "$HOME/.config/git/ignore"
 check_contains "$HOME/.config/git/ignore" "BEGIN UNIVERSAL RESEARCH AGENT KIT"
 check_contains "$HOME/.config/git/ignore" "END UNIVERSAL RESEARCH AGENT KIT"
+check_same_file "$ROOT/tmux/tmux.conf" "$HOME/.tmux.conf"
+if command -v tmux >/dev/null 2>&1; then
+  # A private server sources the file without touching the user's running tmux sessions.
+  tmux_socket="kit-verify-$$"
+  if ! { tmux -L "$tmux_socket" -f /dev/null new-session -d 'sleep 30' && tmux -L "$tmux_socket" source-file "$HOME/.tmux.conf"; }; then
+    echo "tmux $(tmux -V) rejects $HOME/.tmux.conf"
+    missing=1
+  fi
+  tmux -L "$tmux_socket" kill-server 2>/dev/null || true
+fi
 
 check_tool_command() {
   local command_name="$1"
