@@ -13,3 +13,7 @@ experimental_mode = true
 # The updater preserves token_budget=false and all other token-budget settings.
 [features.token_budget]
 auto_compact_fallback_prompt = ""
+
+# Fold finished turns' commands, edits, and tool calls; the transcript keeps them expandable.
+[tui]
+collapse_turn_details = true

@@ -113,6 +113,26 @@ max_threads = 4
                     self.assertIn("# keep boolean comment", updated)
                 self.assertEqual(updated, context.merge_config(updated, self.defaults))
 
+    def test_turn_details_collapse_joins_existing_tui_and_statusline_merge(self):
+        original = ('[tui]\nstatus_line = ["model"]\nscreen_reader_detection_done = true\n'
+                    'collapse_turn_details = false # user choice\n\n[tui.model_availability_nux]\n"gpt-5.5" = 4\n')
+        updated = context.merge_config(original, self.defaults)
+        tui = tomllib.loads(updated)["tui"]
+        self.assertIs(tui["collapse_turn_details"], True)
+        self.assertEqual(tui["model_availability_nux"], {"gpt-5.5": 4})
+        self.assertTrue(tui["screen_reader_detection_done"])
+        statusline_spec = importlib.util.spec_from_file_location("statusline", ROOT / "scripts/statusline.py")
+        statusline = importlib.util.module_from_spec(statusline_spec)
+        statusline_spec.loader.exec_module(statusline)
+        for text in (updated, context.merge_config(statusline.merge_codex("", ["model"]), self.defaults)):
+            merged = statusline.merge_codex(text, ["model", "git-branch"])
+            context.check_config(merged, self.defaults)
+            self.assertEqual(tomllib.loads(merged)["tui"]["status_line"], ["model", "git-branch"])
+        with self.assertRaises(ValueError):
+            context.check_config(updated.replace("collapse_turn_details = true", "collapse_turn_details = false"), self.defaults)
+        with self.assertRaises((ValueError, TOMLKitError)):
+            context.merge_config('tui = "PRIVATE_ACCOUNT_SENTINEL"\n', self.defaults)
+
     def test_boolean_token_budget_false_stays_false(self):
         original = '[features]\ntoken_budget = false # intentionally disabled\ncontext_management = true\n'
         updated = context.merge_config(original, self.defaults)

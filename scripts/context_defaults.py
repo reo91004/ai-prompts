@@ -1,4 +1,4 @@
-"""Prepare or check Codex root defaults while preserving the user's TOML.
+"""Prepare or check Codex context and TUI defaults while preserving the user's TOML.
 
 Codex 0.166 normalizes an explicit empty fallback prompt to None. It prevents
 model-owned fallback defaults and adds no fallback buffer, even when a positive
@@ -64,6 +64,9 @@ def check_config(text, defaults):
     for name, value in (("context_management", context), ("token_budget", budget)):
         if isinstance(value, dict) and "enabled" in value and type(value["enabled"]) is not bool:
             raise ValueError(f"features.{name}.enabled must be a boolean")
+    tui = config.get("tui")
+    if not isinstance(tui, dict) or tui.get("collapse_turn_details") is not defaults["tui"]["collapse_turn_details"]:
+        raise ValueError("Codex tui.collapse_turn_details differs from the bundled context default")
 
 
 def merge_config(text, defaults):
@@ -78,6 +81,11 @@ def merge_config(text, defaults):
     feature_table(features, "context_management")["experimental_mode"] = True
     if features.get("token_budget") is not False:
         feature_table(features, "token_budget")["auto_compact_fallback_prompt"] = ""
+    if "tui" not in document:
+        document["tui"] = tomlkit.table()
+    if not isinstance(document["tui"], MutableMapping):
+        raise ValueError("Codex tui must be a table")
+    document["tui"]["collapse_turn_details"] = defaults["tui"]["collapse_turn_details"]
     updated = tomlkit.dumps(document)
     check_config(updated, defaults)
     return updated
