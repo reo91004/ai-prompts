@@ -66,6 +66,9 @@ checkpoints/
 *.npz
 *.npy
 
+# Rendered manuscripts: rebuilt from docs/paper/ sources; the PDF actually submitted is frozen under docs/venues/
+docs/paper-pdf/
+
 # Vivado / FPGA local artifacts
 .Xil/
 *.jou

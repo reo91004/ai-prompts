@@ -12,7 +12,15 @@ research-repository/
 │   ├── idea/
 │   ├── lit/
 │   ├── ref-code/
-│   └── ref-paper/
+│   ├── ref-paper/
+│   ├── paper/                    # Overleaf project root: LaTeX inputs only
+│   │   ├── main<K>_v<N>.tex      # every version of the current series
+│   │   ├── figures/              # live figure pool; v<N>/ keeps figures an older version reads
+│   │   ├── main<K-1>/            # previous series, self-contained
+│   │   └── submissions/<venue>/  # each submitted paper, self-contained and frozen
+│   ├── paper-pdf/                # rendered PDFs at the same relative paths (untracked)
+│   └── venues/
+│       └── <venue>/              # README.md, planning/, record/, rebuttal/
 ├── records/
 │   ├── conventions.md
 │   ├── research-guide.md
@@ -53,6 +61,12 @@ research-repository/
 AGENTS.md links required documents, environments, commands, equipment/resource limits, disclosure rules, and important boundaries. Keep the entry short.
 
 docs/00-overview.md explains the question and why it matters; docs/01-timeline.md gives the scientific chronology; docs/02-progress.md summarizes supported results, open issues, and next experiments. docs/idea/ preserves supplied ideas and proposals. docs/lit/ is where agents organize the literature: bibliography, paper notes, source locations, and comparisons. docs/ref-code/ and docs/ref-paper/ hold code and papers supplied by the user or the professor; agents read them but never add, edit, move, or delete files there. Code ported from ref-code/ lives under experiments/ with its source, revision, license, changes, and validation scope noted. A supplied manuscript and our new draft are different artifacts.
+
+## Manuscripts And Venue Documents
+
+docs/paper/ is the supervisor's Overleaf project root: uploading it as is must render every manuscript in it. It holds only what LaTeX reads: sources, bibliographies, class/style/bst files, venue templates, and figures. Nothing else goes there, because Overleaf shows the supervisor every file in the tree. Rendered PDFs go to docs/paper-pdf/ at the same relative path (docs/paper/submissions/<venue>/main.tex renders to docs/paper-pdf/submissions/<venue>/main.pdf); they are rebuilt from source and stay untracked. Agent rules and README notes about the manuscripts go in the project AGENTS.md manuscript section. Figure data, number tables, and provenance stay with the generating code's outputs in results/ or the tracked evidence path named in AGENTS.md, so figures/ holds only the figure files. Build logs and auxiliary files never land in docs/paper/; render into a temporary directory.
+
+docs/venues/<venue>/ holds documents for one submission cycle and no code: README.md (venue, deadlines, page limits, status), planning/ (plans and the carry-over from an earlier cycle), record/ (README.md as the current evidence record, plus the PDF actually submitted, frozen), and rebuttal/ (reviews/ verbatim, numbered analyses, drafts/). Rebuttal experiments are ordinary experiment cards, code, and configs under the usual paths; do not create venue-named experiment or config folders. [Manuscript workspace](../../paper-writing/references/manuscript_workspace.md) gives the version, submission, review, and upload procedures.
 
 ## Detailed Research Records
 
