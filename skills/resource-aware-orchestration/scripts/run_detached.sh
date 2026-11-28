@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Start a long command outside the agent session so it survives the session ending.
 # The run directory receives: command, started_at, pid, log, and exit_code when the command ends.
-# From Codex it also records codex_thread and, after exit_code, wakes that session and confirms the
-# woken turn finished, retrying for about a day (wake.log). RUN_WAKE_THREAD overrides the thread to
-# wake; an empty value disables the wake. On macOS the run keeps the machine from idle sleep.
+# From Codex it also records codex_thread and, after exit_code, wakes that session unless its turn
+# already read wait_run.sh's report, retrying for about a day (wake.log). RUN_WAKE_THREAD overrides
+# the thread to wake; an empty value disables the wake. On macOS the run keeps the machine from idle sleep.
 set -euo pipefail
 [ "$#" -ge 3 ] && [ "$2" = -- ] || { echo "Usage: run_detached.sh <run-dir> -- <command> [args...]" >&2; exit 2; }
 wake_thread="${RUN_WAKE_THREAD-${CODEX_THREAD_ID:-}}"

@@ -34,7 +34,7 @@ if [ "$1" = queue ]; then
 fi
 EOF
 chmod +x "$T/bin/codex"
-export FAKE_CODEX_CALLS="$T/calls" FAKE_DAEMON_STATUS=1
+export FAKE_CODEX_CALLS="$T/calls" FAKE_DAEMON_STATUS=1 RUN_WAKE_GRACE=0
 wait_wake() { for _ in $(seq 100); do grep -q 'woken turn' "$1/wake.log" 2>/dev/null && return; sleep 0.1; done; return 1; }
 HOME="$T/home" PATH="$T/bin:$PATH" CODEX_THREAD_ID=thread-1 "$S/run_detached.sh" "$T/a3" -- bash -c 'exit 4' >/dev/null
 "$S/wait_run.sh" "$T/a3" >/dev/null

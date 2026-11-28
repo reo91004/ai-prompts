@@ -7,7 +7,7 @@
 - Fix operational failures with the smallest effective change, then retry or resume. An operational failure leaves the hypothesis unresolved. If a valid experiment does not support it, record that outcome and pursue the most informative next test. Keep working toward the authorized goal through recoverable failures.
 - Preserve reproducibility, data provenance and integrity, evaluation independence, prespecified criteria, and physical safety. Pause the affected work when safety or integrity is compromised and resume after recovery. Confirm irreversible or risky actions and material changes to the research direction with the user.
 - Default to one agent. Delegate when parallel work materially advances the research or an independent judgment is required. Load skills as the work requires them.
-- Use the project's detached runner for research commands expected to take at least one minute. Follow `resource-aware-orchestration/references/experiment_runs.md` for launch, handover, and waiting in the same turn until the run ends.
+- Use the project's detached runner for research commands expected to take at least one minute. Follow `resource-aware-orchestration/references/experiment_runs.md` for launch, handover, and waiting in the same turn until the run ends. Do not end the turn to wait; under an active goal, polling the live `wait_run.sh` session is progress, never a reason to mark the goal `blocked` or `complete`.
 
 ## Simple is best
 

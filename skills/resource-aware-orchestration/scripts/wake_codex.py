@@ -2,11 +2,16 @@
 """Wake the Codex session in <run-dir>/codex_thread after a run ends and confirm the woken turn finished.
 
 run_detached.sh starts this once exit_code exists and appends its output to <run-dir>/wake.log.
+The session normally holds its turn on wait_run.sh, so the wake is a backup: after a grace period
+it exits without a message when that session's rollout already holds wait_run.sh's report.
 Each attempt queues a message carrying a unique token with `codex queue --resume`, then reads the
 thread's rollout until the turn holding that token completes. A failed resume, a turn that ended
 with an error (expired login, network, proxy), or a message never picked up is retried with
-backoff for about a day, so an unattended run does not stay unanalyzed. Duplicate messages are
-harmless: each tells the session to stop if the outcome is already recorded.
+backoff for about a day, so an unattended run does not stay unanalyzed. A queued message stays
+queued until a turn takes it, so a retry adds a second copy; when an open TUI holds the thread
+("active writer"), that TUI delivers the message after its current turn, and the wake waits for it
+instead of queueing copies. Repeated copies flood the session with identical turns, which has sent
+the model into an endless "stop" loop.
 """
 
 import json
@@ -16,8 +21,10 @@ import subprocess
 import sys
 import time
 
-RETRY_DELAYS = [0, 60, 300, 900, 1800] + [3600] * 20
+GRACE = int(os.environ.get("RUN_WAKE_GRACE", "60"))  # lets a turn polling wait_run.sh read the end first
+RETRY_DELAYS = [GRACE, 60, 300, 900, 1800] + [3600] * 20
 PICKUP_LIMIT = 1800  # seconds a queued message may wait before it is sent again
+WRITER_PICKUP_LIMIT = 24 * 3600  # an open TUI delivers after its current turn, however long that runs
 TURN_LIMIT = 6 * 3600  # seconds a started turn may run before the wake is sent again
 POLL = 30
 
@@ -38,6 +45,12 @@ def rollout(thread):
     return matches[-1] if matches else None
 
 
+def seen(thread, run_dir, exit_code):
+    """True when the session already read wait_run.sh's report of this run's end."""
+    path = rollout(thread)
+    return bool(path) and f"run ended: exit_code={exit_code} dir={run_dir}" in path.read_text()
+
+
 def turn_state(path, token):
     """Return queued, running, done, error, or aborted for the turn whose input holds token."""
     seen = False
@@ -55,7 +68,7 @@ def turn_state(path, token):
     return "running" if seen else "queued"
 
 
-def wait_for_turn(thread, token, sleep=time.sleep, clock=time.monotonic):
+def wait_for_turn(thread, token, sleep=time.sleep, clock=time.monotonic, pickup_limit=PICKUP_LIMIT):
     start, started = clock(), None
     while True:
         path = rollout(thread)
@@ -64,7 +77,7 @@ def wait_for_turn(thread, token, sleep=time.sleep, clock=time.monotonic):
             return state
         if state == "running" and started is None:
             started = clock()
-        if started is None and clock() - start > PICKUP_LIMIT:
+        if started is None and clock() - start > pickup_limit:
             return "not picked up"
         if started is not None and clock() - started > TURN_LIMIT:
             return "unfinished"
@@ -76,6 +89,9 @@ def wake(run_dir, sleep=time.sleep, clock=time.monotonic):
     exit_code = (run_dir / "exit_code").read_text().strip()
     for attempt, delay in enumerate(RETRY_DELAYS, 1):
         sleep(delay)
+        if seen(thread, run_dir, exit_code):
+            log(f"attempt {attempt}: the session already read the run's end from wait_run.sh; no wake sent")
+            return 0
         token = f"wake-{attempt}-{time.time_ns()}"
         message = (f"Run finished: exit_code={exit_code} dir={run_dir} [{token}]. Apply 'After the run' in the "
                    "resource-aware-orchestration skill's references/experiment_runs.md to this run, then continue "
@@ -84,9 +100,10 @@ def wake(run_dir, sleep=time.sleep, clock=time.monotonic):
             log("daemon start: " + codex("app-server", "daemon", "start")[1][-300:])
         status, output = codex("queue", "--thread", thread, "--message", message, "--resume")
         log(f"attempt {attempt}: {output}")
-        if status != 0 or "could not resume" in output:
+        writer = "active writer" in output
+        if status != 0 or ("could not resume" in output and not writer):
             continue
-        state = wait_for_turn(thread, token, sleep, clock)
+        state = wait_for_turn(thread, token, sleep, clock, WRITER_PICKUP_LIMIT if writer else PICKUP_LIMIT)
         log(f"attempt {attempt}: woken turn {state}")
         if state == "done":
             return 0
