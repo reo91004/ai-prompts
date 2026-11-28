@@ -21,4 +21,4 @@ Read only the applicable profile:
 
 Return the run ID, preflight outcome, provenance and raw-artifact paths, attempt record, deviations/failures, and the supported claim scope. General hardware-free analysis does not activate this physical-capture workflow.
 
-Apply the relevant [shared research principles](../research-domain-router/references/research_principles.md) to substantive interpretation. Physical safety and capture integrity remain required. A new hypothesis that is the next step toward the user's goal justifies another capture.
+Apply the relevant [shared research principles](../research-repo-protocol/references/research_principles.md) to substantive interpretation. Physical safety and capture integrity remain required. A new hypothesis that is the next step toward the user's goal justifies another capture.

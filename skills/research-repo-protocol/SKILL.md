@@ -5,7 +5,7 @@ description: Design research repositories and coordinate experiments from questi
 
 # Research Repo Protocol
 
-Follow the [directory layout](references/directory-roles.md) exactly, with the project's environment, identifiers, and operational limits. Apply the relevant [shared research principles](../research-domain-router/references/research_principles.md). This protocol connects the research lifecycle; domain-specific validation remains in the applicable hardware, SCA, statistics, or AI/ML skill.
+Follow the [directory layout](references/directory-roles.md) exactly, with the project's environment, identifiers, and operational limits. Apply the relevant [shared research principles](references/research_principles.md). This protocol connects the research lifecycle; domain-specific validation remains in the applicable hardware, SCA, statistics, or AI/ML skill.
 
 ## Establish the record map
 

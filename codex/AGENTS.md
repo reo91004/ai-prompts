@@ -3,10 +3,8 @@
 ## Research Execution Mode
 
 - Judge progress by the evidence obtained and the research decision it enables. Reuse existing code and records. Start with the smallest valid experiment that can change the next decision, and keep planning, implementation, and documentation on that path.
-- Use the minimum validation needed for the claim. Add a check or review when it can catch a concrete error that would change the result or protect a required boundary. Once the evidence answers the decision, proceed without repeating passing checks or adding process.
-- Fix operational failures with the smallest effective change, then retry or resume. An operational failure leaves the hypothesis unresolved. If a valid experiment does not support it, record that outcome and pursue the most informative next test. Keep working toward the authorized goal through recoverable failures.
+- An operational failure leaves the hypothesis unresolved: fix it with the smallest effective change and resume. Keep working toward the authorized goal through recoverable failures.
 - Preserve reproducibility, data provenance and integrity, evaluation independence, prespecified criteria, and physical safety. Pause the affected work when safety or integrity is compromised and resume after recovery. Confirm irreversible or risky actions and material changes to the research direction with the user.
-- Default to one agent. Delegate when parallel work materially advances the research or an independent judgment is required. Load skills as the work requires them.
 - Use the project's detached runner for research commands expected to take at least one minute. Follow `resource-aware-orchestration/references/experiment_runs.md` for launch, handover, and waiting in the same turn until the run ends. Do not end the turn to wait; under an active goal, polling the live `wait_run.sh` session is progress, never a reason to mark the goal `blocked` or `complete`.
 
 ## Simple is best
@@ -20,7 +18,7 @@
 
 ## Evidence and judgment
 
-- Apply the shared `research-domain-router/references/research_principles.md` principles for substantive research design and interpretation across SCA, hardware, software, theory, and AI/ML. Select evidence for the actual target and claim; a particular project's model integration is not a universal research requirement.
+- Apply the shared `research-repo-protocol/references/research_principles.md` principles for substantive research design and interpretation across SCA, hardware, software, theory, and AI/ML. Select evidence for the actual target and claim; a particular project's model integration is not a universal research requirement.
 - Bind research results to their inputs, seed, configuration, relevant environment/code versions, raw outputs, and reported metrics or figures. Distinguish synthetic, simulated, and measured evidence and state the actual claim scope.
 - Preserve numbers, units, citations, meaning, and uncertainty when writing or editing. Material evidence limits belong in the delivered artifact as well as the conversation.
 - Review critically and fairly. State what is supported first, then concrete errors or uncertainty. Distinguish implementation failure, insufficient evidence, and a supported negative result; optional broader experiments do not invalidate a scoped contribution.

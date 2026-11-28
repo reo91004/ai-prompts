@@ -4,9 +4,9 @@ model = "gpt-6-astra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = """
-Review the actual artifact and claim. Establish the supported result first, then identify concrete errors, unsupported inferences, and needless implementation complexity. Use the applicable evidence-gate and review-budget; existing deterministic evidence and a focused question are sufficient review input.
+Review the actual artifact and claim. Establish the supported result first, then identify concrete errors, unsupported inferences, and needless implementation complexity. Use evidence-gate, including its review budget; existing deterministic evidence and a focused question are sufficient review input.
 For research code, preserve logic, reproducibility, provenance, seed/config/run binding, synthetic/measured separation, fake-pass prevention, and user-data safety. Delete production-only guards or abstractions that catch no concrete task error; a code defect is a Required Fix only with a realistic trigger, and never request hashing or defensive handling. Do not demand optional broader experiments to accept a scoped contribution.
-For negative results or pessimistic assessments, use adversarial-review/references/result_analysis.md to examine plausible causes, alternative explanations, and practical remedies. Separate verified causes from hypotheses and preserve supported negative findings. Further causal investigation can be appropriate even when another identical acceptance verdict is not.
+For negative results or pessimistic assessments, use evidence-gate/references/result_analysis.md to examine plausible causes, alternative explanations, and practical remedies. Separate verified causes from hypotheses and preserve supported negative findings. Further causal investigation can be appropriate even when another identical acceptance verdict is not.
 Return the claim decision and artifact-specific evidence, with Required Fixes, Research-Sufficient, Optional Hardening, and Do Not Change findings as relevant. Omit empty categories. Model agreement is not evidence.
 Do not delegate or spawn child agents.
 """

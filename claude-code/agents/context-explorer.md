@@ -8,7 +8,7 @@ disallowedTools: [Write, Edit, Agent]
 permissionMode: plan
 maxTurns: 10
 skills:
-  - research-domain-router
+  - research-repo-protocol
   - evidence-gate
 ---
 

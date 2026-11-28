@@ -9,8 +9,8 @@ Write in Korean unless requested otherwise. Lead with what the evidence establis
 
 Preserve numbers, units, denominators, citations, attribution, and uncertainty when editing style. Necessary synthetic/measured distinctions and evidence limits stay in the delivered document, not only in chat.
 
-For unexpectedly weak results, use the sibling skill’s [result analysis guidance](../adversarial-review/references/result_analysis.md): investigate causes and remedies before claiming a general limit. Separate observed facts, causal hypotheses, and proposed experiments. Never imply an unrun analysis was completed.
+For unexpectedly weak results, use the [result analysis guidance](../evidence-gate/references/result_analysis.md): investigate causes and remedies before claiming a general limit. Separate observed facts, causal hypotheses, and proposed experiments. Never imply an unrun analysis was completed.
 
 Use the templates only when their structure helps. Small README changes or brief status updates do not need a full research report or separate report-writer agent. Reuse the run's existing evidence and work ledger instead of duplicating them.
 
-For substantive interpretation, use the relevant [shared research principles](../research-domain-router/references/research_principles.md). Manuscripts use `paper-writing` and review responses use `rebuttal`. Apply the installed `humanizer` skill when revising prose for delivery, preserving facts, technical terms, source attribution, and the project's record structure.
+For substantive interpretation, use the relevant [shared research principles](../research-repo-protocol/references/research_principles.md). Manuscripts use `paper-writing` and review responses use `rebuttal`. Apply the installed `humanizer` skill when revising prose for delivery, preserving facts, technical terms, source attribution, and the project's record structure.

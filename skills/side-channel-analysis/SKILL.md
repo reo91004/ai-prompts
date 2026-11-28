@@ -5,7 +5,7 @@ description: Use for side-channel research, leakage detection, power/EM traces, 
 
 # Side-Channel Analysis
 
-Apply research checks to the actual target, operating conditions, and claim. For meaningful design or interpretation, use the applicable [research principles](../research-domain-router/references/research_principles.md) and only the domain gates the claim needs (for example, hardware, software, AI/ML, or statistics). Side-channel research does not require an LLM or LLM integration.
+Apply research checks to the actual target, operating conditions, and claim. For meaningful design or interpretation, use the applicable [research principles](../research-repo-protocol/references/research_principles.md) and only the domain gates the claim needs (for example, hardware, software, AI/ML, or statistics). Side-channel research does not require an LLM or LLM integration.
 
 Record project-specific datasets, target firmware, budgets, and venue constraints in project records, not this skill. This skill guides analysis and evidence; it does not authorize acquisition, hardware operation, exploitation, or key-recovery implementation.
 

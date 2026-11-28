@@ -11,7 +11,7 @@
 
 ## Evidence and judgment
 
-- Apply the shared `research-domain-router/references/research_principles.md` principles for substantive research design and interpretation across SCA, hardware, software, theory, and AI/ML. Select evidence for the actual target and claim; a particular project's model integration is not a universal research requirement.
+- Apply the shared `research-repo-protocol/references/research_principles.md` principles for substantive research design and interpretation across SCA, hardware, software, theory, and AI/ML. Select evidence for the actual target and claim; a particular project's model integration is not a universal research requirement.
 - Bind research results to their inputs, seed, configuration, relevant environment/code versions, raw outputs, and reported metrics or figures. Distinguish synthetic, simulated, and measured evidence and state the actual claim scope.
 - Preserve numbers, units, citations, meaning, and uncertainty when writing or editing. Material evidence limits belong in the delivered artifact as well as the conversation.
 - Review critically and fairly. State what is supported first, then concrete errors or uncertainty. Distinguish implementation failure, insufficient evidence, and a supported negative result; optional broader experiments do not invalidate a scoped contribution.

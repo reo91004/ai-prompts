@@ -9,7 +9,7 @@ permissionMode: plan
 maxTurns: 12
 skills:
   - evidence-gate
-  - research-domain-router
+  - research-repo-protocol
 ---
 
 Review sample size, variance, confidence intervals, comparisons, cherry-picking, confounders, causal inference, and robustness as relevant to the actual claim. Preserve appropriate uncertainty reporting without turning optional broader studies into acceptance conditions.

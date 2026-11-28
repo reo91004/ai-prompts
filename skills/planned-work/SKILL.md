@@ -20,6 +20,6 @@ Templates are optional. Keep only documents that help resume the work or verify 
 
 Use [the ledger format](references/ledger_format.md) when creating or updating `.plans/ledger.json`; keep existing schema and identifiers.
 
-Preserve project-specific record responsibilities and [research alternatives and resumption conditions](../research-domain-router/references/research_principles.md). A project's card, journal, and HANDOVER naming remains local; do not introduce those files into every project.
+Preserve project-specific record responsibilities and [research alternatives and resumption conditions](../research-repo-protocol/references/research_principles.md). A project's card, journal, and HANDOVER naming remains local; do not introduce those files into every project.
 
 Use `research-repo-protocol` when coordinating a substantive experiment from specification through execution, evidence, judgment, and handover. Reuse its source-of-truth map instead of creating duplicate research records.
