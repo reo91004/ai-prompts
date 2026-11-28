@@ -196,7 +196,7 @@ UNIVERSAL_RESEARCH_AGENT_KIT_SKIP_TOOLING=1 sh install.sh
 
 `sh install.sh`는 세 CLI, Headroom, 키트 관리 로컬 MCP·통합 도구를 최신 배포판으로 갱신하고 정확 버전·revision을 기록합니다. OpenCode는 V2 공식 채널을 사용합니다. 전역 사용자 스킬은 기존 추가 스킬까지 탐색 경로 밖에 백업한 뒤 새 정본으로 교체합니다. CLI 내장·플러그인 스킬은 해당 관리자로 갱신하고 프로젝트 로컬 스킬·실험 자료·인증·BTW 이력은 정리에 포함하지 않습니다.
 
-[research-repo-protocol](skills/research-repo-protocol/SKILL.md)은 질문·사양·실행·근거·판정·인계를 연결하며 기존 설계 스킬도 통합했습니다. [계층 구조](skills/research-repo-protocol/references/directory-roles.md)와 [공통 연구 원칙](skills/research-domain-router/references/research_principles.md)을 작업에 맞게 참조합니다. [paper-writing](skills/paper-writing/SKILL.md)은 논문 집필을 맡고, 기본 설치·갱신하는 [Humanizer](https://github.com/blader/humanizer)를 문체 편집에 사용합니다. 수치·수식·인용·전문용어·주장 강도는 보존합니다.
+[research-repo-protocol](skills/research-repo-protocol/SKILL.md)은 질문·사양·실행·근거·판정·인계를 연결하며 기존 설계 스킬도 통합했습니다. [계층 구조](skills/research-repo-protocol/references/directory-roles.md)와 [공통 연구 원칙](skills/research-domain-router/references/research_principles.md)을 작업에 맞게 참조합니다. [paper-writing](skills/paper-writing/SKILL.md)은 논문 집필을, [rebuttal](skills/rebuttal/SKILL.md)은 리뷰 페이지 저장부터 교수님 피드백과 게시까지의 리뷰 답변을 맡고, 기본 설치·갱신하는 [Humanizer](https://github.com/blader/humanizer)를 문체 편집에 사용합니다. 수치·수식·인용·전문용어·주장 강도는 보존합니다.
 
 이상치는 새 연구의 단서로 다룹니다. 돌파구가 필요하면 프로젝트의 `records/rounds/<date>-<id>-<topic>/`에 md로 [토론 라운드](skills/research-repo-protocol/SKILL.md#discussion-rounds)를 남깁니다. 오케스트레이터가 `question.md`에 자기 예측을 먼저 쓰고, Codex `breakthrough_analyst`(Ultra)와 Claude `breakthrough-analyst`(Max)의 독립 답변을 `codex.md`·`claude.md`로, 채택 이유와 다음 실험을 `decision.md`로 남깁니다. 실패한 실험은 원인을 찾아 고친 뒤 계속하며, 시도마다 md/json으로 결과만 짧게 기록하고 실패 시도의 대용량 산출물은 지웁니다. 실험 파일에 SHA-256 같은 해시를 고정하거나 재검증하지 않습니다.
 
@@ -256,6 +256,7 @@ Codex agent 17개와 Claude agent 16개는 **플랫폼별 정의를 유지**합�
 | `resource-aware-orchestration` | 하위 agent 위임, 로컬 동시 연산, 실험 실행을 조정할 때 |
 | `sequential-thinking-mcp` | 어려운 계획·불명확한 디버깅·비싼 실험 설계·복잡한 결론 판단 |
 | `report-writer` | 근거를 바탕으로 한국어 연구 보고서나 인계 문서를 작성할 때 |
+| `rebuttal` | 리뷰 페이지 저장부터 교수님 피드백, 게시까지 리뷰 답변을 진행할 때 |
 
 스킬과 참고 문서는 내용의 정확성을 위한 지침입니다. 모든 스킬을 읽는 고정 순서나 빈 템플릿 작성 의무는 없습니다. 문서의 수치·인용·확실성·근거 한계를 문체 때문에 바꾸지 않습니다.
 

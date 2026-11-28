@@ -1,0 +1,3 @@
+interface:
+  display_name: "Rebuttal"
+  short_description: "Review responses from the saved review page to the posted text"

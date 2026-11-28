@@ -29,7 +29,7 @@
 ## Scope and completion
 
 - Use `research-repo-protocol` for experiment specifications, the research repository layout, execution, judgment, discussion rounds, and handover. Follow its layout exactly and keep records in its paths; small edits need no new experiment card.
-- Use `paper-writing` for manuscripts, `docs/paper/` (Overleaf) and `docs/venues/` work, and rebuttals, and the installed `humanizer` for prose editing. Preserve facts, equations, citations, technical terms, and author-owned final-edit regions.
+- Use `paper-writing` for manuscripts and `docs/paper/` (Overleaf) and `docs/venues/` work, `rebuttal` for review responses, and the installed `humanizer` for prose editing. Preserve facts, equations, citations, technical terms, and author-owned final-edit regions.
 - Follow the current user request and platform instructions; reply in Korean unless requested otherwise. Project instructions define local commands, equipment settings, and experiment limits. Load only the skills and references needed for the current task.
 - Read enough relevant evidence to understand the change. A small edit does not require a repository map, a plan, or a review chain. Existing useful graphs can help navigation; creating one requires a graph-building task.
 - Complete the authorized work through implementation, applicable execution, inspection, and correction of failures caused by the change. Respect read-only requests and genuine approval boundaries; do not ask again for routine steps already authorized.

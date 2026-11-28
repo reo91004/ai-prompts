@@ -1,6 +1,6 @@
 # Manuscript Workspace
 
-Use this procedure for any work that creates, versions, renders, submits, or uploads a manuscript, or that handles a venue's reviews. The research-repo-protocol [directory roles](../../research-repo-protocol/references/directory-roles.md) define where each file lives; this document says what to do at each event. The project AGENTS.md manuscript section holds project values: the current series, manuscripts that need XeLaTeX, page limits, the render command, and the frozen list.
+Use this procedure for any work that creates, versions, renders, submits, or uploads a manuscript. The research-repo-protocol [directory roles](../../research-repo-protocol/references/directory-roles.md) define where each file lives; this document says what to do at each event. The project AGENTS.md manuscript section holds project values: the current series, manuscripts that need XeLaTeX, page limits, the render command, and the frozen list.
 
 ## Invariants
 
@@ -17,7 +17,7 @@ Use this procedure for any work that creates, versions, renders, submits, or upl
 - **Submission:** copy the submitted version with its bib, styles, and the figures it reads into `submissions/<venue>/` at the same relative paths so the folder builds alone, and freeze it. Name its main file so no other main document shares the name, for example `<venue>.tex`. Keep the root version byte-identical in content while its series is current. Store the PDF actually sent in `docs/venues/<venue>/record/`.
 - **Paper with its own template:** write it in `submissions/<venue>/` from the start.
 - **New series:** when the supervisor starts `main<K+1>`, move `main<K>_v*.tex` with its bib and styles into `main<K>/`, and copy the figures they read, including `figures/v<N>/`, to `main<K>/figures/` at the same relative paths. No TeX edits are needed.
-- **Reviews:** save them verbatim in `docs/venues/<venue>/rebuttal/reviews/` and freeze them. Write analyses as numbered documents (`01-<topic>.md`) and reply drafts in `rebuttal/drafts/`, keeping the supervisor's text verbatim. Rebuttal experiments are ordinary experiment cards linked from these documents. A revised manuscript is the next version at the root.
+- **Reviews:** the `rebuttal` skill handles reviews and responses in `docs/venues/<venue>/rebuttal/`. A revised manuscript is the next version at the root.
 - **Evidence record:** `docs/venues/<venue>/record/README.md` is the single current record of version changes, responses to criticism, and evidence links. Update it in the same task as the manuscript or evidence change instead of writing dated summaries.
 - **Venue closes:** leave `docs/venues/<venue>/` and `docs/paper/submissions/<venue>/` in place and add both to the project's frozen list. A new cycle opens a new venue folder linked by one carry-over document in its `planning/`.
 
